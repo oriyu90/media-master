@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0f1b1a"/>
+      <stop offset="1" stop-color="#16302c"/>
+    </linearGradient>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3fd8c3"/>
+      <stop offset="1" stop-color="#1f8f7d"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <g transform="translate(90,90)">
+    <rect width="150" height="150" rx="38" fill="#0f2320"/>
+    <path d="M37 58c0-6.6 5.4-12 12-12h32l13 14.4h91c6.6 0 12 5.4 12 12v61.6c0 6.6-5.4 12-12 12H49c-6.6 0-12-5.4-12-12V58z" fill="#34c9b5"/>
+    <path d="M78 70v41l35-20.5L78 70z" fill="#0f2320"/>
+  </g>
+
+  <text x="90" y="330" font-family="-apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif" font-size="72" font-weight="800" fill="#f5fbfa">Media Master</text>
+  <text x="90" y="392" font-family="-apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif" font-size="34" fill="#bfe6df">写真・音楽・書類・ストレージを、ひとつのアプリで。</text>
+
+  <g transform="translate(90,440)" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="26" fill="#7fd6c6">
+    <rect width="150" height="46" rx="23" fill="none" stroke="#2f5a54"/>
+    <text x="30" y="30">v0.1.0</text>
+    <rect x="170" width="230" height="46" rx="23" fill="none" stroke="#2f5a54"/>
+    <text x="200" y="30">Android · Open Source</text>
+  </g>
+
+  <text x="90" y="580" font-family="-apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif" font-size="26" fill="#6fa89e">github.com/oriyu90/media-master</text>
+  <rect x="1010" y="80" width="110" height="110" rx="26" fill="url(#tile)" opacity="0.9"/>
+</svg>

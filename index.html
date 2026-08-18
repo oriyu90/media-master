@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Media Master — 写真・音楽・書類・ストレージをひとつにまとめるAndroidアプリ</title>
+<meta name="description" content="Media Master(メディアマスター)は、写真・動画・音楽・書類・ストレージ・アプリ管理を1つにまとめたAndroid向けオープンソースアプリです。DeX/デスクトップモードにも対応。開発者は折田悠希(おりたゆうき / Yuki_Orita)。無料・オープンソース、GitHubで公開中。">
+<meta name="keywords" content="Media Master, メディアマスター, 折田悠希, おりたゆうき, Yuki_Orita, github, Android, ファイルマネージャー, メディア管理, ファイル管理アプリ, DeX, デスクトップモード, オープンソース, Jetpack Compose">
+<meta name="author" content="折田悠希 (Yuki_Orita)">
+<meta name="theme-color" content="#0f1b1a">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://media-master.pages.dev/">
+<link rel="alternate" hreflang="ja" href="https://media-master.pages.dev/">
+<link rel="sitemap" type="application/xml" href="/sitemap.xml">
+<link rel="stylesheet" href="assets/site.css">
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%230f2320'/%3E%3Cpath d='M8 12.5c0-.83.67-1.5 1.5-1.5h4l1.6 1.8H23c.83 0 1.5.67 1.5 1.5v7.7c0 .83-.67 1.5-1.5 1.5H9.5C8.67 23.5 8 22.83 8 22v-9.5z' fill='%2334c9b5'/%3E%3Cpath d='M14.5 15.2v5.2l4.4-2.6-4.4-2.6z' fill='%230f2320'/%3E%3C/svg%3E">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Media Master">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:title" content="Media Master — 写真・音楽・書類・ストレージをひとつにまとめるAndroidアプリ">
+<meta property="og:description" content="写真・動画・音楽・書類・ストレージ・アプリを1つのアプリで管理。DeX/デスクトップモード対応、5言語対応のオープンソースAndroidアプリです。">
+<meta property="og:url" content="https://media-master.pages.dev/">
+<meta property="og:image" content="https://media-master.pages.dev/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Media Masterのロゴと、写真・音楽・書類・ストレージを表すアイコン">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@InovateofRIZI">
+<meta name="twitter:creator" content="@InovateofRIZI">
+<meta name="twitter:title" content="Media Master — Android向けメディア・ファイル管理アプリ">
+<meta name="twitter:description" content="写真・動画・音楽・書類・ストレージ・アプリを1つのアプリで管理する、オープンソースのAndroidアプリです。">
+<meta name="twitter:image" content="https://media-master.pages.dev/assets/og.png">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "Media Master",
+      "alternateName": ["メディアマスター"],
+      "applicationCategory": "UtilitiesApplication",
+      "operatingSystem": "Android 7.0 (API 24) or later",
+      "softwareVersion": "0.1.0",
+      "description": "写真・動画・音楽・書類・ストレージ・アプリ管理を1つにまとめたAndroid向けオープンソースのメディア・ファイル管理アプリ。",
+      "url": "https://media-master.pages.dev/",
+      "downloadUrl": "https://github.com/oriyu90/media-master",
+      "codeRepository": "https://github.com/oriyu90/media-master",
+      "license": "https://opensource.org/licenses/MIT",
+      "author": { "@id": "https://oriyu90.github.io/official/#person" },
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" }
+    },
+    {
+      "@type": "Person",
+      "@id": "https://oriyu90.github.io/official/#person",
+      "name": "Yuki_Orita",
+      "alternateName": ["折田悠希", "おりたゆうき"],
+      "url": "https://oriyu90.github.io/official/",
+      "sameAs": [
+        "https://x.com/InovateofRIZI",
+        "https://github.com/oriyu90"
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+  <a class="skip-link" href="#main">本文へ移動</a>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="#top" aria-label="Media Master トップへ">
+        <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true">
+          <rect width="32" height="32" rx="9" fill="var(--color-ink)"></rect>
+          <path d="M8 12.5c0-.83.67-1.5 1.5-1.5h4l1.6 1.8H23c.83 0 1.5.67 1.5 1.5v7.7c0 .83-.67 1.5-1.5 1.5H9.5C8.67 23.5 8 22.83 8 22v-9.5z" fill="var(--color-accent)"></path>
+          <path d="M14.5 15.2v5.2l4.4-2.6-4.4-2.6z" fill="var(--color-ink)"></path>
+        </svg>
+        <span>Media Master</span>
+      </a>
+      <nav class="main-nav" aria-label="メインナビゲーション">
+        <a href="#features">できること</a>
+        <a href="#desktop">DeX/デスクトップ</a>
+        <a href="#languages">対応言語</a>
+        <a class="nav-download" href="#get-started">入手する</a>
+      </nav>
+      <span class="header-release">v0.1.0</span>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top" aria-labelledby="hero-title">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <div>
+            <p class="release-line">Android · Kotlin / Jetpack Compose · Open source</p>
+            <h1 id="hero-title">写真も、音楽も、書類も、<br>ここひとつで片づく。</h1>
+            <p class="hero-lead">Media Masterは、写真・動画・音楽・書類・ストレージ・アプリを1つのアプリでまとめて管理できる、Android向けのオープンソースなメディア・ファイルマネージャーです。登録もアカウントも不要で、すぐに使い始められます。</p>
+          </div>
+          <div class="hero-actions" role="group" aria-label="入手方法">
+            <a class="button" href="https://github.com/oriyu90/media-master">GitHubでソースを見る</a>
+            <a class="button button-secondary" href="#get-started">ビルド方法を見る</a>
+          </div>
+        </div>
+        <aside class="hero-aside" aria-label="Media Master v0.1.0">
+          <div class="hero-icon" aria-hidden="true">
+            <svg viewBox="0 0 108 108" width="152" height="152">
+              <rect width="108" height="108" rx="26" fill="var(--color-ink)"></rect>
+              <path d="M27 41c0-2.76 2.24-5 5-5h13l5.4 6h30.1c2.76 0 5 2.24 5 5v25.6c0 2.76-2.24 5-5 5H32c-2.76 0-5-2.24-5-5V41z" fill="var(--color-accent)"></path>
+              <path d="M46 49v18l15-9-15-9z" fill="var(--color-ink)"></path>
+            </svg>
+          </div>
+          <p class="aside-note">写真・動画・音楽・書類・ストレージ・アプリ管理を1アプリに集約。DeXや大画面ではFinder風のデスクトップUIに切り替わります。</p>
+          <ul class="aside-facts" aria-label="概要">
+            <li><span>対応OS</span>Android 7.0 以降</li>
+            <li><span>対応言語</span>5言語</li>
+            <li><span>ライセンス</span>MIT / 無料</li>
+          </ul>
+        </aside>
+      </div>
+    </section>
+
+    <nav class="page-index" aria-label="ページ内目次">
+      <div class="page-width page-index-inner">
+        <span class="page-index-label">このページの案内</span>
+        <ol>
+          <li><a href="#features">できること</a></li>
+          <li><a href="#desktop">DeX/デスクトップ</a></li>
+          <li><a href="#languages">対応言語</a></li>
+          <li><a href="#get-started">入手する</a></li>
+          <li><a href="#community">問い合わせ</a></li>
+        </ol>
+      </div>
+    </nav>
+
+    <section class="section" id="features" aria-labelledby="features-title">
+      <div class="page-width">
+        <div class="section-heading">
+          <h2 id="features-title">端末の中身を、迷わず片づける。</h2>
+          <p>写真や動画の閲覧から、音楽の再生、書類のスキャン、ストレージの整理、アプリ管理まで。必要な機能をひとつのアプリの中で行き来できます。</p>
+        </div>
+        <dl class="feature-ledger">
+          <div class="feature-row">
+            <span class="feature-number">LIBRARY</span>
+            <dt>写真・動画をアルバムで</dt>
+            <dd>端末内の全画像・動画をグリッド表示。保存先フォルダごとのアルバムビューにも対応し、タップでフルスクリーン再生・閲覧に進めます。</dd>
+          </div>
+          <div class="feature-row">
+            <span class="feature-number">AUDIO</span>
+            <dt>音楽をトラック・プレイリストで</dt>
+            <dd>Media3(ExoPlayer)によるバックグラウンド再生。フォルダ単位のプレイリストビューで、シャッフルやスキップも扱えます。</dd>
+          </div>
+          <div class="feature-row">
+            <span class="feature-number">SCAN &amp; DOCS</span>
+            <dt>書類をスキャンしてPDFに</dt>
+            <dd>GMS Document Scannerと連携し、紙の書類をその場でPDFやJPEGへデジタル化できます。</dd>
+          </div>
+          <div class="feature-row">
+            <span class="feature-number">MANAGE</span>
+            <dt>ストレージとアプリを整理</dt>
+            <dd>内部/外部ストレージを直接ブラウジングし、カテゴリ別フィルタ、重複ファイルのハッシュ検出、インストール済みアプリ・APKの管理をまとめて行えます。</dd>
+          </div>
+          <div class="feature-row">
+            <span class="feature-number">EDIT</span>
+            <dt>簡易編集も手元で</dt>
+            <dd>画像のクロップ・回転、動画のトリムとミュートに対応(順次拡張中)。共有アクションもワンタップで呼び出せます。</dd>
+          </div>
+          <div class="feature-row">
+            <span class="feature-number">BACKUP</span>
+            <dt>スケジュールバックアップ</dt>
+            <dd>WorkManagerベースのバックアップエンジン。充電中やWi-Fi接続時のみなど条件を指定して、対象フォルダをZIPへ自動アーカイブします。</dd>
+          </div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="section section-dark" id="desktop" aria-labelledby="desktop-title">
+      <div class="page-width mode-spread">
+        <div class="mode-copy">
+          <h2 id="desktop-title">大画面では、Finder風のデスクトップUIに。</h2>
+          <p>Android が DeX / デスクトップモードを返した場合、または表示幅が840dp以上の場合に自動で切り替わります。左サイドバーからホーム・ライブラリ・オーディオ・ドキュメント・管理・アプリ・設定へ移動でき、フォルダはドラッグ&ドロップでサイドバーへピン留めできます。</p>
+          <ul class="desktop-points">
+            <li>内部ストレージ・外部ストレージ・ネットワークストレージの端末欄</li>
+            <li>Pictures / Download / apk を標準ピン留め</li>
+            <li>長押しまたは右クリックで「新しいタブで開く」「ピン留め」「ピン解除」</li>
+          </ul>
+        </div>
+        <div class="desktop-mock" role="group" aria-label="デスクトップUIのイメージ">
+          <div class="desktop-mock-sidebar">
+            <span class="desktop-mock-item is-active">ホーム</span>
+            <span class="desktop-mock-item">ライブラリ</span>
+            <span class="desktop-mock-item">オーディオ</span>
+            <span class="desktop-mock-item">ドキュメント</span>
+            <span class="desktop-mock-item">管理</span>
+            <span class="desktop-mock-divider"></span>
+            <span class="desktop-mock-pin">📌 Pictures</span>
+            <span class="desktop-mock-pin">📌 Download</span>
+            <span class="desktop-mock-pin">📌 apk</span>
+          </div>
+          <div class="desktop-mock-grid" aria-hidden="true">
+            <span></span><span></span><span></span><span></span><span></span><span></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="languages" aria-labelledby="languages-title">
+      <div class="page-width">
+        <div class="section-heading">
+          <h2 id="languages-title">5言語、175文字列すべて対応。</h2>
+          <p>英語・日本語・簡体字中国語・アラビア語(RTL)・オランダ語の全言語で同数の文字列キーを揃えています。アプリ内設定に加え、Android 13以降のシステム言語設定からも切り替えられます。</p>
+        </div>
+        <ul class="lang-chips" aria-label="対応言語一覧">
+          <li>English</li>
+          <li>日本語</li>
+          <li>简体中文</li>
+          <li dir="rtl">العربية</li>
+          <li>Nederlands</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section section-dark install-section" id="get-started" aria-labelledby="get-started-title">
+      <div class="page-width">
+        <div class="section-heading">
+          <h2 id="get-started-title">今はソースからビルドして試せます。</h2>
+          <p>Media Masterは開発初期(v0.1.0)のオープンソースアプリです。署名済みAPKの配布はまだ行っておらず、現時点はAndroid Studioでのソースビルドが入手方法になります。</p>
+        </div>
+        <article class="install-platform">
+          <h3>ビルド手順</h3>
+          <ol class="step-list">
+            <li><span class="step-number">1</span><span><a href="https://github.com/oriyu90/media-master">GitHubリポジトリ</a>をクローンし、Android Studioで開きます。</span></li>
+            <li><span class="step-number">2</span><span>Android SDK 36 と JDK 21(ソース互換性はJava 11)を用意します。</span></li>
+            <li><span class="step-number">3</span><span>ターミナルで <code>./gradlew :app:assembleDebug</code> を実行するか、Android Studioから実行します。</span></li>
+            <li><span class="step-number">4</span><span>生成されたdebug APKは <code>app/build/outputs/apk/debug/</code> に出力されます。</span></li>
+          </ol>
+          <p class="install-reference"><a href="https://github.com/oriyu90/media-master#readme">READMEでビルド・署名の詳細を見る</a></p>
+        </article>
+        <p class="release-warning">対応OSはAndroid 7.0(API 24)以降です。メディアへのアクセスにはAndroid標準のMediaStore / Storage Access Frameworkを使用します。</p>
+      </div>
+    </section>
+
+    <section class="section" id="community" aria-labelledby="community-title">
+      <div class="page-width project-note">
+        <div>
+          <h2 id="community-title">つくった人と、つながる場所。</h2>
+          <p>開発者は折田悠希(Yuki_Orita)。バグ報告や更新のお知らせはDiscordへ。開発の記録やほかの制作物はXと公式サイトで案内しています。</p>
+        </div>
+        <nav class="link-columns" aria-label="開発者とコミュニティ">
+          <a href="https://discord.gg/x7KXhNTD8M" target="_blank" rel="noopener noreferrer">Discord</a>
+          <a href="https://x.com/InovateofRIZI" target="_blank" rel="noopener noreferrer">X</a>
+          <a href="https://oriyu90.github.io/official/" target="_blank" rel="noopener noreferrer">公式サイト</a>
+          <a href="https://github.com/oriyu90/media-master" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </nav>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="page-width footer-inner">
+      <p>© 2026 Yuki Orita · MIT License</p>
+      <a href="https://github.com/oriyu90/media-master/blob/main/LICENSE">ライセンスを見る</a>
+    </div>
+  </footer>
+</body>
+</html>

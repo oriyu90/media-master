@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://media-master.pages.dev/sitemap.xml
+Sitemap: https://media-master-9o5.pages.dev/sitemap.xml

@@ -39,3 +39,5 @@ patch_strings.py
 schedule_backup.py
 metadata.json
 app/applet/
+.claude/settings.local.json
+.wrangler/

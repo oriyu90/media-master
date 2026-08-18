@@ -67,7 +67,7 @@ release APK は RSA 4096 ビット鍵で APK Signature Scheme v2 署名する想
 | `app/build.gradle.kts` | アプリID、v0.1.0、署名設定、依存関係 |
 | `README.md` | 利用・ビルド・公開の概要 |
 | `LICENSE` | MITライセンス |
-| `index.html` / `tokens.css` / `assets/site.css` | 紹介サイト(未デプロイ、Cloudflare Pages公開予定) |
+| `index.html` / `tokens.css` / `assets/site.css` | 紹介サイト。Cloudflare Pages([https://media-master-9o5.pages.dev/](https://media-master-9o5.pages.dev/))へデプロイ済み |
 | `robots.txt` / `sitemap.xml` | 紹介サイトのSEO設定 |
 
 ## 開発・検証

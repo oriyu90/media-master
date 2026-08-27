@@ -1,7 +1,7 @@
 # 設計書兼仕様書 (Media Master)
 
 ## バージョン情報
-- **Version:** 0.1.0
+- **Version:** 0.2.0
 
 ## 概要
 本アプリケーションは、Android デバイス内のメディアファイル（写真、動画、音声ファイルなど）やストレージを効率よく管理・閲覧できるメディア管理・ファイルマネージャーアプリです。Google Photo や Files by Google のような操作感を意識し、より直感的に操作できるワークフローと、Material Design 3 に準拠した最新の UI を提供します。
@@ -27,6 +27,7 @@
 ### 4. ストレージ管理機能 (Manage Dashboard)
 - **Categories:** Downloads, Images, Videos, Audio, Documents, Apps といったカテゴリ別にファイルを自動フィルタリング。タップで該当するファイル一覧 (`CategoryScreen`) を表示。
 - **Internal Storage:** 内部ストレージをフォルダ階層に従って直接ブラウジング (`FilesScreen`)。
+- **Document Discovery:** 全ファイルアクセス時は実ファイルシステムとMediaStoreを併用し、PDF・Office・OpenDocumentなどのローカル文書を検出。
 - **Clean Duplicates:** 同一ファイル（ハッシュや名前、サイズが一致するもの）をスキャンして重複ファイルを検出し、不要なファイルを削除できるクリーンアップ機能 (`CleanScreen`)。
 
 ### 5. メディアビューアー (Viewer)
@@ -55,6 +56,7 @@
 - **メディア再生:** AndroidX Media3 (ExoPlayer)
 - **画像読み込み:** Coil (非同期ロードとキャッシュ処理)
 - **ドキュメント表示:** AndroidView を介した PDF レンダリング（必要に応じて拡張）
+- **デスクトップUI:** `Configuration.UI_MODE_TYPE_DESK` のみでDeX/Finder風UIを有効化。画面幅では判定しない。
 
 ## ディレクトリ構造・設計方針
 

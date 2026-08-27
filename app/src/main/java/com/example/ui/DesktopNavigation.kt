@@ -42,12 +42,12 @@ import com.example.R
 import com.example.SettingsViewModel
 import java.io.File
 
-/** Android desk mode is authoritative; the width fallback also covers desktop windowing. */
+/** A large tablet or foldable is not DeX: use Android's desk-mode signal only. */
 @Composable
-fun isDesktopLayout(availableWidth: androidx.compose.ui.unit.Dp): Boolean {
+fun isDesktopLayout(): Boolean {
     val configuration = LocalConfiguration.current
     val uiType = configuration.uiMode and Configuration.UI_MODE_TYPE_MASK
-    return uiType == Configuration.UI_MODE_TYPE_DESK || availableWidth >= 840.dp
+    return uiType == Configuration.UI_MODE_TYPE_DESK
 }
 
 private data class DesktopTab(val id: Long, val title: String, val route: String)

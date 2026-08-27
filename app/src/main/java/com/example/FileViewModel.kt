@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.os.Environment
 import android.provider.MediaStore
+import android.webkit.MimeTypeMap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
@@ -45,6 +46,9 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _mediaState = MutableStateFlow<ViewState>(ViewState.Loading)
     val mediaState: StateFlow<ViewState> = _mediaState.asStateFlow()
+
+    private val _documentsState = MutableStateFlow<ViewState>(ViewState.Loading)
+    val documentsState: StateFlow<ViewState> = _documentsState.asStateFlow()
 
     private val _duplicateFiles = MutableStateFlow<List<List<MediaFile>>>(emptyList())
     val duplicateFiles: StateFlow<List<List<MediaFile>>> = _duplicateFiles.asStateFlow()
@@ -124,6 +128,7 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
 
     fun reload() {
         loadAllMedia()
+        loadDocuments()
         loadFiles(currentPath)
     }
 
@@ -133,40 +138,38 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
             _fileTreeState.value = ViewState.Loading
             try {
                 val files = withContext(Dispatchers.IO) {
-                    val allMedia = sortFiles(getAllMediaFiles())
                     val result = mutableListOf<MediaFile>()
-                    
-                    val targetDir = if (path.endsWith("/")) path else "$path/"
-                    val itemsInDir = allMedia.filter { it.path.startsWith(targetDir) }
-                    
-                    val subfolders = mutableSetOf<String>()
-                    val directFiles = mutableListOf<MediaFile>()
-                    
-                    for (item in itemsInDir) {
-                        val remainder = item.path.substring(targetDir.length)
-                        if (remainder.contains("/")) {
-                            val subfolder = remainder.substringBefore("/")
-                            subfolders.add(targetDir + subfolder)
-                        } else {
-                            directFiles.add(item)
+                    val directory = File(path)
+                    val indexedFiles = getAllMediaFiles().associateBy { it.path }
+                    // File.listFiles() is deliberately the primary source here.  MediaStore only
+                    // indexes selected file types, which made folders and ordinary documents
+                    // disappear compared with Files by Google.
+                    val visibleItems = directory.listFiles()
+                        ?.map { file ->
+                            if (file.isDirectory) {
+                                MediaFile(-1, file.name, file.absolutePath, 0, "folder", file.lastModified(), true)
+                            } else {
+                                indexedFiles[file.absolutePath] ?: file.toMediaFile()
+                            }
                         }
+                        ?.toMutableList()
+                        ?: mutableListOf()
+
+                    // On devices where a provider exposes an item before the filesystem does,
+                    // retain direct MediaStore children as a fallback.
+                    val targetDir = if (path.endsWith("/")) path else "$path/"
+                    indexedFiles.values.filter { item ->
+                        item.path.startsWith(targetDir) && !item.path.removePrefix(targetDir).contains("/")
+                    }.forEach { item ->
+                        if (visibleItems.none { it.path == item.path }) visibleItems.add(item)
                     }
-                    
-                    if (path != rootPath) {
+
+                    if (path !in storageRoots()) {
                         val parent = File(path).parent ?: rootPath
                         result.add(MediaFile(-1, "..", parent, 0, "folder", 0, true))
                     }
-                    
-                    subfolders.forEach { folderPath ->
-                        result.add(MediaFile(-1, File(folderPath).name, folderPath, 0, "folder", 0, true))
-                    }
-                    result.addAll(directFiles)
-                    
-                    result.sortedWith(compareBy { !it.isDirectory }).let { dirsAndFiles ->
-                    val dirs = dirsAndFiles.filter { it.isDirectory }
-                    val files = sortFiles(dirsAndFiles.filter { !it.isDirectory })
-                    dirs + files
-                }
+                    val dirs = visibleItems.filter { it.isDirectory }.sortedBy { it.name.lowercase() }
+                    result + dirs + sortFiles(visibleItems.filter { !it.isDirectory })
                 }
                 _fileTreeState.value = ViewState.Success(files, path)
             } catch (e: Exception) {
@@ -177,7 +180,7 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
 
     fun navigateUp() {
         val currentFile = File(currentPath)
-        if (currentFile.absolutePath != rootPath) {
+        if (currentFile.absolutePath !in storageRoots()) {
             currentFile.parent?.let { loadFiles(it) }
         }
     }
@@ -187,8 +190,35 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
             "jpg", "jpeg", "png", "gif", "webp" -> "image/*"
             "mp4", "mkv", "avi" -> "video/*"
             "mp3", "wav", "ogg", "flac" -> "audio/*"
+            "pdf" -> "application/pdf"
+            "doc" -> "application/msword"
+            "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            "odt" -> "application/vnd.oasis.opendocument.text"
+            "rtf" -> "application/rtf"
+            "txt" -> "text/plain"
+            "xls", "xlsx", "ods", "ppt", "pptx", "odp" -> "application/octet-stream"
             else -> "application/octet-stream"
         }
+    }
+
+    private fun File.toMediaFile(): MediaFile = MediaFile(
+        id = -1,
+        name = name,
+        path = absolutePath,
+        size = length(),
+        mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension.lowercase()) ?: getMimeType(extension),
+        dateModified = lastModified(),
+        contentUri = null
+    )
+
+    private fun storageRoots(): List<String> {
+        val context = getApplication<Application>()
+        return buildList {
+            add(rootPath)
+            context.getExternalFilesDirs(null).mapNotNull { it?.absolutePath?.substringBefore("/Android/data/") }
+                .filter { it.isNotBlank() }
+                .forEach(::add)
+        }.distinct().filter { File(it).exists() }
     }
 
     fun findDuplicates() {
@@ -236,6 +266,19 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
                 _mediaState.value = ViewState.Success(files, "All Media")
             } catch (e: Exception) {
                 _mediaState.value = ViewState.Error(e.message ?: "Unknown error")
+            }
+        }
+    }
+
+    /** Lists local PDF and office documents, including app-created scans and non-media files. */
+    fun loadDocuments() {
+        viewModelScope.launch {
+            _documentsState.value = ViewState.Loading
+            try {
+                val files = withContext(Dispatchers.IO) { sortFiles(getAllDocumentFiles()) }
+                _documentsState.value = ViewState.Success(files, "Documents")
+            } catch (e: Exception) {
+                _documentsState.value = ViewState.Error(e.message ?: "Unknown error")
             }
         }
     }
@@ -310,8 +353,7 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun getAllMediaFiles(): List<MediaFile> {
-        val mediaList = mutableListOf<MediaFile>()
-        
+        val mediaList = linkedMapOf<String, MediaFile>()
         val useRelativePath = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q
         val projection = if (useRelativePath) {
             arrayOf(
@@ -334,15 +376,13 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         val context: Context = getApplication()
-        val cursor = context.contentResolver.query(
-            MediaStore.Files.getContentUri("external"),
-            projection,
-            null,
-            null,
-            null
-        )
+        val volumes = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            MediaStore.getExternalVolumeNames(context)
+        } else setOf("external")
+        val roots = storageRoots()
 
-        cursor?.use {
+        volumes.forEach { volume ->
+            context.contentResolver.query(MediaStore.Files.getContentUri(volume), projection, null, null, null)?.use {
             val idCol = it.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID)
             val nameCol = it.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DISPLAY_NAME)
             val sizeCol = it.getColumnIndexOrThrow(MediaStore.Files.FileColumns.SIZE)
@@ -361,7 +401,9 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
                 
                 val path = if (useRelativePath) {
                     val relPath = it.getString(pathCol) ?: ""
-                    val root = Environment.getExternalStorageDirectory().absolutePath
+                    val root = roots.firstOrNull { candidate ->
+                        candidate.substringAfterLast('/').equals(volume, ignoreCase = true)
+                    } ?: rootPath
                     val fullPath = if (relPath.isNotEmpty()) "$root/$relPath$displayName" else "$root/$displayName"
                     fullPath.replace("//", "/")
                 } else {
@@ -373,8 +415,8 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
                 // We only care about media/documents, ignoring random binary/system files if possible
                 if (mimeType.isNotBlank() || displayName.endsWith(".apk", ignoreCase = true)) {
                     val finalMimeType = if (mimeType.isNotBlank()) mimeType else if (displayName.endsWith(".apk", true)) "application/vnd.android.package-archive" else ""
-                    val contentUri = ContentUris.withAppendedId(MediaStore.Files.getContentUri("external"), id)
-                    mediaList.add(
+                    val contentUri = ContentUris.withAppendedId(MediaStore.Files.getContentUri(volume), id)
+                    mediaList[path] =
                         MediaFile(
                             id = id,
                             name = displayName,
@@ -385,12 +427,47 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
                             isDirectory = false,
                             contentUri = contentUri
                         )
-                    )
                 }
             }
         }
-        return mediaList
+        }
+        return mediaList.values.toList()
     }
+
+    private fun getAllDocumentFiles(): List<MediaFile> {
+        val documents = linkedMapOf<String, MediaFile>()
+        getAllMediaFiles().filter { it.isDocument() }.forEach { documents[it.path] = it }
+
+        // Newly scanned PDFs and files which are not indexed by MediaStore (notably documents
+        // in an app-created Documents directory) are found by a bounded filesystem traversal.
+        val pending = java.util.ArrayDeque<File>()
+        storageRoots().map(::File).filter(File::isDirectory).forEach(pending::add)
+        var visited = 0
+        while (pending.isNotEmpty() && visited < 50_000) {
+            val directory = pending.removeFirst()
+            val children = directory.listFiles() ?: continue
+            for (child in children) {
+                if (++visited > 50_000) break
+                if (child.isDirectory) {
+                    if (child.name !in setOf("Android", ".thumbnails")) pending.add(child)
+                } else if (child.isDocument()) {
+                    documents.putIfAbsent(child.absolutePath, child.toMediaFile())
+                }
+            }
+        }
+        return documents.values.toList()
+    }
+
+    private fun MediaFile.isDocument(): Boolean = isDocumentName(name) ||
+        mimeType == "application/pdf" || mimeType.startsWith("application/vnd.openxmlformats-officedocument") ||
+        mimeType.startsWith("application/vnd.oasis.opendocument") || mimeType == "application/msword" ||
+        mimeType == "application/rtf" || mimeType == "text/plain"
+
+    private fun File.isDocument(): Boolean = isFile && isDocumentName(name)
+
+    private fun isDocumentName(name: String): Boolean = name.substringAfterLast('.', "").lowercase() in setOf(
+        "pdf", "doc", "docx", "odt", "rtf", "txt", "xls", "xlsx", "ods", "ppt", "pptx", "odp"
+    )
 
     private fun calculatePartialHash(mediaFile: MediaFile): String {
         try {

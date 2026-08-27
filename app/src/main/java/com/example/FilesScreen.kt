@@ -437,7 +437,7 @@ fun FileItemGrid(
     }
 }
 
-private fun openMediaFile(context: android.content.Context, file: MediaFile, navController: NavHostController) {
+fun openMediaFile(context: android.content.Context, file: MediaFile, navController: NavHostController) {
     if (file.mimeType.startsWith("image/") || file.mimeType.startsWith("video/") || file.mimeType.startsWith("audio/")) {
         navController.navigate("viewer/${Uri.encode(file.path)}")
     } else if (file.mimeType == "application/vnd.android.package-archive" || file.path.endsWith(".apk", ignoreCase = true)) {
@@ -450,6 +450,19 @@ private fun openMediaFile(context: android.content.Context, file: MediaFile, nav
             context.startActivity(intent)
         } catch (_: Exception) {
             android.widget.Toast.makeText(context, context.getString(R.string.could_not_open_apk), android.widget.Toast.LENGTH_SHORT).show()
+        }
+    } else {
+        val uri = file.contentUri ?: runCatching {
+            androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", File(file.path))
+        }.getOrNull() ?: return
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, file.mimeType.takeUnless { it.isBlank() || it == "application/octet-stream" } ?: "*/*")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        try {
+            context.startActivity(Intent.createChooser(intent, file.name))
+        } catch (_: Exception) {
+            android.widget.Toast.makeText(context, context.getString(R.string.invalid_file_path), android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 }

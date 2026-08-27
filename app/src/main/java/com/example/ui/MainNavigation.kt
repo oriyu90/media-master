@@ -3,6 +3,7 @@ package com.example.ui
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import android.os.Environment
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.background
@@ -33,6 +34,7 @@ import com.google.accompanist.permissions.isGranted
 @Composable
 fun MainNavigation(fileViewModel: FileViewModel, settingsViewModel: SettingsViewModel) {
     val navController = rememberNavController()
+    val context = LocalContext.current
 
     val permissionsToRequest = if (android.os.Build.VERSION.SDK_INT >= 34) {
         listOf(
@@ -57,10 +59,17 @@ fun MainNavigation(fileViewModel: FileViewModel, settingsViewModel: SettingsView
     val permissionsState = rememberMultiplePermissionsState(permissionsToRequest)
 
     
-    val isGranted = permissionsState.permissions.any { it.status.isGranted } || (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R && android.os.Environment.isExternalStorageManager())
+    val hasAllFilesAccess = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R && Environment.isExternalStorageManager()
+    // Android's media permissions do not cover PDFs and ordinary files. Full file access is
+    // therefore required on Android 11+ before presenting a file-manager interface.
+    val isGranted = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+        hasAllFilesAccess
+    } else {
+        permissionsState.permissions.any { it.status.isGranted }
+    }
     if (isGranted) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val desktop = isDesktopLayout(maxWidth)
+            val desktop = isDesktopLayout()
             if (desktop) {
                 DesktopNavigation(navController, settingsViewModel) { onPinFolder, onOpenFolderInNewTab ->
                     MediaNavHost(navController, fileViewModel, settingsViewModel, true, onPinFolder, onOpenFolderInNewTab)
@@ -75,7 +84,14 @@ fun MainNavigation(fileViewModel: FileViewModel, settingsViewModel: SettingsView
     } else {
         PermissionScreen(
             onRequestPermission = { permissionsState.launchMultiplePermissionRequest() },
-            shouldShowRationale = permissionsState.shouldShowRationale
+            shouldShowRationale = permissionsState.shouldShowRationale,
+            onRequestAllFilesAccess = {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                    context.startActivity(Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                        data = Uri.parse("package:${context.packageName}")
+                    })
+                }
+            }
         )
     }
 }
@@ -239,7 +255,8 @@ fun HomeCard(title: String, description: String, icon: androidx.compose.ui.graph
 @Composable
 fun PermissionScreen(
     onRequestPermission: () -> Unit, 
-    shouldShowRationale: Boolean
+    shouldShowRationale: Boolean,
+    onRequestAllFilesAccess: () -> Unit
 ) {
     val context = LocalContext.current
     Column(
@@ -257,6 +274,12 @@ fun PermissionScreen(
             onClick = { onRequestPermission() }
         ) {
             Text(stringResource(R.string.grant_permission))
+        }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(onClick = onRequestAllFilesAccess) {
+                Text(stringResource(R.string.grant_all_files_access))
+            }
         }
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedButton(

@@ -9,7 +9,9 @@ import android.graphics.pdf.PdfDocument
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.provider.MediaStore
+import android.content.ContentValues
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
@@ -45,6 +47,7 @@ import com.example.MediaFile
 import com.example.R
 import com.example.ViewMode
 import com.example.ViewState
+import com.example.openMediaFile
 import com.example.ui.components.SortViewMenu
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
@@ -61,14 +64,14 @@ import java.util.*
 @Composable
 fun DocumentsScreen(viewModel: FileViewModel, navController: NavHostController) {
     val context = LocalContext.current
-    val viewState by viewModel.mediaState.collectAsStateWithLifecycle()
+    val viewState by viewModel.documentsState.collectAsStateWithLifecycle()
     val excludedFolders by viewModel.excludedFolders.collectAsStateWithLifecycle()
     
     val selectedFiles = remember { mutableStateListOf<String>() }
     val isSelectionMode = selectedFiles.isNotEmpty()
 
     LaunchedEffect(Unit) {
-        viewModel.loadAllMedia()
+        viewModel.loadDocuments()
     }
 
     val pagerState = rememberPagerState(pageCount = { 2 })
@@ -133,7 +136,7 @@ fun DocumentsScreen(viewModel: FileViewModel, navController: NavHostController) 
             
             HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
                 when (page) {
-                    0 -> ScanView(navController)
+                    0 -> ScanView(navController, viewModel::loadDocuments)
                     1 -> DocumentListView(viewState, navController, selectedFiles, isSelectionMode, excludedFolders)
                 }
             }
@@ -142,7 +145,7 @@ fun DocumentsScreen(viewModel: FileViewModel, navController: NavHostController) 
 }
 
 @Composable
-fun ScanView(navController: NavHostController) {
+fun ScanView(navController: NavHostController, onDocumentsChanged: () -> Unit) {
     val context = LocalContext.current
     val activity = context as? Activity ?: (context as? android.content.ContextWrapper)?.baseContext as? Activity ?: return
     val coroutineScope = rememberCoroutineScope()
@@ -265,19 +268,18 @@ fun ScanView(navController: NavHostController) {
                         try {
                             if (appendPdfUri != null) {
                                 // Append to existing
-                                val destFile = File(context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOCUMENTS), "Scanned_Appended_${System.currentTimeMillis()}.pdf")
-                                appendImagesToPdf(context, appendPdfUri!!, scannedPages, Uri.fromFile(destFile), insertAfterPage)
+                                val destination = createPublicDocument(context, "Scanned_Appended_${System.currentTimeMillis()}.pdf", "application/pdf")
+                                appendImagesToPdf(context, appendPdfUri!!, scannedPages, destination, insertAfterPage)
                                 Toast.makeText(context, context.getString(R.string.appended_to_documents), Toast.LENGTH_LONG).show()
                             } else if (scannedPdfUri != null) {
                                 // Save as new
-                                val destFile = File(context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOCUMENTS), "Scanned_${System.currentTimeMillis()}.pdf")
+                                val destination = createPublicDocument(context, "Scanned_${System.currentTimeMillis()}.pdf", "application/pdf")
                                 context.contentResolver.openInputStream(scannedPdfUri!!)?.use { input ->
-                                    FileOutputStream(destFile).use { output ->
-                                        input.copyTo(output)
-                                    }
+                                    context.contentResolver.openOutputStream(destination)?.use(input::copyTo)
                                 }
                                 Toast.makeText(context, context.getString(R.string.saved_new_pdf), Toast.LENGTH_LONG).show()
                             }
+                            onDocumentsChanged()
                         } catch (e: Exception) {
                             Toast.makeText(context, context.getString(R.string.error_saving_pdf, e.message ?: ""), Toast.LENGTH_LONG).show()
                             e.printStackTrace()
@@ -290,14 +292,82 @@ fun ScanView(navController: NavHostController) {
                 }
             },
             dismissButton = {
-                TextButton(onClick = { 
-                    showAppendDialog = false 
-                    appendPdfUri = null
-                }) {
-                    Text(stringResource(R.string.cancel))
+                Row {
+                    TextButton(onClick = {
+                        coroutineScope.launch {
+                            try {
+                                saveScannedJpegs(context, scannedPages)
+                                onDocumentsChanged()
+                                Toast.makeText(context, context.getString(R.string.exported_jpg_pages), Toast.LENGTH_LONG).show()
+                                showAppendDialog = false
+                                appendPdfUri = null
+                            } catch (e: Exception) {
+                                Toast.makeText(context, context.getString(R.string.error_saving_pdf, e.message ?: ""), Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    }) {
+                        Text(stringResource(R.string.export_as_jpg))
+                    }
+                    TextButton(onClick = {
+                        showAppendDialog = false
+                        appendPdfUri = null
+                    }) {
+                        Text(stringResource(R.string.cancel))
+                    }
                 }
             }
         )
+    }
+}
+
+private fun createPublicDocument(context: Context, displayName: String, mimeType: String): Uri {
+    val values = ContentValues().apply {
+        put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
+        put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            put(MediaStore.MediaColumns.RELATIVE_PATH, "${android.os.Environment.DIRECTORY_DOCUMENTS}/Media Master")
+        } else {
+            val directory = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), "Media Master")
+            directory.mkdirs()
+            @Suppress("DEPRECATION")
+            put(MediaStore.MediaColumns.DATA, File(directory, displayName).absolutePath)
+        }
+    }
+    val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        MediaStore.Downloads.EXTERNAL_CONTENT_URI
+    } else {
+        MediaStore.Files.getContentUri("external")
+    }
+    val uri = context.contentResolver.insert(collection, values)
+        ?: throw IllegalStateException("Could not create document")
+    return uri
+}
+
+private suspend fun saveScannedJpegs(context: Context, pages: List<Uri>) = withContext(Dispatchers.IO) {
+    pages.forEachIndexed { index, pageUri ->
+        val values = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, "Scanned_${System.currentTimeMillis()}_${index + 1}.jpg")
+            put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(MediaStore.MediaColumns.RELATIVE_PATH, "${android.os.Environment.DIRECTORY_PICTURES}/Media Master Scans")
+                put(MediaStore.MediaColumns.IS_PENDING, 1)
+            } else {
+                val directory = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "Media Master Scans")
+                directory.mkdirs()
+                @Suppress("DEPRECATION")
+                put(MediaStore.MediaColumns.DATA, File(directory, "Scanned_${System.currentTimeMillis()}_${index + 1}.jpg").absolutePath)
+            }
+        }
+        val destination = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+            ?: throw IllegalStateException("Could not create JPEG")
+        context.contentResolver.openInputStream(pageUri)?.use { input ->
+            context.contentResolver.openOutputStream(destination)?.use(input::copyTo)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            values.clear()
+            values.put(MediaStore.MediaColumns.IS_PENDING, 0)
+            context.contentResolver.update(destination, values, null, null)
+        }
     }
 }
 
@@ -373,19 +443,17 @@ fun DocumentListView(viewState: ViewState, navController: NavHostController, sel
             }
         }
         is ViewState.Success -> {
-            // Find all PDFs
-            val pdfFiles = viewState.files.filter { 
-                it.mimeType == "application/pdf" && 
+            val documentFiles = viewState.files.filter {
                 !excludedFolders.any { excluded -> it.path.startsWith(excluded) }
             }.sortedByDescending { it.dateModified }
             
-            if (pdfFiles.isEmpty()) {
+            if (documentFiles.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(stringResource(R.string.no_pdf_documents))
                 }
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    itemsIndexed(pdfFiles) { index, file ->
+                    itemsIndexed(documentFiles) { index, file ->
                         val isSelected = selectedFiles.contains(file.path)
                         DocumentListRow(
                             file = file,
@@ -396,12 +464,11 @@ fun DocumentListView(viewState: ViewState, navController: NavHostController, sel
                                 if (isSelectionMode) {
                                     if (isSelected) selectedFiles.remove(file.path) else selectedFiles.add(file.path)
                                 } else {
-                                    // Open in viewer
-                                    navController.navigate("viewer/${Uri.encode(file.path)}")
+                                    openMediaFile(context, file, navController)
                                 }
                             }
                         )
-                        if (index < pdfFiles.lastIndex) {
+                        if (index < documentFiles.lastIndex) {
                             HorizontalDivider(modifier = Modifier.padding(start = 72.dp), color = MaterialTheme.colorScheme.outlineVariant)
                         }
                     }
@@ -423,6 +490,7 @@ fun DocumentListRow(file: MediaFile, isSelected: Boolean, isSelectionMode: Boole
     var pageCount by remember { mutableIntStateOf(-1) }
     
     LaunchedEffect(file.path) {
+        if (file.mimeType != "application/pdf" && !file.name.endsWith(".pdf", ignoreCase = true)) return@LaunchedEffect
         withContext(Dispatchers.IO) {
             try {
                 if (file.contentUri != null) {
@@ -454,7 +522,12 @@ fun DocumentListRow(file: MediaFile, isSelected: Boolean, isSelectionMode: Boole
             Text("$dateString • $pageString") 
         },
         leadingContent = { 
-            Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(40.dp))
+            Icon(
+                if (file.mimeType == "application/pdf" || file.name.endsWith(".pdf", ignoreCase = true)) Icons.Default.PictureAsPdf else Icons.AutoMirrored.Filled.InsertDriveFile,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(40.dp)
+            )
         },
         trailingContent = {
             if (isSelected) {

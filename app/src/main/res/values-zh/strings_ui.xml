@@ -8,4 +8,6 @@
     <string name="notification_settings">通知设置</string><string name="cannot_open_app">无法打开此应用</string><string name="no_apks">设备上未找到 APK</string><string name="add_to_playlist_dialog">添加到播放列表</string><string name="playlist_name">播放列表名称</string><string name="add">添加</string><string name="play_forward">顺序播放</string><string name="play_reverse">倒序播放</string><string name="shuffle">随机播放</string><string name="unknown">未知</string><string name="no_files_found">未找到文件</string><string name="downloads">下载</string><string name="found_duplicates">找到 %1$d 个重复文件</string><string name="backup_from_to">从 %1$s 到 %2$s</string><string name="restore_started">已开始恢复</string><string name="system_default">系统默认</string><string name="light">浅色</string><string name="dark">深色</string><string name="english">英语</string><string name="japanese">日语（日本語）</string><string name="chinese">中文</string><string name="arabic">阿拉伯语（العربية）</string><string name="dutch">荷兰语（Nederlands）</string><string name="share_apk">共享 APK</string>
     <string name="track_count">%1$d 首曲目</string>
     <string name="all">全部</string>
+    <string name="export_as_jpg">导出 JPG</string>
+    <string name="exported_jpg_pages">JPG 页面已保存到图片</string>
 </resources>

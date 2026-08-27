@@ -4,6 +4,15 @@ Media Master is an open-source Android media and file manager built with Kotlin 
 
 Media Master は、Kotlin と Jetpack Compose で開発されたオープンソースのAndroid向けメディア・ファイル管理アプリです。写真・動画、音楽、書類、ストレージ、アプリ／APK、編集、バックアップを1つのアプリで扱えます。
 
+## v0.2.0
+
+- DeX shell is enabled only when Android reports desk mode; wide tablets and foldables retain the standard UI
+- File browser now lists actual accessible filesystem entries and available storage volumes, rather than only MediaStore-indexed media
+- Document list detects local PDFs and office documents (`doc`, `docx`, `odt`, `rtf`, `txt`, spreadsheets, and presentations)
+- Scans are saved to shared Documents storage; multi-page scans can also be exported as individual JPG files to Pictures
+- Requests Android's all-files access when required for full file-manager and document-discovery functionality
+- Published as a signed APK on GitHub Releases
+
 ## v0.1.0
 
 - Responsive layouts for phones, tablets, foldables, landscape windows, and desktop-class windows
@@ -46,7 +55,11 @@ The generated release APK is placed under `app/build/outputs/apk/release/`. Neve
 
 ## DeX and desktop mode
 
-The desktop shell is enabled when Android reports desk mode. A width-based fallback also enables it for desktop windowing and sufficiently wide tablet/foldable windows. Folder drag and drop uses Android's standard drag-and-drop framework; long-click provides the same menu on touch devices and maps to contextual mouse interaction in desktop environments.
+The desktop shell is enabled only when Android reports desk mode (including Samsung DeX). Wide tablets, foldables, landscape orientation, and split-screen do not trigger it. Folder drag and drop uses Android's standard drag-and-drop framework; long-click provides the same menu on touch devices and maps to contextual mouse interaction in desktop environments.
+
+## Storage access
+
+On Android 11 and later, Media Master asks for Android's **all files access** before it opens the full file-manager interface. This is necessary to enumerate ordinary folders and local documents that are not MediaStore media, and to provide a complete internal/external-storage view.
 
 ## License
 

@@ -83,4 +83,4 @@
     <string name="show_excluded">显示排除的媒体</string>
     <string name="external_storage">外部存储</string>
     <string name="add_folder">添加文件夹</string>
-<string name="files">文件</string><string name="folders">文件夹</string></resources>
+<string name="files">文件</string><string name="folders">文件夹</string><string name="grant_all_files_access">授予所有文件访问权限</string></resources>

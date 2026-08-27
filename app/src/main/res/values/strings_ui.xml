@@ -88,4 +88,6 @@
     <string name="share_apk">Share APK</string>
     <string name="track_count">%1$d tracks</string>
     <string name="all">All</string>
+    <string name="export_as_jpg">Export JPG</string>
+    <string name="exported_jpg_pages">JPG pages saved to Pictures</string>
 </resources>

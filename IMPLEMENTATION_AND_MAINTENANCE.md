@@ -1,20 +1,34 @@
-# Media Master v0.1.0 実装・保守メモ
+# Media Master v0.2.0 実装・保守メモ
 
-最終更新: 2026-08-18
+最終更新: 2026-08-27
 
 ## リリース情報
 
 | 項目 | 内容 |
 | --- | --- |
-| バージョン | `0.1.0` (`versionCode 1`) |
+| バージョン | `0.2.0` (`versionCode 2`) |
 | アプリケーションID | `com.yukiorita.mediamaster` |
 | 最小 SDK / target SDK | 24 / 36 |
 | ライセンス | MIT |
 | 著作者 | Yuki_Orita |
-| release APK | `app/build/outputs/apk/release/app-release.apk`(未生成。初回リリースビルド後に配布予定) |
-| GitHub Release | 未作成 |
+| release APK | `app/build/outputs/apk/release/app-release.apk` |
+| GitHub Release | `v0.2.0` (GitHub Releases) |
 
 release APK は RSA 4096 ビット鍵で APK Signature Scheme v2 署名する想定です。公開前には毎回 `apksigner verify --verbose` で署名を確認してください。
+
+## v0.2.0 の実装内容
+
+### DeX 判定
+
+- Finder風デスクトップUIは `Configuration.UI_MODE_TYPE_DESK` が返る場合だけ有効化するよう変更しました。
+- 画面幅 `840dp` 以上という推測条件を撤廃したため、通常のタブレット、折りたたみ端末、横画面、分割画面ではDeX UIに誤遷移しません。
+
+### ストレージ・ドキュメント
+
+- Android 11以降は「すべてのファイルへのアクセス」を明示的に要求し、メディアだけでなくフォルダや一般ファイルを適切に列挙します。
+- ファイル一覧は `File.listFiles()` を主として実体を表示し、MediaStoreはMIMEタイプ・共有URIの補完に使用します。MediaStore未登録のフォルダや文書が消える問題を解消します。
+- 内部・外部ストレージのルートを検出し、PDF、Word、OpenDocument、RTF、テキスト、表計算、プレゼンテーションをドキュメント一覧へ表示します。
+- スキャンPDFは共有Documents領域の `Documents/Media Master/` に保存します。複数ページを個別JPGとして `Pictures/Media Master Scans/` へ書き出せます。
 
 ## 今回の実装内容
 
@@ -31,7 +45,7 @@ release APK は RSA 4096 ビット鍵で APK Signature Scheme v2 署名する想
 
 `ui/DesktopNavigation.kt` に Finder 風のデスクトップシェルを実装しています。
 
-- Android が desk mode を返す場合、または表示幅が `840dp` 以上の場合に有効化。
+- Android が desk mode を返す場合にのみ有効化。
 - 初期画面は **ホーム**。ライブラリ、オーディオ、ドキュメントへの入口を表示。
 - 左サイドバーからホーム、ライブラリ、オーディオ、ドキュメント、管理、アプリ、設定へ移動可能。
 - 端末欄には内部ストレージ、外部ストレージ、ネットワークストレージを表示。
@@ -64,7 +78,7 @@ release APK は RSA 4096 ビット鍵で APK Signature Scheme v2 署名する想
 | `app/src/main/java/com/example/SettingsRepository.kt` | DataStore設定（ピン留めを含む） |
 | `app/src/main/java/com/example/SettingsViewModel.kt` | 設定操作のViewModel |
 | `app/src/main/res/values*/strings*.xml` | UI翻訳リソース |
-| `app/build.gradle.kts` | アプリID、v0.1.0、署名設定、依存関係 |
+| `app/build.gradle.kts` | アプリID、v0.2.0、署名設定、依存関係 |
 | `README.md` | 利用・ビルド・公開の概要 |
 | `LICENSE` | MITライセンス |
 | `index.html` / `tokens.css` / `assets/site.css` | 紹介サイト。Cloudflare Pages([https://studio-rizi.pages.dev/projects/media-master/](https://studio-rizi.pages.dev/projects/media-master/))へデプロイ済み |
@@ -81,7 +95,10 @@ release APK は RSA 4096 ビット鍵で APK Signature Scheme v2 署名する想
 主な確認ポイント:
 
 1. phone / tablet / 横画面 / 分割画面で表示が切れないこと。
-2. DeXまたは幅840dp以上でサイドバーとホームが表示されること。
+2. DeX時だけサイドバーとホームが表示され、通常の大画面タブレットでは標準UIのままであること。
+3. 内部・外部ストレージで、MediaStore未登録のフォルダと文書が一覧に現れること。
+4. PDFとOffice/OpenDocumentファイルがドキュメント一覧に現れ、外部アプリで開けること。
+5. スキャン後にPDF保存と複数JPG書き出しができ、それぞれDocuments/Picturesに現れること。
 3. フォルダをサイドバーにドラッグしてピン留めできること。
 4. 右クリック・長押しでフォルダのコンテキストメニューが開くこと。
 5. 各アプリ言語で文字列が英語へフォールバックしていないこと。
@@ -106,7 +123,11 @@ $ANDROID_HOME/build-tools/36.1.0/apksigner verify --verbose --print-certs \
   app/build/outputs/apk/release/app-release.apk
 ```
 
-v0.1.0 の APK SHA-256 は、初回リリースビルド完了後にここへ記載する(現時点では未生成)。
+v0.2.0 release APK の SHA-256:
+
+```text
+252625e14469d9d9282e90d38512943c23ced02a30698a00be6a1a70fd11d58f
+```
 
 ```text
 shasum -a 256 app/build/outputs/apk/release/app-release.apk

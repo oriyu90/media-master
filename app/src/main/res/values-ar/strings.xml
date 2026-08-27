@@ -83,4 +83,4 @@
     <string name="show_excluded">عرض الوسائط المستبعدة</string>
     <string name="external_storage">التخزين الخارجي</string>
     <string name="add_folder">إضافة مجلد</string>
-<string name="files">ملفات</string><string name="folders">مجلدات</string></resources>
+<string name="files">ملفات</string><string name="folders">مجلدات</string><string name="grant_all_files_access">السماح بالوصول إلى كل الملفات</string></resources>

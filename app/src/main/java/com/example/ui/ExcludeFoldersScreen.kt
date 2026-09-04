@@ -20,6 +20,7 @@ import androidx.navigation.NavHostController
 import com.example.FileViewModel
 import com.example.R
 import java.io.File
+import kotlinx.coroutines.withContext
 import androidx.core.content.ContextCompat
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -109,8 +110,16 @@ fun FolderPickerDialog(onDismiss: () -> Unit, onFolderSelected: (String) -> Unit
         } else null
     }.distinct()
 
-    val currentFile = File(currentPath)
-    val files = currentFile.listFiles()?.filter { it.isDirectory && !it.isHidden }?.sortedBy { it.name } ?: emptyList()
+    // Disk I/O off the composition: recompute only when the browsed path changes.
+    var files by remember { mutableStateOf<List<File>>(emptyList()) }
+    LaunchedEffect(currentPath) {
+        files = withContext(kotlinx.coroutines.Dispatchers.IO) {
+            File(currentPath).listFiles()
+                ?.filter { it.isDirectory && !it.isHidden }
+                ?.sortedBy { it.name }
+                .orEmpty()
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -159,7 +168,7 @@ fun FolderPickerDialog(onDismiss: () -> Unit, onFolderSelected: (String) -> Unit
                                 headlineContent = { Text("..") },
                                 leadingContent = { Icon(Icons.Default.Folder, contentDescription = null) },
                                 modifier = Modifier.clickable {
-                                    currentFile.parentFile?.let { parent ->
+                                    File(currentPath).parentFile?.let { parent ->
                                         currentPath = parent.absolutePath
                                     }
                                 }

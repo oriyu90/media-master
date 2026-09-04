@@ -57,7 +57,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
-import java.text.SimpleDateFormat
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -81,7 +80,7 @@ fun DocumentsScreen(viewModel: FileViewModel, navController: NavHostController) 
         topBar = {
             if (isSelectionMode) {
                 TopAppBar(
-                    title = { Text("${selectedFiles.size} ${stringResource(R.string.selected)}") },
+                    title = { Text(androidx.compose.ui.res.pluralStringResource(R.plurals.items_selected, selectedFiles.size, selectedFiles.size)) },
                     navigationIcon = {
                         IconButton(onClick = { selectedFiles.clear() }) {
                             Icon(Icons.Default.Close, contentDescription = stringResource(R.string.clear_selection))
@@ -264,17 +263,19 @@ fun ScanView(navController: NavHostController, onDocumentsChanged: () -> Unit) {
             },
             confirmButton = {
                 Button(onClick = {
+                    val appendTarget = appendPdfUri
+                    val scannedTarget = scannedPdfUri
                     coroutineScope.launch {
                         try {
-                            if (appendPdfUri != null) {
+                            if (appendTarget != null) {
                                 // Append to existing
                                 val destination = createPublicDocument(context, "Scanned_Appended_${System.currentTimeMillis()}.pdf", "application/pdf")
-                                appendImagesToPdf(context, appendPdfUri!!, scannedPages, destination, insertAfterPage)
+                                appendImagesToPdf(context, appendTarget, scannedPages, destination, insertAfterPage)
                                 Toast.makeText(context, context.getString(R.string.appended_to_documents), Toast.LENGTH_LONG).show()
-                            } else if (scannedPdfUri != null) {
+                            } else if (scannedTarget != null) {
                                 // Save as new
                                 val destination = createPublicDocument(context, "Scanned_${System.currentTimeMillis()}.pdf", "application/pdf")
-                                context.contentResolver.openInputStream(scannedPdfUri!!)?.use { input ->
+                                context.contentResolver.openInputStream(scannedTarget)?.use { input ->
                                     context.contentResolver.openOutputStream(destination)?.use(input::copyTo)
                                 }
                                 Toast.makeText(context, context.getString(R.string.saved_new_pdf), Toast.LENGTH_LONG).show()
@@ -516,10 +517,11 @@ fun DocumentListRow(file: MediaFile, isSelected: Boolean, isSelectionMode: Boole
 
     ListItem(
         headlineContent = { Text(file.name, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
-        supportingContent = { 
-            val dateString = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date(file.dateModified))
+        supportingContent = {
+            val dateString = java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM, Locale.getDefault())
+                .format(Date(file.dateModified))
             val pageString = if (pageCount > 0) stringResource(R.string.page_count, pageCount) else stringResource(R.string.pdf_document)
-            Text("$dateString • $pageString") 
+            Text("$dateString · $pageString")
         },
         leadingContent = { 
             Icon(

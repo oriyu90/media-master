@@ -96,6 +96,8 @@ dependencies {
   implementation(libs.androidx.lifecycle.viewmodel.compose)
   implementation(libs.androidx.navigation.compose)
   implementation(libs.kotlinx.serialization.json)
+  implementation(libs.androidx.security.crypto)
+  implementation(libs.smbj)
   implementation(libs.androidx.room.ktx)
   implementation(libs.androidx.room.runtime)
   implementation("androidx.documentfile:documentfile:1.0.1")

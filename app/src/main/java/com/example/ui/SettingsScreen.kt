@@ -35,7 +35,6 @@ import com.example.SettingsViewModel
 fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostController) {
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val language by viewModel.language.collectAsStateWithLifecycle()
-    val serverUrl by viewModel.serverUrl.collectAsStateWithLifecycle()
 
     val backupEnabled by viewModel.backupEnabled.collectAsStateWithLifecycle()
     val backupStartTime by viewModel.backupStartTime.collectAsStateWithLifecycle()
@@ -47,7 +46,6 @@ fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostControlle
     val backupDeletePrevious by viewModel.backupDeletePrevious.collectAsStateWithLifecycle()
     var showThemeDialog by remember { mutableStateOf(false) }
     var showLangDialog by remember { mutableStateOf(false) }
-    var showServerDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
@@ -84,8 +82,8 @@ fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostControlle
             item {
                 ListItem(
                     headlineContent = { Text(stringResource(R.string.server_connection)) },
-                    supportingContent = { Text(serverUrl.ifEmpty { stringResource(R.string.not_connected) }) },
-                    modifier = Modifier.clickable { showServerDialog = true }
+                    supportingContent = { Text(stringResource(R.string.network_locations)) },
+                    modifier = Modifier.clickable { navController.navigate("network") }
                 )
             }
             item {
@@ -353,31 +351,6 @@ fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostControlle
             },
             confirmButton = {
                 TextButton(onClick = { showLangDialog = false }) { Text(stringResource(R.string.cancel)) }
-            }
-        )
-    }
-
-    if (showServerDialog) {
-        var urlInput by remember { mutableStateOf(serverUrl) }
-        AlertDialog(
-            onDismissRequest = { showServerDialog = false },
-            title = { Text(stringResource(R.string.server_url)) },
-            text = {
-                OutlinedTextField(
-                    value = urlInput,
-                    onValueChange = { urlInput = it },
-                    label = { Text(stringResource(R.string.url)) },
-                    singleLine = true
-                )
-            },
-            confirmButton = {
-                Button(onClick = {
-                    viewModel.setServerUrl(urlInput)
-                    showServerDialog = false
-                }) { Text(stringResource(R.string.save)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showServerDialog = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }

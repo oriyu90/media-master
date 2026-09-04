@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="network_locations">Netwerklocaties</string>
+    <string name="no_network_locations">Nog geen netwerklocaties. Voeg een SMB- of WebDAV-server toe.</string>
+    <string name="add_location">Locatie toevoegen</string>
+    <string name="edit_location">Locatie bewerken</string>
+    <string name="location_name">Weergavenaam</string>
+    <string name="host">Host</string>
+    <string name="port">Poort (optioneel)</string>
+    <string name="share_or_path">Share of pad</string>
+    <string name="base_path">Submap (optioneel)</string>
+    <string name="username">Gebruikersnaam</string>
+    <string name="password">Wachtwoord</string>
+    <string name="password_keep_hint">Laat leeg om het opgeslagen wachtwoord te behouden</string>
+    <string name="smb">SMB</string>
+    <string name="webdav">WebDAV</string>
+</resources>

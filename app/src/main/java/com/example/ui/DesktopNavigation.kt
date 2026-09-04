@@ -249,9 +249,8 @@ private fun DesktopSidebar(
             }
         }
         item {
-            SidebarDestination(stringResource(R.string.network_storage), Icons.Default.Storage, false) {
-                if (serverUrl.isBlank()) onNavigate("settings", context.getString(R.string.settings))
-                else onNavigate("file_browser?path=${Uri.encode(serverUrl)}", context.getString(R.string.network_storage))
+            SidebarDestination(stringResource(R.string.network_storage), Icons.Default.Storage, currentRoute == "network") {
+                onNavigate("network", context.getString(R.string.network_storage))
             }
         }
         item { SidebarSectionTitle(stringResource(R.string.tools)) }

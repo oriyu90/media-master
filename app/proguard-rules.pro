@@ -68,6 +68,21 @@
 # --- Coil ---
 -dontwarn coil.**
 
+# --- smbj (SMB) + BouncyCastle + slf4j (network storage) ---
+-keep class com.hierynomus.** { *; }
+-keep class net.engio.mbassy.** { *; }
+-keep class org.bouncycastle.** { *; }
+-dontwarn com.hierynomus.**
+-dontwarn net.engio.mbassy.**
+-dontwarn org.bouncycastle.**
+-dontwarn org.slf4j.**
+-dontwarn javax.annotation.**
+-dontwarn com.google.errorprone.annotations.**
+
+# --- androidx.security (EncryptedSharedPreferences / Tink) ---
+-keep class com.google.crypto.tink.** { *; }
+-dontwarn com.google.crypto.tink.**
+
 # --- Enums used across serialization boundaries ---
 -keepclassmembers enum * {
     public static **[] values();

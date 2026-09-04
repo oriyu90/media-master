@@ -26,7 +26,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draganddrop.DragAndDropTransferData
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.isSecondaryPressed
@@ -244,21 +243,12 @@ fun FileItemRow(
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     val dragModifier = if (file.isDirectory && file.name != "..") {
-        Modifier.dragAndDropSource {
-            detectDragGesturesAfterLongPress(
-                onDragStart = {
-                    startTransfer(
-                        DragAndDropTransferData(
-                            clipData = ClipData.newPlainText("Media Master folder", file.path),
-                            flags = View.DRAG_FLAG_GLOBAL
-                        )
-                    )
-                },
-                onDrag = { _, _ -> },
-                onDragEnd = {},
-                onDragCancel = {}
+        Modifier.dragAndDropSource(transferData = {
+            DragAndDropTransferData(
+                clipData = ClipData.newPlainText("Media Master folder", file.path),
+                flags = View.DRAG_FLAG_GLOBAL
             )
-        }
+        })
     } else Modifier
     Box(modifier = dragModifier) {
     Column {
@@ -349,21 +339,12 @@ fun FileItemGrid(
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     val dragModifier = if (file.isDirectory && file.name != "..") {
-        Modifier.dragAndDropSource {
-            detectDragGesturesAfterLongPress(
-                onDragStart = {
-                    startTransfer(
-                        DragAndDropTransferData(
-                            clipData = ClipData.newPlainText("Media Master folder", file.path),
-                            flags = View.DRAG_FLAG_GLOBAL
-                        )
-                    )
-                },
-                onDrag = { _, _ -> },
-                onDragEnd = {},
-                onDragCancel = {}
+        Modifier.dragAndDropSource(transferData = {
+            DragAndDropTransferData(
+                clipData = ClipData.newPlainText("Media Master folder", file.path),
+                flags = View.DRAG_FLAG_GLOBAL
             )
-        }
+        })
     } else Modifier
     Box(modifier = dragModifier) {
     Card(

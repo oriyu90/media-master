@@ -94,6 +94,28 @@ release APK は RSA 4096 ビット鍵で APK Signature Scheme v2 署名する想
 - 検証: `DeepLinksTest`（Robolectric）でパーサを網羅。手動疎通は
   `adb shell am start -a android.intent.action.VIEW -d "mediamaster://<host>" com.yukiorita.mediamaster`。
 
+## デザインシステム（2026-09 / Phase 2）
+
+- `ui/theme/Color.kt`: Material 3 の全ロールを light/dark 両方で明示定義。アンバーのブランド色から
+  導出し、**すべての前景/背景の文字ペアが WCAG 2.1 AA（本文 4.5:1・大文字 3:1）以上**になるよう
+  手調整（`ColorUtils.calculateContrast` 相当で検証）。従来 `onPrimary=白` on 明るいアンバー地で
+  AA 未達だったのを、light は深いアンバーブラウンの `primary`＋白文字、明るいアンバーは
+  `primaryContainer`/`inversePrimary` へ移動。ビューア用のダーク固定トークン（`ViewerSurface` 等）も
+  追加し、`ViewerScreen` などの生 `Color.Black/White` を段階的に置換する。
+- `ui/theme/Type.kt`: M3 タイプスケールを全ロール明示。CJK・アラビア語で行が詰まらないよう
+  `lineHeight` と `LineHeightStyle` を全ロールに設定。
+- `ui/theme/Theme.kt`: `MediaMasterTheme`（`MyApplicationTheme` は `@Deprecated` エイリアスで後方互換）。
+  **動的カラー（Material You）は既定 OFF**（端末生成配色はコントラストを保証できないため）。
+  edge-to-edge のシステムバーアイコン明暗を `WindowCompat` で制御。
+- `res/values/themes.xml`: `Theme.MediaMaster`（`Theme.AppCompat.DayNight.NoActionBar` 継承。
+  AppCompat 継承は per-app locale のために必須）。旧 `Theme.MyApplication` は別名で残す。
+  `window_background` を light/dark（`values-night/`）で定義。
+- `ui/components/CommonUi.kt`: `SectionHeader` / `EmptyState` / `ErrorState`（`liveRegion`）/
+  `LoadingButton` / `StatusPill`。全画面リメイクで共通利用する。
+- ツールチェーン: Compose BOM `2025.05.00`、lifecycle `2.9.0` へ引き上げ（Navigation の
+  `2.9.x` 化は Phase 3）。BOM 更新に伴い `FilesScreen` の `dragAndDropSource` を
+  新 API（`transferData` ラムダ形式、長押し検出は API 内蔵）へ移行。
+
 ## 主要ファイル
 
 | パス | 役割 |

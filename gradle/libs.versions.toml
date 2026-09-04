@@ -4,15 +4,14 @@ coreKtx = "1.18.0"
 junit = "4.13.2"
 junitVersion = "1.3.0"
 espressoCore = "3.7.0"
-lifecycleRuntimeKtx = "2.8.7"
-lifecycleViewmodelCompose = "2.8.7"
-lifecycleRuntimeCompose = "2.8.7"
+lifecycleRuntimeKtx = "2.9.0"
+lifecycleViewmodelCompose = "2.9.0"
+lifecycleRuntimeCompose = "2.9.0"
 activityCompose = "1.10.1"
 kotlin = "2.2.10"
-# NOTE: composeBom / navigationCompose / lifecycle are bumped to the skill-mandated
-# matrix in later phases (Compose BOM -> Phase 2 design-system, Navigation -> Phase 3
-# type-safe nav), where the accompanying API migrations (e.g. dragAndDropSource) are done.
-composeBom = "2024.09.00"
+# Compose BOM + lifecycle on the skill-mandated matrix (Phase 2). Navigation is
+# bumped to 2.9.x in Phase 3 together with the type-safe route migration.
+composeBom = "2025.05.00"
 googleDevtoolsKsp = "2.3.5"
 navigationCompose = "2.8.9"
 kotlinxSerializationJson = "1.8.1"

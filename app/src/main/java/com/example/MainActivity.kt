@@ -24,7 +24,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import com.example.ui.MainNavigation
-import com.example.ui.theme.MyApplicationTheme
+import com.example.ui.theme.MediaMasterTheme
 import com.example.deeplink.DeepLinks
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -115,7 +115,7 @@ class MainActivity : AppCompatActivity() {
                 else -> isSystemInDarkTheme()
             }
             
-            MyApplicationTheme(darkTheme = useDarkTheme) {
+            MediaMasterTheme(darkTheme = useDarkTheme) {
                 MainNavigation(
                     fileViewModel = fileViewModel,
                     settingsViewModel = settingsViewModel,

@@ -3,6 +3,7 @@ import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesS
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
+  alias(libs.plugins.kotlin.serialization)
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.roborazzi)
   alias(libs.plugins.secrets)
@@ -44,8 +45,8 @@ android {
     }
   }
   compileOptions {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
   }
   buildFeatures {
     compose = true
@@ -94,6 +95,7 @@ dependencies {
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.lifecycle.viewmodel.compose)
   implementation(libs.androidx.navigation.compose)
+  implementation(libs.kotlinx.serialization.json)
   implementation(libs.androidx.room.ktx)
   implementation(libs.androidx.room.runtime)
   implementation("androidx.documentfile:documentfile:1.0.1")

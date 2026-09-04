@@ -60,30 +60,19 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun addMediaFolder(folderPath: String) {
-        viewModelScope.launch {
-            val currentFolders = mediaFolders.value.toMutableSet()
-            currentFolders.add(folderPath)
-            repository.setMediaFolders(currentFolders)
-        }
+        viewModelScope.launch { repository.updateMediaFolders(add = folderPath) }
     }
 
     fun removeMediaFolder(folderPath: String) {
-        viewModelScope.launch {
-            val currentFolders = mediaFolders.value.toMutableSet()
-            currentFolders.remove(folderPath)
-            repository.setMediaFolders(currentFolders)
-        }
+        viewModelScope.launch { repository.updateMediaFolders(remove = folderPath) }
     }
+
     fun addPinnedFolder(folderPath: String) {
-        viewModelScope.launch {
-            repository.setPinnedFolders(pinnedFolders.value + folderPath)
-        }
+        viewModelScope.launch { repository.updatePinnedFolders(add = folderPath) }
     }
 
     fun removePinnedFolder(folderPath: String) {
-        viewModelScope.launch {
-            repository.setPinnedFolders(pinnedFolders.value - folderPath)
-        }
+        viewModelScope.launch { repository.updatePinnedFolders(remove = folderPath) }
     }
     fun setBackupEnabled(value: Boolean) { viewModelScope.launch { repository.setBackupEnabled(value) } }
     fun setBackupStartTime(value: Int) { viewModelScope.launch { repository.setBackupStartTime(value) } }

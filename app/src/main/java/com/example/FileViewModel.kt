@@ -331,10 +331,11 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
 
     fun onPendingDeleteResult(success: Boolean) {
         _pendingDeleteIntent.value = null
-        if (success && pendingDeletePath != null) {
-            onFileDeleted(pendingDeletePath!!)
-            pendingDeletePath = null
+        val path = pendingDeletePath
+        if (success && path != null) {
+            onFileDeleted(path)
         }
+        pendingDeletePath = null
     }
 
     private fun onFileDeleted(path: String) {

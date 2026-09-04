@@ -100,7 +100,10 @@ fun MainNavigation(
             } else {
                 Box(modifier = Modifier.fillMaxSize()) {
                     MediaNavHost(navController, fileViewModel, settingsViewModel, false)
-                    com.example.playback.MiniPlayer(onNavigateToAudio = { navController.navigate("audio") { launchSingleTop = true } })
+                    com.example.playback.MiniPlayer(
+                        onNavigateToAudio = { navController.navigate("audio") { launchSingleTop = true } },
+                        modifier = Modifier.align(Alignment.BottomCenter),
+                    )
                 }
             }
         }

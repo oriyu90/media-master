@@ -157,6 +157,24 @@ release APK は RSA 4096 ビット鍵で APK Signature Scheme v2 署名する想
 - 補足: `ViewerScreen` の OCR 座標計算と `?: return` を含む本格的なビューア再設計は、
   回帰リスク管理のため専用フォローアップに切り出し（本フェーズは安全な部分改修に限定）。
 
+## オーディオ・再生（2026-09 / Phase 5）
+
+- **`PlaybackManager`**: 宣言だけで未更新だった `currentPosition` を実装。内部 `CoroutineScope`
+  で再生中のみ 0.5 秒間隔で更新するティッカーを `onIsPlayingChanged` から起動/停止し、
+  `onMediaItemTransition` / `onPositionDiscontinuity` でも即時反映。`release()` でティッカー停止＋
+  状態リセット。
+- **`MiniPlayer`**: `collectAsState()` → `collectAsStateWithLifecycle()`。合成内の
+  `while(true){ delay(1000) }` ポーリングを撤廃し `PlaybackManager.currentPosition` を購読。
+  `WindowInsets.navigationBars` を自前でパディングし、`MainNavigation` 側で
+  `Modifier.align(Alignment.BottomCenter)` を付与（従来は Box 内で左上に描画され得た）。
+  背景を `surfaceContainerHigh`＋`onSurfaceVariant` の副題色でコントラスト確保。
+- **`AudioScreen`**: 選択数タイトルを `pluralStringResource` へ。`(viewState as ViewState.Success)`
+  の危険キャストを `?.let` へ。空表示 `EmptyState`／エラー `ErrorState`。プレイリスト作成の
+  `file.copyTo` を `coroutineScope.launch { withContext(Dispatchers.IO) { … } }` へ（主スレッド I/O 解消）。
+  プレイリストカード副題の `onSecondaryContainer.copy(alpha = 0.7f)` を不透明へ。
+- **`PlaylistScreen`**: `when (val vs = viewState)` で危険キャスト排除、`EmptyState`/`ErrorState`、
+  区切り線・省略表示を追加。
+
 ## 主要ファイル
 
 | パス | 役割 |

@@ -61,6 +61,28 @@ The desktop shell is enabled only when Android reports desk mode (including Sams
 
 On Android 11 and later, Media Master asks for Android's **all files access** before it opens the full file-manager interface. This is necessary to enumerate ordinary folders and local documents that are not MediaStore media, and to provide a complete internal/external-storage view.
 
+## Network storage (SMB / WebDAV)
+
+Add SMB shares and WebDAV servers under **Settings → Server connection**. For
+each location you provide a display name, protocol, host, optional port, share or
+path, optional sub-folder, and credentials. Passwords are stored with
+`EncryptedSharedPreferences` (AES-256, key in the Android Keystore) — never in
+plain text and never in the location's JSON.
+
+Browsing a location lists its directories and files; opening a file downloads it
+to the app cache and hands it to the system "Open with" chooser. All network
+calls run off the main thread with connect/read timeouts, and a bad host, wrong
+password, or timeout shows an error rather than crashing.
+
+### ネットワークストレージ（SMB / WebDAV）
+
+**設定 → サーバー接続** から SMB 共有・WebDAV サーバーを追加できます。表示名・
+プロトコル・ホスト・ポート（任意）・共有名/パス・サブフォルダ（任意）・認証情報を
+登録します。パスワードは `EncryptedSharedPreferences`（AES-256、鍵は Android
+Keystore）で暗号化保存し、平文や場所の JSON には保存しません。ファイルを開くと
+キャッシュへダウンロードしてシステムの「アプリで開く」に渡します。接続失敗・
+認証エラー・タイムアウトはクラッシュせずエラー表示になります。
+
 ## External access (open a feature from another app)
 
 Other apps can open a specific Media Master feature directly.

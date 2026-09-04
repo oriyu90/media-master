@@ -197,6 +197,31 @@ release APK は RSA 4096 ビット鍵で APK Signature Scheme v2 署名する想
 - **`ExcludeFoldersScreen`**: 合成中の `File.listFiles()` を `LaunchedEffect(currentPath)` +
   `Dispatchers.IO` へ。
 
+## ネットワークストレージ SMB / WebDAV（2026-09 / Phase 7）
+
+`SERVER_URL` 設定の未実装ネットワーク層を実機能化。
+
+- 依存追加: `com.hierynomus:smbj:0.13.0`（SMB）、`androidx.security:security-crypto:1.1.0-alpha06`
+  （EncryptedSharedPreferences）。WebDAV は既存 OkHttp を使用。`proguard-rules.pro` に
+  smbj/BouncyCastle/slf4j/Tink の keep を追加。
+- `com.example.network`:
+  - `NetworkModels`: `NetworkProtocol`(SMB/WEBDAV)、`@Serializable NetworkLocation`
+    （**パスワードを含まない**）、`NetworkEntry`、`sealed interface BrowseUiState`。
+  - `NetworkCredentialStore`: `EncryptedSharedPreferences`（AES-256、鍵は Keystore）。
+    キーセット破損時は例外を投げず「パスワード無し」に劣化。
+  - `NetworkLocationRepository`: 専用 DataStore(`network_locations`)へ JSON 永続化。
+    `upsert`/`delete` は `edit{}` 内で read-modify-write。
+  - `NetworkStorageClient`: `list` / `download` とも `Dispatchers.IO`・タイムアウト・
+    リソース `use{}`・`Result` 返却で**クラッシュしない**。WebDAV は PROPFIND(Depth 1)+
+    DOM パース（名前空間非依存の局所名マッチ）。SMB は smbj `DiskShare`。
+  - `NetworkViewModel`: `locations` StateFlow、`browse` StateFlow（Idle/Loading/Ready/Error）。
+    ファイルタップ → キャッシュへ DL → `FileProvider` + `ACTION_VIEW`。
+- UI: `ui/NetworkScreen.kt`（保存済み一覧＋追加/編集ダイアログ／ブラウズ）。ルート `network` を
+  `MainNavigation` に追加。設定「サーバー接続」行と DeX サイドバー「ネットワークストレージ」から遷移。
+  旧「サーバー URL」ダイアログは削除。
+- 新規文字列 `strings_network.xml` 14キー×5ロケール（en/ja/zh/ar/nl 同数、合計202キー）。
+- 実機テストは今サイクル未実施。到達不可・認証失敗系のパスは `Result.failure` で UI にエラー表示。
+
 ## 主要ファイル
 
 | パス | 役割 |

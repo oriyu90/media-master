@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="network_locations">مواقع الشبكة</string>
+    <string name="no_network_locations">لا توجد مواقع شبكة بعد. أضِف خادم SMB أو WebDAV.</string>
+    <string name="add_location">إضافة موقع</string>
+    <string name="edit_location">تعديل الموقع</string>
+    <string name="location_name">اسم العرض</string>
+    <string name="host">المضيف</string>
+    <string name="port">المنفذ (اختياري)</string>
+    <string name="share_or_path">اسم المشاركة أو المسار</string>
+    <string name="base_path">مجلد فرعي (اختياري)</string>
+    <string name="username">اسم المستخدم</string>
+    <string name="password">كلمة المرور</string>
+    <string name="password_keep_hint">اتركه فارغًا للإبقاء على كلمة المرور المحفوظة</string>
+    <string name="smb">SMB</string>
+    <string name="webdav">WebDAV</string>
+</resources>

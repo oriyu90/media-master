@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="network_locations">网络位置</string>
+    <string name="no_network_locations">还没有网络位置。请添加 SMB 或 WebDAV 服务器。</string>
+    <string name="add_location">添加位置</string>
+    <string name="edit_location">编辑位置</string>
+    <string name="location_name">显示名称</string>
+    <string name="host">主机</string>
+    <string name="port">端口（可选）</string>
+    <string name="share_or_path">共享名或路径</string>
+    <string name="base_path">子文件夹（可选）</string>
+    <string name="username">用户名</string>
+    <string name="password">密码</string>
+    <string name="password_keep_hint">留空则保留已保存的密码</string>
+    <string name="smb">SMB</string>
+    <string name="webdav">WebDAV</string>
+</resources>

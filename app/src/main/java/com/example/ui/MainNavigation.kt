@@ -149,6 +149,7 @@ private fun MediaNavHost(
             FilesScreen(fileViewModel, navController, path, onPinFolder, onOpenFolderInNewTab)
         }
         composable("clean") { CleanScreen(fileViewModel, navController) }
+        composable("network") { NetworkScreen(navController) }
         composable("settings") { SettingsScreen(settingsViewModel, navController) }
         composable("exclude_folders") { ExcludeFoldersScreen(fileViewModel, navController) }
         composable("apps") { AppManagerScreen(fileViewModel, navController) }

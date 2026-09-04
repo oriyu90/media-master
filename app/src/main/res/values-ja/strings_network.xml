@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="network_locations">ネットワークの場所</string>
+    <string name="no_network_locations">ネットワークの場所がありません。SMB か WebDAV サーバーを追加してください。</string>
+    <string name="add_location">場所を追加</string>
+    <string name="edit_location">場所を編集</string>
+    <string name="location_name">表示名</string>
+    <string name="host">ホスト</string>
+    <string name="port">ポート（任意）</string>
+    <string name="share_or_path">共有名またはパス</string>
+    <string name="base_path">サブフォルダ（任意）</string>
+    <string name="username">ユーザー名</string>
+    <string name="password">パスワード</string>
+    <string name="password_keep_hint">空欄で保存済みのパスワードを維持</string>
+    <string name="smb">SMB</string>
+    <string name="webdav">WebDAV</string>
+</resources>

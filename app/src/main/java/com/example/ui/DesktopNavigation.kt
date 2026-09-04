@@ -31,6 +31,8 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -173,7 +175,7 @@ private fun DesktopTabStrip(
     onClose: (DesktopTab) -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().height(44.dp).background(MaterialTheme.colorScheme.surfaceContainerLow),
+        modifier = Modifier.fillMaxWidth().height(48.dp).background(MaterialTheme.colorScheme.surfaceContainerLow),
         verticalAlignment = Alignment.CenterVertically
     ) {
         tabs.forEach { tab ->
@@ -188,7 +190,7 @@ private fun DesktopTabStrip(
                 ) {
                     Text(tab.title, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                     if (tabs.size > 1) {
-                        IconButton(onClick = { onClose(tab) }, modifier = Modifier.size(36.dp)) {
+                        IconButton(onClick = { onClose(tab) }) {
                             Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close_tab), modifier = Modifier.size(18.dp))
                         }
                     }
@@ -273,11 +275,14 @@ private fun SidebarSectionTitle(text: String) {
 private fun SidebarDestination(title: String, icon: ImageVector, selected: Boolean, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .semantics { this.selected = selected },
         shape = MaterialTheme.shapes.small,
         color = if (selected) MaterialTheme.colorScheme.secondaryContainer else androidx.compose.ui.graphics.Color.Transparent
     ) {
-        Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
                 Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
             }
@@ -302,7 +307,7 @@ private fun PinnedFolderItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 40.dp)
+                .heightIn(min = 48.dp)
                 .pointerInput(path) {
                     awaitPointerEventScope {
                         while (true) {
@@ -318,14 +323,28 @@ private fun PinnedFolderItem(
                     onClick = { onNavigate("file_browser?path=${Uri.encode(path)}", title) },
                     onLongClick = { menuExpanded = true }
                 )
-                .padding(horizontal = 10.dp, vertical = 8.dp),
+                .padding(start = 10.dp, top = 4.dp, bottom = 4.dp, end = 0.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
                 Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
             }
             Spacer(Modifier.width(10.dp))
-            Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                title,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+            // Keyboard/touch-accessible alternative to right-click / long-press.
+            IconButton(onClick = { menuExpanded = true }) {
+                Icon(
+                    Icons.Default.MoreVert,
+                    contentDescription = stringResource(R.string.options),
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
         DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
             DropdownMenuItem(
@@ -349,7 +368,10 @@ fun DesktopHomeScreen(navController: NavHostController) {
     val actions = listOf(
         Triple(R.string.library, Icons.Default.PhotoLibrary, "library"),
         Triple(R.string.audio, Icons.Default.LibraryMusic, "audio"),
-        Triple(R.string.documents, Icons.Default.Description, "documents")
+        Triple(R.string.documents, Icons.Default.Description, "documents"),
+        Triple(R.string.manage, Icons.Default.Folder, "manage"),
+        Triple(R.string.apps, Icons.Default.Apps, "apps"),
+        Triple(R.string.settings, Icons.Default.Settings, "settings"),
     )
     Column(modifier = Modifier.fillMaxSize().padding(32.dp)) {
         Text(stringResource(R.string.home), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)

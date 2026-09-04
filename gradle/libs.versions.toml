@@ -9,11 +9,9 @@ lifecycleViewmodelCompose = "2.9.0"
 lifecycleRuntimeCompose = "2.9.0"
 activityCompose = "1.10.1"
 kotlin = "2.2.10"
-# Compose BOM + lifecycle on the skill-mandated matrix (Phase 2). Navigation is
-# bumped to 2.9.x in Phase 3 together with the type-safe route migration.
 composeBom = "2025.05.00"
 googleDevtoolsKsp = "2.3.5"
-navigationCompose = "2.8.9"
+navigationCompose = "2.9.0"
 kotlinxSerializationJson = "1.8.1"
 roomRuntime = "2.7.0"
 roomKtx = "2.7.0"

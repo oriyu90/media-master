@@ -116,6 +116,22 @@ release APK は RSA 4096 ビット鍵で APK Signature Scheme v2 署名する想
   `2.9.x` 化は Phase 3）。BOM 更新に伴い `FilesScreen` の `dragAndDropSource` を
   新 API（`transferData` ラムダ形式、長押し検出は API 内蔵）へ移行。
 
+## ホーム & ナビ（2026-09 / Phase 3）
+
+- Navigation `2.9.0` へ引き上げ。**ルート文字列方式は維持**（`@Serializable` 型安全ルートへの全面移行は
+  各画面フェーズ 4–6 で段階的に行い、回帰リスクをフェーズ内に閉じる）。
+- `HomeScreen`: 全トップレベル機能（Library / Audio / Documents / Manage / Apps / Clean）を
+  データ駆動のカードグリッドで**ホームから直接到達可能**に（従来 Apps/Clean は Manage 配下のみ、
+  Settings は右上のみだった）。`LargeTopAppBar` + `exitUntilCollapsedScrollBehavior`、
+  `contentWindowInsets = WindowInsets(0)`。カードは `semantics(mergeDescendants)`、最小高 148dp。
+- `DesktopHomeScreen`: カードに Manage / Apps / Settings を追加。
+- `DesktopNavigation` アクセシビリティ: タブ閉じるボタンとサイドバー項目を 48dp 以上へ、
+  タブ列の高さも 48dp、サイドバー項目に `semantics { selected }`、`PinnedFolderItem` に
+  右クリック/長押し以外の代替として末尾「その他」IconButton を追加。
+- `PermissionScreen`: `WindowInsets.safeDrawing` パディング、ボタンを全幅・48dp、
+  文字色を `onSurface`/`onSurfaceVariant` で明示。
+- 新規文字列 `home_desc_apps` を en/ja/zh/ar/nl の5ロケールに追加（同数維持）。
+
 ## 主要ファイル
 
 | パス | 役割 |

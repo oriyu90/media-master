@@ -83,4 +83,5 @@
     <string name="show_excluded">Show Excluded Media</string>
     <string name="external_storage">External Storage</string>
     <string name="add_folder">Add Folder</string>
-<string name="files">Files</string><string name="folders">Folders</string><string name="grant_all_files_access">Grant access to all files</string></resources>
+<string name="files">Files</string><string name="folders">Folders</string><string name="grant_all_files_access">Grant access to all files</string>    <string name="home_desc_apps">Installed apps &amp; APKs</string>
+</resources>

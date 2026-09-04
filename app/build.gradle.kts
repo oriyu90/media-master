@@ -18,8 +18,8 @@ android {
     applicationId = "com.yukiorita.mediamaster"
     minSdk = 24
     targetSdk = 36
-    versionCode = 2
-    versionName = "0.2.0"
+    versionCode = 3
+    versionName = "0.3.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -37,7 +37,8 @@ android {
   buildTypes {
     release {
       isCrunchPngs = false
-      isMinifyEnabled = false
+      isMinifyEnabled = true
+      isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       if (System.getenv("STORE_PASSWORD") != null && System.getenv("KEY_PASSWORD") != null) {
         signingConfig = signingConfigs.getByName("release")

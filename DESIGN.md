@@ -1,7 +1,20 @@
 # 設計書兼仕様書 (Media Master)
 
 ## バージョン情報
-- **Version:** 0.2.0
+- **Version:** 0.3.0
+
+## v0.3.0 の設計変更（要約）
+- **外部連携**: `com.example.deeplink.DeepLinks` を単一 allowlist とし、`mediamaster://` スキームと
+  標準 `ACTION_VIEW`/`ACTION_EDIT` を内部ナビルートへ写像。破壊的操作は外部から到達不可。
+- **デザインシステム**: `ui/theme` に WCAG AA 検証済み M3 フル配色（light/dark）・明示タイプスケール・
+  `MediaMasterTheme`（動的カラー既定 OFF）。`ui/components` に `EmptyState`/`ErrorState`/`LoadingButton` 等。
+- **状態管理**: 画面は `when (val s = state)` で `ViewState` を安全に消費（危険キャスト・`!!`・
+  合成中副作用を排除）。`PlaybackManager` はリスナー駆動で位置更新。
+- **ネットワークストレージ**: `com.example.network`（SMB=smbj / WebDAV=OkHttp、認証情報は
+  `EncryptedSharedPreferences`）。設定→サーバー接続、DeX サイドバーから到達。
+- **アクセシビリティ**: 48dp タップ領域、`selected`/`Role` セマンティクス、`liveRegion`、
+  `<plurals>`（ar 6分類）、ロケール依存の日付整形。
+- **ツールチェーン**: Compose BOM 2025.05 / Navigation 2.9 / JDK 17 ソース。release は R8 + resource shrink。
 
 ## 概要
 本アプリケーションは、Android デバイス内のメディアファイル（写真、動画、音声ファイルなど）やストレージを効率よく管理・閲覧できるメディア管理・ファイルマネージャーアプリです。Google Photo や Files by Google のような操作感を意識し、より直感的に操作できるワークフローと、Material Design 3 に準拠した最新の UI を提供します。

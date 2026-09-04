@@ -58,61 +58,52 @@ class BackupWorker(
             val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
             val backupFile = dir.createFile("application/zip", "MediaMaster_Backup_$timestamp.zip") ?: return@withContext Result.failure()
             
-            val pfd = context.contentResolver.openFileDescriptor(backupFile.uri, "w") ?: return@withContext Result.failure()
-            val fos = java.io.FileOutputStream(pfd.fileDescriptor)
-            val bos = BufferedOutputStream(fos)
-            val zos = ZipOutputStream(bos)
-
             val projection = arrayOf(MediaStore.Files.FileColumns._ID,
                 MediaStore.Files.FileColumns.DATA,
                 MediaStore.Files.FileColumns.DISPLAY_NAME,
                 MediaStore.Files.FileColumns.RELATIVE_PATH
             )
-            
-            val cursor = context.contentResolver.query(
-                MediaStore.Files.getContentUri("external"),
-                projection,
-                null,
-                null,
-                null
-            )
-            
-            cursor?.use {
-                val idCol = it.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID)
-                val dataCol = it.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATA)
-                val relCol = it.getColumnIndex(MediaStore.Files.FileColumns.RELATIVE_PATH)
-                val nameCol = it.getColumnIndex(MediaStore.Files.FileColumns.DISPLAY_NAME)
-                
-                while (it.moveToNext()) {
-                    val path = it.getString(dataCol) ?: continue
-                    val id = it.getLong(idCol)
-                    val uri = android.content.ContentUris.withAppendedId(MediaStore.Files.getContentUri("external"), id)
-                    
-                    // Exclude Android/data and Android/obb which are app files
-                    if (path.contains("/Android/data/") || path.contains("/Android/obb/")) continue
-                    
-                    val relPath = if (relCol >= 0) it.getString(relCol) else File(path).parentFile?.name ?: "Unknown"
-                    val name = if (nameCol >= 0) it.getString(nameCol) else File(path).name
-                    
-                    val zipEntryName = "${relPath?.trimEnd('/')}/$name".replace("//", "/")
-                    
-                    try {
-                        val entry = ZipEntry(zipEntryName)
-                        zos.putNextEntry(entry)
-                        context.contentResolver.openInputStream(uri)?.use { fis ->
-                            fis.copyTo(zos)
+
+            context.contentResolver.openFileDescriptor(backupFile.uri, "w")?.use { pfd ->
+                ZipOutputStream(BufferedOutputStream(java.io.FileOutputStream(pfd.fileDescriptor))).use { zos ->
+                    context.contentResolver.query(
+                        MediaStore.Files.getContentUri("external"),
+                        projection,
+                        null,
+                        null,
+                        null
+                    )?.use {
+                        val idCol = it.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID)
+                        val dataCol = it.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATA)
+                        val relCol = it.getColumnIndex(MediaStore.Files.FileColumns.RELATIVE_PATH)
+                        val nameCol = it.getColumnIndex(MediaStore.Files.FileColumns.DISPLAY_NAME)
+
+                        while (it.moveToNext()) {
+                            val path = it.getString(dataCol) ?: continue
+                            val id = it.getLong(idCol)
+                            val uri = android.content.ContentUris.withAppendedId(MediaStore.Files.getContentUri("external"), id)
+
+                            // Exclude Android/data and Android/obb which are app files
+                            if (path.contains("/Android/data/") || path.contains("/Android/obb/")) continue
+
+                            val relPath = if (relCol >= 0) it.getString(relCol) else File(path).parentFile?.name ?: "Unknown"
+                            val name = if (nameCol >= 0) it.getString(nameCol) else File(path).name
+
+                            val zipEntryName = "${relPath?.trimEnd('/')}/$name".replace("//", "/")
+
+                            try {
+                                zos.putNextEntry(ZipEntry(zipEntryName))
+                                context.contentResolver.openInputStream(uri)?.use { fis ->
+                                    fis.copyTo(zos)
+                                }
+                                zos.closeEntry()
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
                         }
-                        zos.closeEntry()
-                    } catch (e: Exception) {
-                        e.printStackTrace()
                     }
                 }
-            }
-            
-            zos.close()
-            bos.close()
-            fos.close()
-            pfd.close()
+            } ?: return@withContext Result.failure()
 
             Result.success()
         } catch (e: Exception) {

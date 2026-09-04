@@ -80,6 +80,21 @@ class SettingsRepository(private val context: Context) {
     suspend fun setPinnedFolders(folders: Set<String>) {
         context.dataStore.edit { preferences -> preferences[PINNED_FOLDERS] = folders }
     }
+
+    /** Atomically add/remove a single entry in a string-set preference (read-modify-write inside [edit]). */
+    suspend fun updateMediaFolders(add: String? = null, remove: String? = null) {
+        context.dataStore.edit { preferences ->
+            val current = preferences[MEDIA_FOLDERS] ?: emptySet()
+            preferences[MEDIA_FOLDERS] = current.let { s -> (if (add != null) s + add else s).let { if (remove != null) it - remove else it } }
+        }
+    }
+
+    suspend fun updatePinnedFolders(add: String? = null, remove: String? = null) {
+        context.dataStore.edit { preferences ->
+            val current = preferences[PINNED_FOLDERS] ?: emptySet()
+            preferences[PINNED_FOLDERS] = current.let { s -> (if (add != null) s + add else s).let { if (remove != null) it - remove else it } }
+        }
+    }
     suspend fun setBackupEnabled(value: Boolean) { context.dataStore.edit { it[BACKUP_ENABLED] = value } }
     suspend fun setBackupStartTime(value: Int) { context.dataStore.edit { it[BACKUP_START_TIME] = value } }
     suspend fun setBackupEndTime(value: Int) { context.dataStore.edit { it[BACKUP_END_TIME] = value } }

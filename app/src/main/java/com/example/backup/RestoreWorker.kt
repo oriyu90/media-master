@@ -8,7 +8,7 @@ import androidx.work.WorkerParameters
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.BufferedInputStream
-import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.util.zip.ZipInputStream
 
@@ -21,33 +21,25 @@ class RestoreWorker(
         val uriStr = inputData.getString("uri") ?: return@withContext Result.failure()
         try {
             val uri = Uri.parse(uriStr)
-            val pfd = context.contentResolver.openFileDescriptor(uri, "r") ?: return@withContext Result.failure()
-            val fis = java.io.FileInputStream(pfd.fileDescriptor)
-            val bis = BufferedInputStream(fis)
-            val zis = ZipInputStream(bis)
+            val rootDir = Environment.getExternalStorageDirectory()
 
-            val root = Environment.getExternalStorageDirectory().absolutePath
-
-            var entry = zis.nextEntry
-            while (entry != null) {
-                if (!entry.isDirectory) {
-                    val path = entry.name // e.g. "Pictures/MyAlbum/photo.jpg"
-                    val destFile = File(root, path)
-                    
-                    destFile.parentFile?.mkdirs()
-                    
-                    FileOutputStream(destFile).use { fos ->
-                        zis.copyTo(fos)
+            context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
+                ZipInputStream(BufferedInputStream(FileInputStream(pfd.fileDescriptor))).use { zis ->
+                    var entry = zis.nextEntry
+                    while (entry != null) {
+                        if (!entry.isDirectory) {
+                            // Zip-slip guard: reject any entry that would resolve outside the backup root.
+                            val destFile = BackupPaths.safeResolve(rootDir, entry.name)
+                            if (destFile != null) {
+                                destFile.parentFile?.mkdirs()
+                                FileOutputStream(destFile).use { fos -> zis.copyTo(fos) }
+                            }
+                        }
+                        zis.closeEntry()
+                        entry = zis.nextEntry
                     }
                 }
-                zis.closeEntry()
-                entry = zis.nextEntry
-            }
-            
-            zis.close()
-            bis.close()
-            fis.close()
-            pfd.close()
+            } ?: return@withContext Result.failure()
 
             Result.success()
         } catch (e: Exception) {

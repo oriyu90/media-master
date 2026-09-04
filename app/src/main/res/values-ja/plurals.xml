@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="items_selected">
+        <item quantity="other">%d件を選択</item>
+    </plurals>
+    <plurals name="duplicate_groups_found">
+        <item quantity="other">重複グループが%d件見つかりました</item>
+    </plurals>
+</resources>

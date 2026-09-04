@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="adj_exposure">Belichting</string>
+    <string name="adj_brightness">Helderheid</string>
+    <string name="adj_contrast">Contrast</string>
+    <string name="adj_brilliance">Brille</string>
+    <string name="adj_sharpness">Scherpte</string>
+    <string name="adj_black_point">Zwartpunt</string>
+    <string name="adj_white_point">Witpunt</string>
+    <string name="adj_saturation">Verzadiging</string>
+    <string name="adj_hue">Tint</string>
+</resources>

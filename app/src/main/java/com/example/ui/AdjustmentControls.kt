@@ -11,8 +11,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -25,13 +29,14 @@ fun AdjustmentControls(
 
     Column(modifier = modifier.fillMaxWidth()) {
         selectedAdjustment?.let { adjustment ->
+            val label = stringResource(adjustment.labelRes)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(adjustment.label, style = MaterialTheme.typography.labelMedium)
+                Text(label, style = MaterialTheme.typography.labelMedium)
                 Slider(
                     value = adjustmentValues[adjustment] ?: getDefaultAdjustmentValue(adjustment),
                     onValueChange = { onAdjustmentChange(adjustment, it) },
@@ -42,27 +47,36 @@ fun AdjustmentControls(
 
         LazyRow(
             modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(horizontal = 16.dp)
         ) {
-            items(AdjustmentType.values()) { adjustment ->
+            items(AdjustmentType.entries.toList(), key = { it.name }) { adjustment ->
                 val isSelected = selectedAdjustment == adjustment
+                val label = stringResource(adjustment.labelRes)
+                val tint = if (isSelected) MaterialTheme.colorScheme.primary else LocalContentColor.current
                 Column(
-                    modifier = Modifier.clickable {
-                        selectedAdjustment = if (isSelected) null else adjustment
-                    },
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    modifier = Modifier
+                        .widthIn(min = 48.dp)
+                        .heightIn(min = 48.dp)
+                        .clickable { selectedAdjustment = if (isSelected) null else adjustment }
+                        .semantics {
+                            role = Role.Tab
+                            selected = isSelected
+                        }
+                        .padding(4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
                 ) {
                     Icon(
                         imageVector = getAdjustmentIcon(adjustment),
-                        contentDescription = adjustment.label,
-                        tint = if (isSelected) MaterialTheme.colorScheme.primary else LocalContentColor.current,
-                        modifier = Modifier.size(32.dp).padding(4.dp)
+                        contentDescription = null,
+                        tint = tint,
+                        modifier = Modifier.size(24.dp)
                     )
                     Text(
-                        text = adjustment.label,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (isSelected) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                        text = label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = tint,
                     )
                 }
             }

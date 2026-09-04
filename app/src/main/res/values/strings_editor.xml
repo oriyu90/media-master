@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="adj_exposure">Exposure</string>
+    <string name="adj_brightness">Brightness</string>
+    <string name="adj_contrast">Contrast</string>
+    <string name="adj_brilliance">Brilliance</string>
+    <string name="adj_sharpness">Sharpness</string>
+    <string name="adj_black_point">Black point</string>
+    <string name="adj_white_point">White point</string>
+    <string name="adj_saturation">Saturation</string>
+    <string name="adj_hue">Hue</string>
+</resources>

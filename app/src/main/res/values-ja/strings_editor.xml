@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="adj_exposure">露出</string>
+    <string name="adj_brightness">明るさ</string>
+    <string name="adj_contrast">コントラスト</string>
+    <string name="adj_brilliance">ブリリアンス</string>
+    <string name="adj_sharpness">シャープネス</string>
+    <string name="adj_black_point">ブラックポイント</string>
+    <string name="adj_white_point">ホワイトポイント</string>
+    <string name="adj_saturation">彩度</string>
+    <string name="adj_hue">色味</string>
+</resources>

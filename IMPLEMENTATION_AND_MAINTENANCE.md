@@ -132,6 +132,31 @@ release APK は RSA 4096 ビット鍵で APK Signature Scheme v2 署名する想
   文字色を `onSurface`/`onSurfaceVariant` で明示。
 - 新規文字列 `home_desc_apps` を en/ja/zh/ar/nl の5ロケールに追加（同数維持）。
 
+## ライブラリ・ビューア・エディタ（2026-09 / Phase 4）
+
+- **i18n バグ修正**: `AdjustmentType` のラベルが Kotlin 内ハードコード日本語だったのを `@StringRes`
+  化し、`res/values*/strings_editor.xml` に9キー×5ロケールを追加（en/ja/zh/ar/nl 同数）。
+- **`<plurals>` 導入**: `res/values*/plurals.xml` に `items_selected` / `duplicate_groups_found`。
+  ar は zero/one/two/few/many/other の6分類。選択数タイトルの文字列連結
+  （`"${n} ${selected}"`）を `pluralStringResource` へ置換（Library、以降のフェーズで他画面も）。
+- **共通部品適用**: `LibraryScreen` / `AlbumScreen` の空表示に `EmptyState`、エラー表示に
+  `ErrorState`（assertive live region）。`AlbumScreen` は `when (val vs = viewState)` で
+  危険キャストを排除。アルバム名ラベルのスクリムを縦グラデーションに。
+- **`ViewerScreen`**: OCR ドラッグ選択の `!!`（`selectionStart!!`/`selectionCurrent!!`）を
+  ローカル束縛へ、重複していた `DisposableEffect(pageUri){exoPlayer.release()}` を削除
+  （二重 release 回避）。トップバー／背景の生 `Color.Black/White` を `ui/theme` の
+  `Viewer*` トークンへ。トップバーに **「編集」アクション**を追加し画像/動画エディタへ遷移
+  （孤立していた `imageEditor`/`videoEditor` ルートを内部から到達可能に）。
+- **`ImageEditorScreen`**: 合成中に `isPerspectiveMode` を書き込んでいた anti-pattern を、
+  `pagerState.currentPage == 2` からの派生値へ変更（`pagerState` を状態宣言部へホイスト）。
+  `mutableStateOf(0f)` → `mutableFloatStateOf`。`DraggableCorner` は毎フレームの
+  `resources.displayMetrics.density` 読みを `LocalDensity` へ、`contentDescription` を付与。
+- **`VideoEditorScreen`**: `mutableStateOf(0L/0)` → `mutableLongStateOf`/`mutableIntStateOf`。
+- **`AdjustmentControls`**: `AdjustmentType.values()` → `entries`、チップを 48dp・
+  `Role.Tab` + `selected` セマンティクスへ。
+- 補足: `ViewerScreen` の OCR 座標計算と `?: return` を含む本格的なビューア再設計は、
+  回帰リスク管理のため専用フォローアップに切り出し（本フェーズは安全な部分改修に限定）。
+
 ## 主要ファイル
 
 | パス | 役割 |

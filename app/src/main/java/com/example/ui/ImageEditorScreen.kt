@@ -30,6 +30,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
@@ -51,18 +53,22 @@ fun ImageEditorScreen(uriString: String, navController: NavHostController) {
     
     var bitmap by remember { mutableStateOf<Bitmap?>(null) }
     var isSaving by remember { mutableStateOf(false) }
-    
+
+    // Editor tab pager, hoisted so the image overlay can react to the selected tab
+    // without writing state during composition.
+    val pagerState = rememberPagerState(pageCount = { 3 })
+
     // Color
     val adjustmentValues = remember { mutableStateMapOf<AdjustmentType, Float>() }
-    
+
     // Transform
-    var rotationZ by remember { mutableStateOf(0f) }
-    var rotationX by remember { mutableStateOf(0f) }
-    var rotationY by remember { mutableStateOf(0f) }
+    var rotationZ by remember { mutableFloatStateOf(0f) }
+    var rotationX by remember { mutableFloatStateOf(0f) }
+    var rotationY by remember { mutableFloatStateOf(0f) }
     var flipHorizontal by remember { mutableStateOf(false) }
-    
-    // Crop / Perspective
-    var isPerspectiveMode by remember { mutableStateOf(false) }
+
+    // Crop / Perspective — derived from the active tab (page 2 == Crop).
+    val isPerspectiveMode = pagerState.currentPage == 2
     var tl by remember { mutableStateOf(Offset(0f, 0f)) }
     var tr by remember { mutableStateOf(Offset(1f, 0f)) }
     var bl by remember { mutableStateOf(Offset(0f, 1f)) }
@@ -201,7 +207,6 @@ fun ImageEditorScreen(uriString: String, navController: NavHostController) {
             }
             
             // Tabs
-            val pagerState = rememberPagerState(pageCount = { 3 })
             TabRow(selectedTabIndex = pagerState.currentPage) {
                 Tab(selected = pagerState.currentPage == 0, onClick = { coroutineScope.launch { pagerState.animateScrollToPage(0) } }) {
                     Text(stringResource(R.string.color), modifier = Modifier.padding(16.dp))
@@ -220,14 +225,12 @@ fun ImageEditorScreen(uriString: String, navController: NavHostController) {
                 .background(MaterialTheme.colorScheme.surface)) { page ->
                 when (page) {
                     0 -> {
-                        isPerspectiveMode = false
                         AdjustmentControls(
                             adjustmentValues = adjustmentValues,
                             onAdjustmentChange = { type, value -> adjustmentValues[type] = value }
                         )
                     }
                     1 -> {
-                        isPerspectiveMode = false
                         Column(modifier = Modifier
                             .fillMaxSize()
                             .padding(16.dp)) {
@@ -252,7 +255,6 @@ fun ImageEditorScreen(uriString: String, navController: NavHostController) {
                         }
                     }
                     2 -> {
-                        isPerspectiveMode = true
                         Column(modifier = Modifier
                             .fillMaxSize()
                             .padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -279,10 +281,13 @@ fun ImageEditorScreen(uriString: String, navController: NavHostController) {
 fun DraggableCorner(offset: Offset, w: Float, h: Float, onOffsetChange: (Offset) -> Unit) {
     val pxX = offset.x * w
     val pxY = offset.y * h
+    val density = androidx.compose.ui.platform.LocalDensity.current.density
+    val cornerLabel = stringResource(R.string.perspective_crop_help)
     Box(
         modifier = Modifier
-            .offset(x = (pxX / LocalContext.current.resources.displayMetrics.density - 24f).dp, y = (pxY / LocalContext.current.resources.displayMetrics.density - 24f).dp)
+            .offset(x = (pxX / density - 24f).dp, y = (pxY / density - 24f).dp)
             .size(48.dp)
+            .semantics { contentDescription = cornerLabel }
             .pointerInput(Unit) {
                 detectDragGestures { change, dragAmount ->
                     change.consume()

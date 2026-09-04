@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="items_selected">
+        <item quantity="other">已选择 %d 项</item>
+    </plurals>
+    <plurals name="duplicate_groups_found">
+        <item quantity="other">找到 %d 组重复文件</item>
+    </plurals>
+</resources>

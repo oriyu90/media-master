@@ -23,7 +23,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
@@ -33,6 +36,8 @@ import com.example.MediaFile
 import com.example.R
 import com.example.ViewMode
 import com.example.ViewState
+import com.example.ui.components.EmptyState
+import com.example.ui.components.ErrorState
 import com.example.ui.components.SortViewMenu
 import kotlinx.coroutines.launch
 import java.io.File
@@ -59,7 +64,7 @@ fun LibraryScreen(viewModel: FileViewModel, navController: NavHostController) {
         topBar = {
             if (isSelectionMode) {
                 TopAppBar(
-                    title = { Text("${selectedFiles.size} ${stringResource(R.string.selected)}") },
+                    title = { Text(pluralStringResource(R.plurals.items_selected, selectedFiles.size, selectedFiles.size)) },
                     navigationIcon = {
                         IconButton(onClick = { selectedFiles.clear() }) {
                             Icon(Icons.Default.Close, contentDescription = stringResource(R.string.clear_selection))
@@ -131,12 +136,20 @@ fun PhotosView(viewState: ViewState, navController: NavHostController, selectedF
             }
         }
         is ViewState.Success -> {
-            val photosAndVideos = viewState.files.filter { 
-                (it.mimeType.startsWith("image/") || it.mimeType.startsWith("video/")) && 
+            val photosAndVideos = viewState.files.filter {
+                (it.mimeType.startsWith("image/") || it.mimeType.startsWith("video/")) &&
                 !excludedFolders.any { excluded -> it.path.startsWith(excluded) }
             }
-            
-            if (viewMode == ViewMode.LIST) {
+
+            if (photosAndVideos.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    EmptyState(
+                        icon = Icons.Default.PhotoLibrary,
+                        title = stringResource(R.string.photos),
+                        description = stringResource(R.string.no_files_found),
+                    )
+                }
+            } else if (viewMode == ViewMode.LIST) {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(photosAndVideos) { file ->
                         val isSelected = selectedFiles.contains(file.path)
@@ -186,7 +199,7 @@ fun PhotosView(viewState: ViewState, navController: NavHostController, selectedF
         }
         is ViewState.Error -> {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(viewState.message, color = MaterialTheme.colorScheme.error)
+                ErrorState(message = viewState.message)
             }
         }
     }
@@ -207,7 +220,16 @@ fun AlbumsView(viewState: ViewState, navController: NavHostController, excludedF
             }
             val unknown = stringResource(R.string.unknown)
             val albums = photosAndVideos.groupBy { File(it.path).parentFile?.name ?: unknown }
-            
+
+            if (albums.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    EmptyState(
+                        icon = Icons.Default.PhotoLibrary,
+                        title = stringResource(R.string.albums),
+                        description = stringResource(R.string.no_files_found),
+                    )
+                }
+            } else {
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(minSize = 160.dp),
                 modifier = Modifier.fillMaxSize(),
@@ -215,7 +237,7 @@ fun AlbumsView(viewState: ViewState, navController: NavHostController, excludedF
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(albums.keys.toList()) { albumName ->
+                items(albums.keys.toList(), key = { it }) { albumName ->
                     val files = albums[albumName] ?: emptyList()
                     val firstFile = files.firstOrNull()
                     
@@ -237,23 +259,31 @@ fun AlbumsView(viewState: ViewState, navController: NavHostController, excludedF
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .align(Alignment.BottomStart)
-                                    .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.5f))
-                                    .padding(8.dp)
+                                    .background(
+                                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                                            0f to androidx.compose.ui.graphics.Color.Transparent,
+                                            1f to androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.72f),
+                                        )
+                                    )
+                                    .padding(horizontal = 8.dp, vertical = 6.dp)
                             ) {
                                 Text(
-                                    text = albumName, 
+                                    text = albumName,
                                     color = androidx.compose.ui.graphics.Color.White,
-                                    style = MaterialTheme.typography.bodyMedium
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                                 )
                             }
                         }
                     }
                 }
             }
+            }
         }
         is ViewState.Error -> {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(viewState.message, color = MaterialTheme.colorScheme.error)
+                ErrorState(message = viewState.message)
             }
         }
     }
@@ -265,12 +295,13 @@ fun MediaGridItem(file: MediaFile, isSelected: Boolean, onClick: () -> Unit, onL
     Box(
         modifier = Modifier
             .aspectRatio(1f)
+            .semantics { selected = isSelected }
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick
             )
             .border(
-                if (isSelected) 4.dp else 0.5.dp, 
+                if (isSelected) 3.dp else 0.5.dp,
                 if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
             )
     ) {

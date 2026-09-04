@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="items_selected">
+        <item quantity="one">%d selected</item>
+        <item quantity="other">%d selected</item>
+    </plurals>
+    <plurals name="duplicate_groups_found">
+        <item quantity="one">%d duplicate group found</item>
+        <item quantity="other">%d duplicate groups found</item>
+    </plurals>
+</resources>

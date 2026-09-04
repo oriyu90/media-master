@@ -37,6 +37,9 @@ import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.navigation.NavHostController
+import com.example.ui.theme.ViewerChromeContainer
+import com.example.ui.theme.ViewerOnSurface
+import com.example.ui.theme.ViewerScrim
 import coil.compose.AsyncImage
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.Text
@@ -155,7 +158,7 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
                                     if (isOcrLoading) {
                                         CircularProgressIndicator(
                                             modifier = Modifier.size(24.dp),
-                                            color = Color.White,
+                                            color = ViewerOnSurface,
                                             strokeWidth = 2.dp
                                         )
                                     } else if (isOcrMode) {
@@ -166,9 +169,19 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
                                 }
                             }
                             
+                            if (isImage || isVideo) {
+                                IconButton(onClick = {
+                                    val encoded = Uri.encode(contentUri.toString())
+                                    navController.navigate(
+                                        if (isImage) "imageEditor/$encoded" else "videoEditor/$encoded"
+                                    )
+                                }) {
+                                    Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.edit))
+                                }
+                            }
                             IconButton(onClick = {
                                 coroutineScope.launch {
-                                    viewModel.deleteFile(currentFile.path, currentFile.contentUri)
+                                    viewModel?.deleteFile(currentFile.path, currentFile.contentUri)
                                     if (mediaList.size <= 1) {
                                         navController.popBackStack()
                                     }
@@ -187,10 +200,10 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = Color.Black.copy(alpha = 0.6f),
-                            titleContentColor = Color.White,
-                            actionIconContentColor = Color.White,
-                            navigationIconContentColor = Color.White
+                            containerColor = ViewerChromeContainer,
+                            titleContentColor = ViewerOnSurface,
+                            actionIconContentColor = ViewerOnSurface,
+                            navigationIconContentColor = ViewerOnSurface
                         )
                     )
                 }
@@ -200,7 +213,7 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
                 state = pagerState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black)
+                    .background(ViewerScrim)
                     .padding(if (isFullScreen) PaddingValues(0.dp) else innerPadding),
                 userScrollEnabled = !isOcrMode
             ) { page ->
@@ -235,12 +248,6 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
                             } else {
                                 exoPlayer.playWhenReady = false
                                 exoPlayer.seekTo(0)
-                            }
-                        }
-
-                        DisposableEffect(pageUri) {
-                            onDispose {
-                                exoPlayer.release()
                             }
                         }
 
@@ -384,9 +391,9 @@ fun ImageWithOcrOverlay(
                             selectionCurrent = Offset(imgX, imgY)
                             
                             // Find intersections
-                            if (selectionStart != null && selectionCurrent != null) {
-                                val s = selectionStart!!
-                                val c = selectionCurrent!!
+                            val s = selectionStart
+                            val c = selectionCurrent
+                            if (s != null && c != null) {
                                 val selRect = Rect(
                                     left = minOf(s.x, c.x),
                                     top = minOf(s.y, c.y),

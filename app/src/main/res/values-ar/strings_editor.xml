@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="adj_exposure">التعريض</string>
+    <string name="adj_brightness">السطوع</string>
+    <string name="adj_contrast">التباين</string>
+    <string name="adj_brilliance">التألّق</string>
+    <string name="adj_sharpness">الحدّة</string>
+    <string name="adj_black_point">نقطة السواد</string>
+    <string name="adj_white_point">نقطة البياض</string>
+    <string name="adj_saturation">التشبّع</string>
+    <string name="adj_hue">تدرّج اللون</string>
+</resources>

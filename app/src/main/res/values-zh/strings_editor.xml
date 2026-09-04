@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="adj_exposure">曝光</string>
+    <string name="adj_brightness">亮度</string>
+    <string name="adj_contrast">对比度</string>
+    <string name="adj_brilliance">鲜明度</string>
+    <string name="adj_sharpness">锐度</string>
+    <string name="adj_black_point">黑点</string>
+    <string name="adj_white_point">白点</string>
+    <string name="adj_saturation">饱和度</string>
+    <string name="adj_hue">色相</string>
+</resources>

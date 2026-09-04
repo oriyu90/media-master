@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="items_selected">
+        <item quantity="zero">لم يُحدَّد شيء</item>
+        <item quantity="one">عنصر واحد محدَّد</item>
+        <item quantity="two">عنصران محدَّدان</item>
+        <item quantity="few">%d عناصر محدَّدة</item>
+        <item quantity="many">%d عنصرًا محدَّدًا</item>
+        <item quantity="other">%d عنصر محدَّد</item>
+    </plurals>
+    <plurals name="duplicate_groups_found">
+        <item quantity="zero">لا مجموعات مكرَّرة</item>
+        <item quantity="one">مجموعة مكرَّرة واحدة</item>
+        <item quantity="two">مجموعتان مكرَّرتان</item>
+        <item quantity="few">%d مجموعات مكرَّرة</item>
+        <item quantity="many">%d مجموعةً مكرَّرة</item>
+        <item quantity="other">%d مجموعة مكرَّرة</item>
+    </plurals>
+</resources>

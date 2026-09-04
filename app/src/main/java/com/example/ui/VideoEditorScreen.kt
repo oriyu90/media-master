@@ -45,15 +45,15 @@ fun VideoEditorScreen(uriString: String, navController: NavHostController) {
     val coroutineScope = rememberCoroutineScope()
     
     var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
-    var durationMs by remember { mutableStateOf(0L) }
-    var startTrimMs by remember { mutableStateOf(0L) }
-    var endTrimMs by remember { mutableStateOf(100L) } // dummy initial value
+    var durationMs by remember { mutableLongStateOf(0L) }
+    var startTrimMs by remember { mutableLongStateOf(0L) }
+    var endTrimMs by remember { mutableLongStateOf(100L) } // dummy initial value
     var isSaving by remember { mutableStateOf(false) }
 
     var isMuted by remember { mutableStateOf(false) }
-    
+
     val adjustmentValues = remember { mutableStateMapOf<AdjustmentType, Float>() }
-    var editTab by remember { mutableStateOf(0) } // 0 for Trim, 1 for Adjust
+    var editTab by remember { mutableIntStateOf(0) } // 0 for Trim, 1 for Adjust
 
     DisposableEffect(uri) {
         val player = ExoPlayer.Builder(context).build().apply {

@@ -16,6 +16,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 
@@ -57,10 +58,10 @@ fun ManageDashboardScreen(navController: NavHostController) {
             }
             item {
                 CategoryGrid { category ->
-                    if (category == "Apps") {
+                    if (category == MediaCategory.APPS) {
                         navController.navigate("apps")
                     } else {
-                        navController.navigate("category/${android.net.Uri.encode(category)}")
+                        navController.navigate("category/${android.net.Uri.encode(category.key)}")
                     }
                 }
             }
@@ -110,15 +111,8 @@ fun ManageDashboardScreen(navController: NavHostController) {
 }
 
 @Composable
-fun CategoryGrid(onCategoryClick: (String) -> Unit) {
-    val categories = listOf(
-        Triple("Downloads", R.string.downloads, Icons.Default.Download),
-        Triple("Images", R.string.images, Icons.Default.Image),
-        Triple("Videos", R.string.videos, Icons.Default.VideoLibrary),
-        Triple("Audio", R.string.audio, Icons.Default.Audiotrack),
-        Triple("Documents", R.string.documents, Icons.Default.Description),
-        Triple("Apps", R.string.apps, Icons.Default.Apps)
-    )
+fun CategoryGrid(onCategoryClick: (MediaCategory) -> Unit) {
+    val categories = MediaCategory.entries
     BoxWithConstraints {
         val columnCount = if (maxWidth < 360.dp) 1 else 2
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -128,8 +122,8 @@ fun CategoryGrid(onCategoryClick: (String) -> Unit) {
                         val category = categories.getOrNull(i + offset)
                         Box(modifier = Modifier.weight(1f)) {
                             if (category != null) {
-                                CategoryCard(stringResource(category.second), category.third) {
-                                    onCategoryClick(category.first)
+                                CategoryCard(stringResource(category.titleRes), category.icon) {
+                                    onCategoryClick(category)
                                 }
                             }
                         }
@@ -143,7 +137,11 @@ fun CategoryGrid(onCategoryClick: (String) -> Unit) {
 @Composable
 fun CategoryCard(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth().heightIn(min = 92.dp).clickable(onClick = onClick),
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 92.dp)
+            .clickable(onClick = onClick)
+            .semantics(mergeDescendants = true) {},
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
     ) {
         Column(

@@ -4,8 +4,4 @@
         <item quantity="one">%d geselecteerd</item>
         <item quantity="other">%d geselecteerd</item>
     </plurals>
-    <plurals name="duplicate_groups_found">
-        <item quantity="one">%d duplicaatgroep gevonden</item>
-        <item quantity="other">%d duplicaatgroepen gevonden</item>
-    </plurals>
 </resources>

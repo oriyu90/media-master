@@ -8,12 +8,4 @@
         <item quantity="many">%d عنصرًا محدَّدًا</item>
         <item quantity="other">%d عنصر محدَّد</item>
     </plurals>
-    <plurals name="duplicate_groups_found">
-        <item quantity="zero">لا مجموعات مكرَّرة</item>
-        <item quantity="one">مجموعة مكرَّرة واحدة</item>
-        <item quantity="two">مجموعتان مكرَّرتان</item>
-        <item quantity="few">%d مجموعات مكرَّرة</item>
-        <item quantity="many">%d مجموعةً مكرَّرة</item>
-        <item quantity="other">%d مجموعة مكرَّرة</item>
-    </plurals>
 </resources>

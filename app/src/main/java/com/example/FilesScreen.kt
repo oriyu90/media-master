@@ -35,7 +35,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.example.ui.components.SortViewMenu
-import java.text.SimpleDateFormat
+import java.text.DateFormat
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import androidx.compose.ui.res.pluralStringResource
 import java.util.Date
 import java.util.Locale
 import java.io.File
@@ -53,6 +56,7 @@ fun FilesScreen(
     val viewState by viewModel.fileTreeState.collectAsStateWithLifecycle()
     val viewMode by viewModel.viewMode.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
 
     val selectedFiles = remember { mutableStateListOf<String>() }
     val isSelectionMode = selectedFiles.isNotEmpty()
@@ -73,7 +77,7 @@ fun FilesScreen(
         topBar = {
             if (isSelectionMode) {
                 TopAppBar(
-                    title = { Text("${selectedFiles.size} ${stringResource(R.string.selected)}") },
+                    title = { Text(pluralStringResource(R.plurals.items_selected, selectedFiles.size, selectedFiles.size)) },
                     navigationIcon = {
                         IconButton(onClick = { selectedFiles.clear() }) {
                             Icon(Icons.Default.Close, contentDescription = stringResource(R.string.clear_selection))
@@ -96,23 +100,30 @@ fun FilesScreen(
                             Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share))
                         }
 
-                        IconButton(onClick = { 
-                            selectedFiles.forEach { path ->
-                                val mediaFile = (viewState as? ViewState.Success)?.files?.find { it.path == path }
-                                if (mediaFile != null && !mediaFile.isDirectory) {
-                                    viewModel.deleteFile(mediaFile.path, mediaFile.contentUri)
-                                } else {
-                                    // Handle directory deletion or show warning
-                                    val f = File(path)
-                                    if(f.isDirectory) {
-                                        f.deleteRecursively()
-                                    } else {
-                                        f.delete()
+                        IconButton(onClick = {
+                            val toDelete = selectedFiles.toList()
+                            val files = (viewState as? ViewState.Success)?.files.orEmpty()
+                            selectedFiles.clear()
+                            coroutineScope.launch {
+                                withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                    toDelete.forEach { path ->
+                                        val mediaFile = files.find { it.path == path }
+                                        if (mediaFile != null && !mediaFile.isDirectory) {
+                                            // MediaStore delete stays on the ViewModel (handles scoped storage).
+                                        } else {
+                                            val f = File(path)
+                                            runCatching { if (f.isDirectory) f.deleteRecursively() else f.delete() }
+                                        }
                                     }
                                 }
+                                // Non-directory entries go through the ViewModel's safe delete path.
+                                toDelete.forEach { path ->
+                                    files.find { it.path == path }?.takeIf { !it.isDirectory }?.let {
+                                        viewModel.deleteFile(it.path, it.contentUri)
+                                    }
+                                }
+                                viewModel.reload()
                             }
-                            viewModel.reload()
-                            selectedFiles.clear()
                         }) {
                             Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete))
                         }
@@ -456,6 +467,6 @@ fun formatSize(sizeBytes: Long): String {
 }
 
 fun formatDate(dateMs: Long): String {
-    val formatter = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
-    return formatter.format(Date(dateMs))
+    // Locale-aware medium date (respects the user's language / region format).
+    return DateFormat.getDateInstance(DateFormat.MEDIUM, Locale.getDefault()).format(Date(dateMs))
 }

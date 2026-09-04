@@ -89,7 +89,7 @@ fun AppManagerScreen(viewModel: FileViewModel, navController: NavHostController)
         topBar = {
             if (isAppSelectionMode) {
                 TopAppBar(
-                    title = { Text("${selectedApps.size} ${stringResource(R.string.selected)}") },
+                    title = { Text(androidx.compose.ui.res.pluralStringResource(R.plurals.items_selected, selectedApps.size, selectedApps.size)) },
                     navigationIcon = {
                         IconButton(onClick = { selectedApps.clear() }) {
                             Icon(Icons.Default.Close, contentDescription = stringResource(R.string.clear_selection))
@@ -144,7 +144,7 @@ fun AppManagerScreen(viewModel: FileViewModel, navController: NavHostController)
                 )
             } else if (isApkSelectionMode) {
                  TopAppBar(
-                    title = { Text("${selectedApks.size} ${stringResource(R.string.selected)}") },
+                    title = { Text(androidx.compose.ui.res.pluralStringResource(R.plurals.items_selected, selectedApks.size, selectedApks.size)) },
                     navigationIcon = {
                         IconButton(onClick = { selectedApks.clear() }) {
                             Icon(Icons.Default.Close, contentDescription = stringResource(R.string.clear_selection))
@@ -225,16 +225,18 @@ fun InstalledAppsView(installedApps: List<AppInfo>, isLoadingApps: Boolean, sele
         }
     } else {
         LazyColumn(modifier = Modifier.fillMaxSize()) {
-            items(installedApps) { app ->
+            items(installedApps, key = { it.packageName }) { app ->
                 val isSelected = selectedApps.contains(app.packageName)
                 var expanded by remember { mutableStateOf(false) }
-                
+                // Rasterise the launcher icon once per package, not every recomposition.
+                val iconBitmap = remember(app.packageName) { app.icon.toBitmap().asImageBitmap() }
+
                 ListItem(
-                    headlineContent = { Text(app.name) },
-                    supportingContent = { Text(app.packageName) },
-                    leadingContent = { 
+                    headlineContent = { Text(app.name, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
+                    supportingContent = { Text(app.packageName, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
+                    leadingContent = {
                         Image(
-                            bitmap = app.icon.toBitmap().asImageBitmap(),
+                            bitmap = iconBitmap,
                             contentDescription = app.name,
                             modifier = Modifier.size(40.dp)
                         )

@@ -175,6 +175,28 @@ release APK は RSA 4096 ビット鍵で APK Signature Scheme v2 署名する想
 - **`PlaylistScreen`**: `when (val vs = viewState)` で危険キャスト排除、`EmptyState`/`ErrorState`、
   区切り線・省略表示を追加。
 
+## 管理系・設定（2026-09 / Phase 6）
+
+- **`MediaCategory` enum 新設**（`ui/MediaCategory.kt`）: `key`（ナビ用の非ローカライズ ID）/
+  `titleRes` / `icon` / `matches(file)` を一元化。従来 `ManageDashboardScreen` と `CategoryScreen`
+  の3箇所に英語 literal で重複していた分類ロジックの単一情報源。
+- **`SettingsScreen`**: 空 onClick だった「メディアフォルダ」行 → `exclude_folders` へ遷移
+  （孤立画面の配線完了）。バックアップ時間帯ダイアログの入力欄に数値キーボード・`label`・
+  桁数フィルタ・`coerceIn(0..23 / 0..59)` を追加。テーマ/言語のラジオ行を `selectableGroup` +
+  `Modifier.selectable(role = Role.RadioButton)` + 48dp へ。
+- **`CleanScreen`**: `LoadingButton` 共通部品、重複ゼロ時に `EmptyState`、行パスの省略表示。
+- **`ManageDashboardScreen`**: `CategoryCard` に `semantics(mergeDescendants)`。
+- **`FilesScreen`**: 選択数タイトルを `pluralStringResource` へ。ディレクトリ削除の
+  `deleteRecursively()`/`delete()` を `rememberCoroutineScope` + `Dispatchers.IO` へ（主スレッド I/O 解消、
+  `runCatching` で保護）。`formatDate` をロケール依存 `DateFormat.getDateInstance(MEDIUM)` へ。
+- **`AppManagerScreen`**: ランチャーアイコンの `toBitmap().asImageBitmap()` を
+  `remember(packageName)` でキャッシュ（毎再合成の再生成を解消）。選択数タイトルを plural へ。
+  行テキストを省略表示。
+- **`DocumentsScreen`**: `appendPdfUri!!` / `scannedPdfUri!!` をローカル束縛へ。日付整形を
+  ロケール依存へ。選択数タイトルを plural へ。
+- **`ExcludeFoldersScreen`**: 合成中の `File.listFiles()` を `LaunchedEffect(currentPath)` +
+  `Dispatchers.IO` へ。
+
 ## 主要ファイル
 
 | パス | 役割 |

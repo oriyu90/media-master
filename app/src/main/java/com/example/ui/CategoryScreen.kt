@@ -1,7 +1,6 @@
 package com.example.ui
 
 import android.net.Uri
-import android.os.Environment
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -25,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -61,7 +61,7 @@ fun CategoryScreen(categoryName: String, viewModel: FileViewModel, navController
         topBar = {
             if (isSelectionMode) {
                 TopAppBar(
-                    title = { Text("${selectedFiles.size} ${stringResource(R.string.selected)}") },
+                    title = { Text(pluralStringResource(R.plurals.items_selected, selectedFiles.size, selectedFiles.size)) },
                     navigationIcon = {
                         IconButton(onClick = { selectedFiles.clear() }) {
                             Icon(Icons.Default.Close, contentDescription = stringResource(R.string.clear_selection))
@@ -73,15 +73,7 @@ fun CategoryScreen(categoryName: String, viewModel: FileViewModel, navController
                                 val isExcluded = excludedFolders.any { file.path.startsWith(it) }
                                 val shouldShow = !isExcluded || showExcluded
                                 
-                                shouldShow && when (categoryName) {
-                                    "Downloads" -> file.path.contains(Environment.DIRECTORY_DOWNLOADS)
-                                    "Images" -> file.mimeType.startsWith("image/")
-                                    "Videos" -> file.mimeType.startsWith("video/")
-                                    "Audio" -> file.mimeType.startsWith("audio/")
-                                    "Documents" -> file.mimeType.startsWith("application/") || file.mimeType.startsWith("text/")
-                                    "Apps" -> file.mimeType == "application/vnd.android.package-archive"
-                                    else -> false
-                                }
+                                shouldShow && (MediaCategory.fromKey(categoryName)?.matches(file) == true)
                             } ?: emptyList()
                             if (selectedFiles.size == allDisplayedFiles.size) {
                                 selectedFiles.clear()
@@ -121,14 +113,7 @@ fun CategoryScreen(categoryName: String, viewModel: FileViewModel, navController
                     }
                 )
             } else {
-                val titleRes = when(categoryName) {
-                    "Images" -> stringResource(R.string.images)
-                    "Videos" -> stringResource(R.string.videos)
-                    "Audio" -> stringResource(R.string.audio)
-                    "Documents" -> stringResource(R.string.documents)
-                    "Apps" -> stringResource(R.string.apps)
-                    else -> categoryName
-                }
+                val titleRes = MediaCategory.fromKey(categoryName)?.titleRes?.let { stringResource(it) } ?: categoryName
                 TopAppBar(
                     title = { Text(titleRes) },
                     navigationIcon = {
@@ -150,20 +135,12 @@ fun CategoryScreen(categoryName: String, viewModel: FileViewModel, navController
                 }
             }
             is ViewState.Success -> {
-                val allFiles = (viewState as ViewState.Success).files
+                val allFiles = (viewState as ViewState.Success).files  // guarded by `is` above
                 val categoryFiles = allFiles.filter { file ->
                     val isExcluded = excludedFolders.any { file.path.startsWith(it) }
                     val shouldShow = !isExcluded || showExcluded
                     
-                    shouldShow && when (categoryName) {
-                        "Downloads" -> file.path.contains(Environment.DIRECTORY_DOWNLOADS)
-                        "Images" -> file.mimeType.startsWith("image/")
-                        "Videos" -> file.mimeType.startsWith("video/")
-                        "Audio" -> file.mimeType.startsWith("audio/")
-                        "Documents" -> file.mimeType.startsWith("application/") || file.mimeType.startsWith("text/")
-                        "Apps" -> file.mimeType == "application/vnd.android.package-archive"
-                        else -> false
-                    }
+                    shouldShow && (MediaCategory.fromKey(categoryName)?.matches(file) == true)
                 }
                 
                 val groupedFiles = categoryFiles.groupBy { File(it.path).parentFile?.name ?: context.getString(R.string.unknown) }

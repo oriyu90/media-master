@@ -3,12 +3,15 @@ package com.example.ui
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.net.Uri
@@ -47,6 +50,7 @@ fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostControlle
     var showServerDialog by remember { mutableStateOf(false) }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.settings)) },
@@ -88,7 +92,7 @@ fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostControlle
                 ListItem(
                     headlineContent = { Text(stringResource(R.string.media_folders)) },
                     supportingContent = { Text(stringResource(R.string.configure_folders)) },
-                    modifier = Modifier.clickable { /* TODO */ }
+                    modifier = Modifier.clickable { navController.navigate("exclude_folders") }
                 )
             }
             item {
@@ -142,26 +146,48 @@ fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostControlle
                             text = {
                                 Column {
                                     Text(stringResource(R.string.start_time))
-                                    Row {
-                                        OutlinedTextField(value = startH, onValueChange = { startH = it }, modifier = Modifier.weight(1f))
-                                        Text(" : ", modifier = Modifier.align(Alignment.CenterVertically))
-                                        OutlinedTextField(value = startM, onValueChange = { startM = it }, modifier = Modifier.weight(1f))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        OutlinedTextField(
+                                            value = startH, onValueChange = { startH = it.filter(Char::isDigit).take(2) },
+                                            label = { Text("h") }, singleLine = true,
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                        Text(":", modifier = Modifier.padding(horizontal = 8.dp))
+                                        OutlinedTextField(
+                                            value = startM, onValueChange = { startM = it.filter(Char::isDigit).take(2) },
+                                            label = { Text("m") }, singleLine = true,
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                            modifier = Modifier.weight(1f),
+                                        )
                                     }
                                     Spacer(modifier = Modifier.height(16.dp))
                                     Text(stringResource(R.string.end_time))
-                                    Row {
-                                        OutlinedTextField(value = endH, onValueChange = { endH = it }, modifier = Modifier.weight(1f))
-                                        Text(" : ", modifier = Modifier.align(Alignment.CenterVertically))
-                                        OutlinedTextField(value = endM, onValueChange = { endM = it }, modifier = Modifier.weight(1f))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        OutlinedTextField(
+                                            value = endH, onValueChange = { endH = it.filter(Char::isDigit).take(2) },
+                                            label = { Text("h") }, singleLine = true,
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                        Text(":", modifier = Modifier.padding(horizontal = 8.dp))
+                                        OutlinedTextField(
+                                            value = endM, onValueChange = { endM = it.filter(Char::isDigit).take(2) },
+                                            label = { Text("m") }, singleLine = true,
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                            modifier = Modifier.weight(1f),
+                                        )
                                     }
                                 }
                             },
                             confirmButton = {
                                 Button(onClick = {
-                                    val s = (startH.toIntOrNull() ?: 0) * 60 + (startM.toIntOrNull() ?: 0)
-                                    val e = (endH.toIntOrNull() ?: 0) * 60 + (endM.toIntOrNull() ?: 0)
-                                    viewModel.setBackupStartTime(s)
-                                    viewModel.setBackupEndTime(e)
+                                    val sh = (startH.toIntOrNull() ?: 0).coerceIn(0, 23)
+                                    val sm = (startM.toIntOrNull() ?: 0).coerceIn(0, 59)
+                                    val eh = (endH.toIntOrNull() ?: 0).coerceIn(0, 23)
+                                    val em = (endM.toIntOrNull() ?: 0).coerceIn(0, 59)
+                                    viewModel.setBackupStartTime(sh * 60 + sm)
+                                    viewModel.setBackupEndTime(eh * 60 + em)
                                     showTimeDialog = false
                                 }) { Text(stringResource(R.string.save)) }
                             },
@@ -254,7 +280,7 @@ fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostControlle
             onDismissRequest = { showThemeDialog = false },
             title = { Text(stringResource(R.string.select_theme)) },
             text = {
-                Column {
+                Column(Modifier.selectableGroup()) {
                     listOf(
                         0 to stringResource(R.string.system_default),
                         1 to stringResource(R.string.light),
@@ -264,11 +290,16 @@ fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostControlle
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable {
-                                    viewModel.setThemeMode(value)
-                                    showThemeDialog = false
-                                }
-                                .padding(vertical = 12.dp)
+                                .heightIn(min = 48.dp)
+                                .selectable(
+                                    selected = themeMode == value,
+                                    role = Role.RadioButton,
+                                    onClick = {
+                                        viewModel.setThemeMode(value)
+                                        showThemeDialog = false
+                                    },
+                                )
+                                .padding(vertical = 8.dp)
                         ) {
                             RadioButton(selected = themeMode == value, onClick = null)
                             Spacer(Modifier.width(8.dp))
@@ -288,7 +319,7 @@ fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostControlle
             onDismissRequest = { showLangDialog = false },
             title = { Text(stringResource(R.string.select_language)) },
             text = {
-                Column {
+                Column(Modifier.selectableGroup()) {
                     val langs = listOf(
                         "system" to stringResource(R.string.system_default),
                         "en" to stringResource(R.string.english),
@@ -302,11 +333,16 @@ fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostControlle
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable {
-                                    viewModel.setLanguage(value)
-                                    showLangDialog = false
-                                }
-                                .padding(vertical = 12.dp)
+                                .heightIn(min = 48.dp)
+                                .selectable(
+                                    selected = language == value,
+                                    role = Role.RadioButton,
+                                    onClick = {
+                                        viewModel.setLanguage(value)
+                                        showLangDialog = false
+                                    },
+                                )
+                                .padding(vertical = 8.dp)
                         ) {
                             RadioButton(selected = language == value, onClick = null)
                             Spacer(Modifier.width(8.dp))

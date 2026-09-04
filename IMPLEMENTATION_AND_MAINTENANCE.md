@@ -68,6 +68,32 @@ release APK は RSA 4096 ビット鍵で APK Signature Scheme v2 署名する想
 
 アプリ内設定に加え、Android 13以降のアプリ言語設定でも認識できるよう `res/xml/locales_config.xml` を追加済みです。
 
+## 外部連携 API（2026-09 追加 / Phase 1）
+
+他アプリから Media Master の各機能を「アクセス先を指定して」開けるようにした。設計上の要点:
+
+- **専用スキーム `mediamaster://`**: `com.example.deeplink.DeepLinks` が受信 Intent を内部ナビ
+  ルート文字列へ変換する単一の allowlist。`AndroidManifest.xml` の `mediamaster` スキームの
+  `intent-filter` には **`android.intent.category.BROWSABLE` を付けない**（Web ページから任意に
+  起動されないため）。
+- 対応ホスト（引数なし）: `home` `library` `audio` `documents` `manage` `apps` `clean` `settings`。
+  引数あり: `browse?path=<絶対パス>`（`file_browser?path=` へ）、`edit/image?uri=<uri>` /
+  `edit/video?uri=<uri>`（既存の `imageEditor`/`videoEditor` ルートはもともと URI 文字列引数を取る）。
+- **標準 Intent**: `ACTION_EDIT`(`image/*`,`video/*`) → 各エディタ。`ACTION_VIEW`(`image/*`,
+  `video/*`,`audio/*`) → 現状は `library` を開く（外部 URI 単体表示の `ViewerScreen` 対応は
+  後続フェーズ）。`ACTION_VIEW`(`vnd.android.document/directory`) → `file_browser`。
+- `MainActivity`: `android:launchMode="singleTask"`。`onCreate` と `onNewIntent` で
+  `DeepLinks.resolve(intent)` を `MutableStateFlow` に載せ、`MainNavigation` が
+  ストレージ権限付与後に一度だけ `navController.navigate(...)`（`runCatching` で
+  未知ルートを握りつぶし、**不正 Intent でクラッシュしない**）。
+- **破壊的操作（削除・アンインストール・バックアップ復元）は外部 Intent から到達不可**。必ず
+  アプリ内 UI で明示確認する。
+- `FileProvider`（authority `${applicationId}.fileprovider`, `res/xml/file_paths.xml`）を
+  Manifest に宣言。従来 `FilesScreen`/`AppManagerScreen`/`CategoryScreen` が同 authority を
+  参照していたが Manifest 未宣言で共有・APKインストールが失敗していた潜在バグも解消。
+- 検証: `DeepLinksTest`（Robolectric）でパーサを網羅。手動疎通は
+  `adb shell am start -a android.intent.action.VIEW -d "mediamaster://<host>" com.yukiorita.mediamaster`。
+
 ## 主要ファイル
 
 | パス | 役割 |

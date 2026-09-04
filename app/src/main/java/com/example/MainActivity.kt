@@ -1,5 +1,6 @@
 package com.example
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.work.WorkManager
 import androidx.work.PeriodicWorkRequestBuilder
@@ -24,12 +25,27 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import com.example.ui.MainNavigation
 import com.example.ui.theme.MyApplicationTheme
+import com.example.deeplink.DeepLinks
+import kotlinx.coroutines.flow.MutableStateFlow
 
 import com.example.playback.PlaybackManager
 
 class MainActivity : AppCompatActivity() {
     companion object {
         var shouldEnterPiP = false
+    }
+
+    /**
+     * Route requested by an incoming external intent (custom `mediamaster://`
+     * scheme or a standard VIEW/EDIT intent). `null` means "open normally".
+     * Consumed by [MainNavigation] once storage access is granted.
+     */
+    private val pendingDeepLink = MutableStateFlow<String?>(null)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        DeepLinks.resolve(intent)?.let { pendingDeepLink.value = it }
     }
 
     override fun onUserLeaveHint() {
@@ -43,6 +59,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        pendingDeepLink.value = DeepLinks.resolve(intent)
         PlaybackManager.initialize(this)
         val imageLoader = coil.ImageLoader.Builder(this)
             .components {
@@ -99,7 +116,12 @@ class MainActivity : AppCompatActivity() {
             }
             
             MyApplicationTheme(darkTheme = useDarkTheme) {
-                MainNavigation(fileViewModel, settingsViewModel)
+                MainNavigation(
+                    fileViewModel = fileViewModel,
+                    settingsViewModel = settingsViewModel,
+                    deepLinkRoute = pendingDeepLink,
+                    onDeepLinkHandled = { pendingDeepLink.value = null }
+                )
             }
         }
     }

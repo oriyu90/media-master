@@ -15,8 +15,11 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import com.example.R
+import com.example.ui.components.EmptyState
+import com.example.ui.components.ErrorState
 import com.example.ui.components.SortViewMenu
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,7 +32,9 @@ import com.example.FileViewModel
 import com.example.MediaFile
 import com.example.ViewState
 import com.example.playback.PlaybackManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -55,7 +60,7 @@ fun AudioScreen(viewModel: FileViewModel, navController: NavHostController) {
         topBar = {
             if (isSelectionMode) {
                 TopAppBar(
-                    title = { Text("${selectedFiles.size} ${stringResource(R.string.selected)}") },
+                    title = { Text(pluralStringResource(R.plurals.items_selected, selectedFiles.size, selectedFiles.size)) },
                     navigationIcon = {
                         IconButton(onClick = { selectedFiles.clear() }) {
                             Icon(Icons.Default.Close, contentDescription = stringResource(R.string.clear_selection))
@@ -94,10 +99,10 @@ fun AudioScreen(viewModel: FileViewModel, navController: NavHostController) {
                             Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete))
                         }
                         SortViewMenu(viewModel = viewModel, onSelectAll = {
-                            if (viewState is ViewState.Success) {
-                                val audioFiles = (viewState as ViewState.Success).files.filter { 
-                    it.mimeType.startsWith("audio/") && !excludedFolders.any { excluded -> it.path.startsWith(excluded) }
-                }
+                            (viewState as? ViewState.Success)?.let { s ->
+                                val audioFiles = s.files.filter {
+                                    it.mimeType.startsWith("audio/") && !excludedFolders.any { excluded -> it.path.startsWith(excluded) }
+                                }
                                 selectedFiles.clear()
                                 selectedFiles.addAll(audioFiles.map { it.path })
                             }
@@ -114,10 +119,10 @@ fun AudioScreen(viewModel: FileViewModel, navController: NavHostController) {
                     },
                     actions = {
                         SortViewMenu(viewModel = viewModel, onSelectAll = {
-                            if (viewState is ViewState.Success) {
-                                val audioFiles = (viewState as ViewState.Success).files.filter { 
-                    it.mimeType.startsWith("audio/") && !excludedFolders.any { excluded -> it.path.startsWith(excluded) }
-                }
+                            (viewState as? ViewState.Success)?.let { s ->
+                                val audioFiles = s.files.filter {
+                                    it.mimeType.startsWith("audio/") && !excludedFolders.any { excluded -> it.path.startsWith(excluded) }
+                                }
                                 selectedFiles.clear()
                                 selectedFiles.addAll(audioFiles.map { it.path })
                             }
@@ -163,23 +168,26 @@ fun AudioScreen(viewModel: FileViewModel, navController: NavHostController) {
                 )
             },
             confirmButton = {
-                TextButton(onClick = { 
+                TextButton(onClick = {
                     if (newPlaylistName.isNotBlank()) {
-                        val musicDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_MUSIC)
-                        val playlistDir = File(musicDir, newPlaylistName)
-                        if (!playlistDir.exists()) playlistDir.mkdirs()
-                        
-                        selectedFiles.forEach { path ->
-                            val file = File(path)
-                            if (file.exists()) {
-                                file.copyTo(File(playlistDir, file.name), overwrite = true)
-                                // We should ideally delete the original or keep it depending on 'Add' semantics
-                                // For playlist creation by folder, moving is usually what people expect or copying. Let's copy for safety.
-                            }
-                        }
-                        viewModel.reload()
+                        val name = newPlaylistName
+                        val paths = selectedFiles.toList()
                         selectedFiles.clear()
                         showPlaylistDialog = false
+                        coroutineScope.launch {
+                            withContext(Dispatchers.IO) {
+                                val musicDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_MUSIC)
+                                val playlistDir = File(musicDir, name)
+                                if (!playlistDir.exists()) playlistDir.mkdirs()
+                                paths.forEach { path ->
+                                    val file = File(path)
+                                    if (file.exists()) {
+                                        runCatching { file.copyTo(File(playlistDir, file.name), overwrite = true) }
+                                    }
+                                }
+                            }
+                            viewModel.reload()
+                        }
                     }
                 }) { Text(stringResource(R.string.add)) }
             },
@@ -212,7 +220,16 @@ fun TracksView(viewState: ViewState, navController: NavHostController, selectedF
         }
         is ViewState.Success -> {
             val audioFiles = viewState.files.filter { it.mimeType.startsWith("audio/") }
-            
+
+            if (audioFiles.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    EmptyState(
+                        icon = Icons.Default.LibraryMusic,
+                        title = stringResource(R.string.tracks),
+                        description = stringResource(R.string.no_files_found),
+                    )
+                }
+            } else {
             Column(modifier = Modifier.fillMaxSize()) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(8.dp),
@@ -261,10 +278,11 @@ fun TracksView(viewState: ViewState, navController: NavHostController, selectedF
                     }
                 }
             }
+            }
         }
         is ViewState.Error -> {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(viewState.message, color = MaterialTheme.colorScheme.error)
+                ErrorState(message = viewState.message)
             }
         }
     }
@@ -282,12 +300,21 @@ fun PlaylistsView(viewState: ViewState, navController: NavHostController, exclud
             val audioFiles = viewState.files.filter { it.mimeType.startsWith("audio/") }
             val unknown = stringResource(R.string.unknown)
             val playlists = audioFiles.groupBy { File(it.path).parentFile?.name ?: unknown }
+            if (playlists.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    EmptyState(
+                        icon = Icons.AutoMirrored.Filled.PlaylistPlay,
+                        title = stringResource(R.string.playlists),
+                        description = stringResource(R.string.no_files_found),
+                    )
+                }
+            } else
             LazyColumn(
-                modifier = Modifier.fillMaxSize(), 
-                contentPadding = PaddingValues(16.dp), 
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(playlists.keys.toList()) { playlistName ->
+                items(playlists.keys.toList(), key = { it }) { playlistName ->
                     Card(
                         modifier = Modifier.fillMaxWidth().clickable { 
                             navController.navigate("playlist/${Uri.encode(playlistName)}") 
@@ -301,9 +328,9 @@ fun PlaylistsView(viewState: ViewState, navController: NavHostController, exclud
                                 color = MaterialTheme.colorScheme.onSecondaryContainer
                             )
                             Text(
-                                text = stringResource(R.string.track_count, playlists[playlistName]?.size ?: 0), 
-                                style = MaterialTheme.typography.bodyMedium, 
-                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha=0.7f)
+                                text = stringResource(R.string.track_count, playlists[playlistName]?.size ?: 0),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
                             )
                         }
                     }
@@ -312,7 +339,7 @@ fun PlaylistsView(viewState: ViewState, navController: NavHostController, exclud
         }
         is ViewState.Error -> {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(viewState.message, color = MaterialTheme.colorScheme.error)
+                ErrorState(message = viewState.message)
             }
         }
     }

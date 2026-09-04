@@ -1,20 +1,24 @@
-# Media Master v0.2.0 実装・保守メモ
+# Media Master v0.3.0 実装・保守メモ
 
-最終更新: 2026-08-27
+最終更新: 2026-09-05
 
 ## リリース情報
 
 | 項目 | 内容 |
 | --- | --- |
-| バージョン | `0.2.0` (`versionCode 2`) |
+| バージョン | `0.3.0` (`versionCode 3`) |
 | アプリケーションID | `com.yukiorita.mediamaster` |
 | 最小 SDK / target SDK | 24 / 36 |
 | ライセンス | MIT |
 | 著作者 | Yuki_Orita |
-| release APK | `app/build/outputs/apk/release/app-release.apk` |
-| GitHub Release | `v0.2.0` (GitHub Releases) |
+| release APK | `app/build/outputs/apk/release/app-release.apk`（R8 + resource shrink 有効） |
+| APK SHA-256 | `5f896b1bd15a65b4a947c428490ca63cc0ea0cac81332d89477029b5fe3d4bab` |
+| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0/v0.2.0 と同一鍵） |
+| GitHub Release | `v0.3.0` (GitHub Releases) |
 
-release APK は RSA 4096 ビット鍵で APK Signature Scheme v2 署名する想定です。公開前には毎回 `apksigner verify --verbose` で署名を確認してください。
+release APK は RSA 4096 ビット鍵・APK Signature Scheme v2 署名。署名鍵は `common-rules-document/keystores/media-master-upload-key.jks`（alias `upload`）。公開前には毎回 `apksigner verify --verbose` で署名を確認してください。
+
+v0.3.0 は R8 有効ビルドで Android 14 (arm64) エミュレータのスモークテスト済み（主要画面・全 `mediamaster://` ディープリンク・回転・ダークモードで `com.yukiorita.mediamaster` プロセスのクラッシュ 0 件を確認）。DeX・RTL(ar)・TalkBack・分割画面・実 SMB/WebDAV サーバー疎通は未検証。
 
 ## v0.2.0 の実装内容
 

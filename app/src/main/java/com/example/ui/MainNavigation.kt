@@ -88,7 +88,7 @@ fun MainNavigation(
     }
 
     if (isGranted) {
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize()) {
             val desktop = isDesktopLayout()
             if (desktop) {
                 DesktopNavigation(navController, settingsViewModel) { onPinFolder, onOpenFolderInNewTab ->

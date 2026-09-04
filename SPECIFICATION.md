@@ -37,5 +37,5 @@ Media Master is a comprehensive Android application designed to manage, browse, 
 
 ## 6. Target Devices
 - **Minimum SDK**: 24 (Android 7.0)
-- **Target SDK**: 34 (Android 14)
+- **Target SDK**: 36
 - **Form Factors**: Adaptive layouts tailored for Phones, Foldables, and Tablets.

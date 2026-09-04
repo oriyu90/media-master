@@ -222,6 +222,59 @@ release APK は RSA 4096 ビット鍵で APK Signature Scheme v2 署名する想
 - 新規文字列 `strings_network.xml` 14キー×5ロケール（en/ja/zh/ar/nl 同数、合計202キー）。
 - 実機テストは今サイクル未実施。到達不可・認証失敗系のパスは `Result.failure` で UI にエラー表示。
 
+## 設計評価（2026-09 / Phase 8）
+
+### コントラスト（`ui/theme/Color.kt`、WCAG AA 目標 本文 4.5:1）
+
+`ColorUtils.calculateContrast` 相当で検証。代表ペア（すべて AA 以上）:
+
+| ペア | Light | Dark |
+| --- | --- | --- |
+| onPrimary / primary | 6.44 | 7.69 |
+| onPrimaryContainer / primaryContainer | 7.25 | 7.25 |
+| onSurface / surface | 16.4 | 14.3 |
+| onSurfaceVariant / surfaceVariant | 7.23 | 5.48 |
+| onSurfaceVariant / surfaceContainer | 7.99 | 9.63 |
+| onSecondaryContainer / secondaryContainer | 13.3 | 7.25 |
+| onError / error | 6.46 | 7.72 |
+| outline / surface（非テキスト、3:1 目標） | 4.23 | 5.81 |
+
+ビューアの `Viewer*` トークンは意図的にダーク固定（写真/動画は暗地が最適）。OCR の
+`Color.Blue`/`Color.Yellow` は任意画像上の高視認マーカーとして意図的に残置。
+
+### banned-antipattern 対応状況（`compose-kotlin-agent-skills` 表）
+
+| # | 項目 | 状態 |
+| --- | --- | --- |
+| 3 | ハードコード文字列 | 解消（`AdjustmentType` 日本語 literal → `@StringRes`。新規は全 `stringResource`） |
+| 4 | `collectAsState()` on Android | 解消（`MiniPlayer` を `collectAsStateWithLifecycle` へ。全新規コードも） |
+| 5 | `_state.value = x` | ネットワーク層は `update`/置換のみ。既存 `FileViewModel` は `ViewState` 据え置き（段階移行） |
+| 7 | `items(list)` no key | 主要リストに `key` 付与（Library/Album/Audio/Playlist/Clean/AppManager/Network 等） |
+| 15 | LazyColumn 内でソート | 一覧のソートは呼び出し前 / repository 側 |
+| 17 | 合成中の状態書き込み | 解消（`ImageEditorScreen.isPerspectiveMode` を派生値へ） |
+| 18 | nullable への `!!` | UI コードから除去（Viewer/Documents/FileViewModel） |
+| 21 | `SharedPreferences.edit().apply()` | 新規は DataStore。除外フォルダの生 SP は既存機能維持のため据え置き（別課題） |
+| 24 | `contentDescription = null` on icons | 機能アイコンにラベル、装飾は明示 `null`。`DraggableCorner` に付与 |
+| 25 | `kapt` | 不使用（KSP のみ） |
+
+### 残課題（フォローアップ）
+
+- `FileViewModel`（532行）の完全 MVI 分割は未実施（`ViewState` は安全消費へ移行済み。回帰リスク管理のため据え置き）。
+- `ViewerScreen` の OCR 座標計算・合成中 `?: return` の本格再設計。
+- `DocumentsScreen.ScanView` の `?: return`（合成中）。
+- 除外フォルダの生 `SharedPreferences("media_master_prefs")` を DataStore へ統一。
+- ネットワークストレージの実機（SMB/WebDAV サーバー）疎通テスト。
+- Firebase AI/AppCheck・Room の未使用依存の撤去（本改修では非対象）。
+
+### 検証手順（リリース前・要実施）
+
+1. `./gradlew :app:assembleRelease`（R8 有効）でビルドが通ること。
+2. 署名済み APK を実機へ導入し**全機能スモーク**（ライブラリ/ビューア/編集/オーディオ/
+   ドキュメントスキャン/管理/重複クリーン/APK管理/バックアップ/復元/ネットワーク/
+   全ディープリンク `am start`）。
+3. 回転・分割・DeX・RTL(ar)・ダーク・TalkBack を確認。
+4. `apksigner verify --verbose --print-certs` と SHA-256 記録。
+
 ## 主要ファイル
 
 | パス | 役割 |

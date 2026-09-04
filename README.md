@@ -4,6 +4,15 @@ Media Master is an open-source Android media and file manager built with Kotlin 
 
 Media Master は、Kotlin と Jetpack Compose で開発されたオープンソースのAndroid向けメディア・ファイル管理アプリです。写真・動画、音楽、書類、ストレージ、アプリ／APK、編集、バックアップを1つのアプリで扱えます。
 
+## v0.3.0
+
+- **External access:** other apps can open a specific feature via the dedicated `mediamaster://` scheme (Library, Audio, Documents, Manage, Apps, Clean, Settings, `browse?path=`, `edit/image?uri=`, `edit/video?uri=`), and Media Master now appears in the system "Open with" / "Edit with" chooser for images, video, audio and folders. Malformed external intents open the app normally and never perform destructive actions.
+- **Network storage:** add SMB shares and WebDAV servers under Settings → Server connection; passwords are stored with `EncryptedSharedPreferences`. Browse remote folders and open files through the system chooser.
+- **UI remade against `compose-kotlin-agent-skills`:** a full Material 3 colour system verified for WCAG AA contrast in light and dark, an explicit type scale, shared empty/error/loading components, and a strict-MVI-leaning state model. Every top-level feature is reachable directly from Home. The image/video editors and the excluded-folders screen are now wired into the app.
+- **Accessibility:** 48 dp minimum touch targets, `selected`/`Role` semantics on selectable items, merged descendants on cards, assertive live regions on error text, localised date formatting, and `<plurals>` for counts (six categories for Arabic).
+- **Safety:** zip-slip guard on restore, no more main-thread file I/O, no `!!` on nullable UI state, no state writes during composition, listener-driven playback position instead of polling loops, atomic DataStore updates.
+- Toolchain moved to Compose BOM 2025.05, Navigation 2.9, JDK 17 source level; release builds now run R8 with resource shrinking.
+
 ## v0.2.0
 
 - DeX shell is enabled only when Android reports desk mode; wide tablets and foldables retain the standard UI
@@ -26,8 +35,10 @@ Media Master は、Kotlin と Jetpack Compose で開発されたオープンソ�
 ## Requirements
 
 - Android Studio with Android SDK 36
-- JDK 21 (the source compatibility target is Java 11)
+- JDK 21 (the source compatibility target is Java 17)
 - Android 7.0 (API 24) or newer
+
+See the "External access" and "Network storage" sections below for the new integration points.
 
 ## Build
 

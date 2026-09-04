@@ -61,6 +61,56 @@ The desktop shell is enabled only when Android reports desk mode (including Sams
 
 On Android 11 and later, Media Master asks for Android's **all files access** before it opens the full file-manager interface. This is necessary to enumerate ordinary folders and local documents that are not MediaStore media, and to provide a complete internal/external-storage view.
 
+## External access (open a feature from another app)
+
+Other apps can open a specific Media Master feature directly.
+
+### `mediamaster://` scheme
+
+A dedicated, documented entry point. It is **not** marked `BROWSABLE`, so a web
+page cannot trigger it — only an app on the device that builds the intent
+explicitly.
+
+| URI | Opens |
+| --- | --- |
+| `mediamaster://home` | Home |
+| `mediamaster://library` | Library (photos & videos) |
+| `mediamaster://audio` | Audio |
+| `mediamaster://documents` | Documents / scanner |
+| `mediamaster://manage` | Manage (storage dashboard) |
+| `mediamaster://apps` | App & APK manager |
+| `mediamaster://clean` | Duplicate cleanup |
+| `mediamaster://settings` | Settings |
+| `mediamaster://browse?path=/storage/emulated/0/Download` | File browser at an absolute path |
+| `mediamaster://edit/image?uri=<content-uri>` | Image editor for a URI the caller has granted read access to |
+| `mediamaster://edit/video?uri=<content-uri>` | Video editor |
+
+```sh
+adb shell am start -a android.intent.action.VIEW \
+  -d "mediamaster://library" com.yukiorita.mediamaster
+```
+
+### Standard intents
+
+Media Master also registers for the system chooser:
+
+- `ACTION_EDIT` with `image/*` or `video/*` → the corresponding editor
+- `ACTION_VIEW` with `image/*`, `video/*`, or `audio/*` → opens the app at Library
+- `ACTION_VIEW` with `vnd.android.document/directory` → file browser at that folder
+
+Unknown or malformed requests simply open the app normally. Destructive
+operations (delete, uninstall, restore-from-backup) are never performed from an
+external intent — they always require an explicit in-app confirmation.
+
+### 外部連携（他アプリから機能を直接開く）
+
+他のアプリから Media Master の特定機能を直接開けます。`mediamaster://` スキームは
+`BROWSABLE` を付けていないため、Web ページからは起動できず、端末上のアプリが明示的に
+Intent を組み立てた場合のみ動作します。対応する URI は上表のとおりです。標準の
+`ACTION_EDIT`（`image/*`・`video/*`）、`ACTION_VIEW`（メディア／フォルダ）にも登録されます。
+未知・不正なリクエストは通常どおりアプリを開くだけで、削除・アンインストール・バックアップ復元
+などの破壊的操作が外部 Intent から実行されることはありません。
+
 ## License
 
 Copyright © 2026 Yuki_Orita. Released under the [MIT License](LICENSE).

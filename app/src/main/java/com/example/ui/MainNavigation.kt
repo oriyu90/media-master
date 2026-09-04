@@ -29,12 +29,20 @@ import com.example.ViewerScreen
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.google.accompanist.permissions.isGranted
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
-fun MainNavigation(fileViewModel: FileViewModel, settingsViewModel: SettingsViewModel) {
+fun MainNavigation(
+    fileViewModel: FileViewModel,
+    settingsViewModel: SettingsViewModel,
+    deepLinkRoute: StateFlow<String?> = MutableStateFlow(null),
+    onDeepLinkHandled: () -> Unit = {}
+) {
     val navController = rememberNavController()
     val context = LocalContext.current
+    val pendingDeepLink by deepLinkRoute.collectAsState()
 
     val permissionsToRequest = if (android.os.Build.VERSION.SDK_INT >= 34) {
         listOf(
@@ -67,6 +75,18 @@ fun MainNavigation(fileViewModel: FileViewModel, settingsViewModel: SettingsView
     } else {
         permissionsState.permissions.any { it.status.isGranted }
     }
+    // Apply an external deep link once storage access is granted and the NavHost exists.
+    // Unknown routes are swallowed so a malformed external intent can never crash the app.
+    LaunchedEffect(pendingDeepLink, isGranted) {
+        val route = pendingDeepLink
+        if (isGranted && route != null) {
+            runCatching {
+                navController.navigate(route) { launchSingleTop = true }
+            }
+            onDeepLinkHandled()
+        }
+    }
+
     if (isGranted) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val desktop = isDesktopLayout()

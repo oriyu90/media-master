@@ -55,7 +55,6 @@ fun NetworkScreen(navController: NavHostController, viewModel: NetworkViewModel 
     BackHandler(enabled = browseState !is BrowseUiState.Idle) { viewModel.up() }
 
     Scaffold(
-        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },

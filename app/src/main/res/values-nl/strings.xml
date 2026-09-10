@@ -46,4 +46,6 @@
   <string name="apps">Apps</string>
   <string name="grant_all_files_access">Toegang tot alle bestanden verlenen</string>
   <string name="home_desc_apps">Geïnstalleerde apps en APK\'s</string>
+    <string name="retry">Opnieuw proberen</string>
+    <string name="parent_folder">Bovenliggende map</string>
 </resources>

@@ -29,6 +29,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -37,6 +39,9 @@ import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.navigation.NavHostController
+import com.example.ui.components.ConfirmDeleteDialog
+import com.example.ui.components.EmptyState
+import com.example.ui.components.ErrorState
 import com.example.ui.theme.ViewerChromeContainer
 import com.example.ui.theme.ViewerOnSurface
 import com.example.ui.theme.ViewerScrim
@@ -45,27 +50,26 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions
-import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import java.io.File
 import kotlin.math.max
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHostController) {
-    if (path == null) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(stringResource(R.string.invalid_file_path))
-        }
+    val context = LocalContext.current
+    if (path == null || viewModel == null) {
+        EmptyState(
+            icon = Icons.Default.BrokenImage,
+            title = stringResource(R.string.invalid_file_path),
+            modifier = Modifier.fillMaxSize(),
+        )
         return
     }
-
-    val context = LocalContext.current
-    val viewState = viewModel?.mediaState?.collectAsStateWithLifecycle()?.value
+    val viewState = viewModel.mediaState.collectAsStateWithLifecycle().value
 
     var isFullScreen by remember { mutableStateOf(false) }
     
@@ -77,17 +81,43 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
 
     val coroutineScope = rememberCoroutineScope()
 
-    if (viewState is ViewState.Success) {
-        val targetFile = viewState.files.find { it.path == path } ?: return
+    when (val s = viewState) {
+        is ViewState.Loading -> {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = ViewerOnSurface)
+            }
+            return
+        }
+        is ViewState.Error -> {
+            ErrorState(
+                message = s.message,
+                modifier = Modifier.fillMaxSize(),
+                retryLabel = stringResource(R.string.retry),
+                onRetry = { viewModel.loadAllMedia() },
+            )
+            return
+        }
+        is ViewState.Success -> {
+        val targetFile = s.files.find { it.path == path }
+        if (targetFile == null) {
+            EmptyState(
+                icon = Icons.Default.BrokenImage,
+                title = stringResource(R.string.invalid_file_path),
+                modifier = Modifier.fillMaxSize(),
+            )
+            return
+        }
         val isTargetAudio = targetFile.mimeType.startsWith("audio/")
         val isTargetImageOrVideo = targetFile.mimeType.startsWith("image/") || targetFile.mimeType.startsWith("video/")
         
-        val mediaList = if (isTargetImageOrVideo) {
-            viewState.files.filter { it.mimeType.startsWith("image/") || it.mimeType.startsWith("video/") }
-        } else if (isTargetAudio) {
-            viewState.files.filter { it.mimeType.startsWith("audio/") }
-        } else {
-            listOf(targetFile)
+        val mediaList = remember(s.files, path) {
+            if (isTargetImageOrVideo) {
+                s.files.filter { it.mimeType.startsWith("image/") || it.mimeType.startsWith("video/") }
+            } else if (isTargetAudio) {
+                s.files.filter { it.mimeType.startsWith("audio/") }
+            } else {
+                listOf(targetFile)
+            }
         }
         
         val initialIndex = mediaList.indexOfFirst { it.path == path }.coerceAtLeast(0)
@@ -97,7 +127,15 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
         )
 
         val safePage = if (pagerState.currentPage >= mediaList.size) maxOf(0, mediaList.size - 1) else pagerState.currentPage
-        val currentFile = mediaList.getOrNull(safePage) ?: return
+        val currentFile = mediaList.getOrNull(safePage)
+        if (currentFile == null) {
+            EmptyState(
+                icon = Icons.Default.BrokenImage,
+                title = stringResource(R.string.invalid_file_path),
+                modifier = Modifier.fillMaxSize(),
+            )
+            return
+        }
         val contentUri = currentFile.contentUri ?: Uri.fromFile(File(currentFile.path))
         val isVideo = currentFile.mimeType.startsWith("video/")
         val isAudio = currentFile.mimeType.startsWith("audio/")
@@ -128,27 +166,22 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
                                         isOcrMode = true
                                         if (recognizedText == null && !isOcrLoading) {
                                             isOcrLoading = true
-                                            coroutineScope.launch(Dispatchers.IO) {
+                                            coroutineScope.launch {
+                                                val recognizer = TextRecognition.getClient(
+                                                    JapaneseTextRecognizerOptions.Builder().build(),
+                                                )
                                                 try {
-                                                    val inputImage = InputImage.fromFilePath(context, contentUri)
-                                                    imageSize = IntSize(inputImage.width, inputImage.height)
-                                                    
-                                                    val latinRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-                                                    val japaneseRecognizer = TextRecognition.getClient(JapaneseTextRecognizerOptions.Builder().build())
-                                                    
-                                                    val latinTask = async { latinRecognizer.process(inputImage).await() }
-                                                    val japaneseTask = async { japaneseRecognizer.process(inputImage).await() }
-                                                    
-                                                    val (latinResult, japaneseResult) = awaitAll(latinTask, japaneseTask)
-                                                    
-                                                    recognizedText = if (japaneseResult.text.length > latinResult.text.length) {
-                                                        japaneseResult
-                                                    } else {
-                                                        latinResult
+                                                    val inputImage = withContext(Dispatchers.IO) {
+                                                        InputImage.fromFilePath(context, contentUri)
                                                     }
-                                                } catch (e: Exception) {
-                                                    e.printStackTrace()
+                                                    val size = IntSize(inputImage.width, inputImage.height)
+                                                    val result = recognizer.process(inputImage).await()
+                                                    imageSize = size
+                                                    recognizedText = result
+                                                } catch (_: Exception) {
+                                                    recognizedText = null
                                                 } finally {
+                                                    runCatching { recognizer.close() }
                                                     isOcrLoading = false
                                                 }
                                             }
@@ -174,25 +207,37 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
                                     val encoded = Uri.encode(contentUri.toString())
                                     navController.navigate(
                                         if (isImage) "imageEditor/$encoded" else "videoEditor/$encoded"
-                                    )
+                                    ) { launchSingleTop = true }
                                 }) {
                                     Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.edit))
                                 }
                             }
-                            IconButton(onClick = {
-                                coroutineScope.launch {
-                                    viewModel?.deleteFile(currentFile.path, currentFile.contentUri)
-                                    if (mediaList.size <= 1) {
-                                        navController.popBackStack()
-                                    }
-                                }
-                            }) {
+                            var confirmDelete by remember { mutableStateOf(false) }
+                            if (confirmDelete) {
+                                ConfirmDeleteDialog(
+                                    title = stringResource(R.string.delete),
+                                    message = currentFile.name,
+                                    confirmLabel = stringResource(R.string.delete),
+                                    dismissLabel = stringResource(R.string.cancel),
+                                    onDismiss = { confirmDelete = false },
+                                    onConfirm = {
+                                        confirmDelete = false
+                                        val deletedPath = currentFile.path
+                                        coroutineScope.launch {
+                                            viewModel.deleteFile(deletedPath, currentFile.contentUri)
+                                            navController.popBackStack()
+                                        }
+                                    },
+                                )
+                            }
+                            IconButton(onClick = { confirmDelete = true }) {
                                 Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete))
                             }
                             IconButton(onClick = {
                                 val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                                     type = currentFile.mimeType
                                     putExtra(android.content.Intent.EXTRA_STREAM, contentUri)
+                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                 }
                                 context.startActivity(android.content.Intent.createChooser(shareIntent, context.getString(R.string.share_media)))
                             }) {
@@ -275,11 +320,8 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
                 }
             }
         }
-    } else {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
-        }
-    }
+        } // when (Success)
+    } // when
 }
 
 @Composable
@@ -311,6 +353,13 @@ fun ImageWithOcrOverlay(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .semantics {
+                // Expose OCR text to TalkBack (was unreachable Canvas-only).
+                val text = recognizedText?.text.orEmpty()
+                if (text.isNotEmpty()) {
+                    contentDescription = text
+                }
+            }
             .onGloballyPositioned { coordinates ->
                 boxSize = coordinates.size
             }

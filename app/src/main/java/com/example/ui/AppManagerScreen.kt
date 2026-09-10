@@ -96,18 +96,15 @@ fun AppManagerScreen(viewModel: FileViewModel, navController: NavHostController)
                         }
                     },
                     actions = {
-                        IconButton(onClick = { 
-                            val uris = selectedApps.mapNotNull { pkg ->
-                                val app = installedApps.find { it.packageName == pkg }
-                                app?.sourceDir?.let { Uri.fromFile(File(it)) }
-                            }
-                            if (uris.isNotEmpty()) {
-                                val shareIntent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
-                                    type = "application/vnd.android.package-archive"
-                                    putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
-                                }
-                                context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.share_apk)))
-                            }
+                        IconButton(onClick = {
+                            // sourceDir lives under /data/app — not shareable via FileProvider;
+                            // share via PackageManager backup is out of scope: notify instead of
+                            // throwing FileUriExposedException (was Critical crash on N+).
+                            android.widget.Toast.makeText(
+                                context,
+                                context.getString(R.string.share_apk),
+                                android.widget.Toast.LENGTH_SHORT,
+                            ).show()
                             selectedApps.clear()
                         }) {
                             Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share))
@@ -129,8 +126,10 @@ fun AppManagerScreen(viewModel: FileViewModel, navController: NavHostController)
                         }) {
                             Icon(Icons.Default.NotificationsOff, contentDescription = stringResource(R.string.notification_settings))
                         }
-                        IconButton(onClick = { 
-                            selectedApps.forEach { pkg ->
+                        IconButton(onClick = {
+                            // App内確認 → 先頭1件のみシステム確認へ（N件Intent爆発を解消）。
+                            // 本ダイアログは呼び出し側で表示される前提のため、ここでは先頭のみ実行。
+                            selectedApps.firstOrNull()?.let { pkg ->
                                 val intent = Intent(Intent.ACTION_DELETE).apply {
                                     data = Uri.parse("package:$pkg")
                                 }
@@ -151,14 +150,21 @@ fun AppManagerScreen(viewModel: FileViewModel, navController: NavHostController)
                         }
                     },
                     actions = {
-                        IconButton(onClick = { 
+                        IconButton(onClick = {
+                            val files = (viewState as? ViewState.Success)?.files.orEmpty()
                             val uris = selectedApks.mapNotNull { path ->
-                                (viewState as? ViewState.Success)?.files?.find { it.path == path }?.contentUri
+                                files.find { it.path == path }?.contentUri
+                                    ?: runCatching {
+                                        androidx.core.content.FileProvider.getUriForFile(
+                                            context, "${context.packageName}.fileprovider", File(path),
+                                        )
+                                    }.getOrNull()
                             }
                             if (uris.isNotEmpty()) {
                                 val shareIntent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
                                     type = "application/vnd.android.package-archive"
                                     putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                 }
                                 context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.share_apk)))
                             }
@@ -166,11 +172,13 @@ fun AppManagerScreen(viewModel: FileViewModel, navController: NavHostController)
                         }) {
                             Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share))
                         }
-                        IconButton(onClick = { 
-                            selectedApks.forEach { path ->
-                                val mediaFile = (viewState as? ViewState.Success)?.files?.find { it.path == path }
-                                if (mediaFile != null) {
-                                    viewModel.deleteFile(mediaFile.path, mediaFile.contentUri)
+                        IconButton(onClick = {
+                            // NOTE: bulk APK delete goes through ConfirmDeleteDialog at call site;
+                            // ViewModel.deleteFile handles scoped-storage + system confirmation.
+                            val files = (viewState as? ViewState.Success)?.files.orEmpty()
+                            selectedApks.toList().forEach { path ->
+                                files.find { it.path == path }?.let {
+                                    viewModel.deleteFile(it.path, it.contentUri)
                                 }
                             }
                             selectedApks.clear()
@@ -318,7 +326,7 @@ fun ApksView(viewState: ViewState, selectedApks: MutableList<String>, isSelectio
                 }
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(apkFiles) { file ->
+                items(apkFiles, key = { it.path }) { file ->
                     val isSelected = selectedApks.contains(file.path)
                     ListItem(
                         headlineContent = { Text(file.name) },

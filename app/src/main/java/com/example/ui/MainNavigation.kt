@@ -34,6 +34,7 @@ import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.google.accompanist.permissions.isGranted
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -45,7 +46,7 @@ fun MainNavigation(
 ) {
     val navController = rememberNavController()
     val context = LocalContext.current
-    val pendingDeepLink by deepLinkRoute.collectAsState()
+    val pendingDeepLink by deepLinkRoute.collectAsStateWithLifecycle()
 
     val permissionsToRequest = if (android.os.Build.VERSION.SDK_INT >= 34) {
         listOf(
@@ -198,7 +199,6 @@ fun HomeScreen(navController: NavHostController) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        contentWindowInsets = WindowInsets(0),
         topBar = {
             LargeTopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },

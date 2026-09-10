@@ -37,7 +37,6 @@ fun AlbumScreen(albumName: String, viewModel: FileViewModel, navController: NavH
     val viewState by viewModel.mediaState.collectAsStateWithLifecycle()
 
     Scaffold(
-        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title = {

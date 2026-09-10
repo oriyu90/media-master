@@ -48,7 +48,6 @@ fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostControlle
     var showLangDialog by remember { mutableStateOf(false) }
 
     Scaffold(
-        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.settings)) },
@@ -113,8 +112,19 @@ fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostControlle
             }
             if (backupEnabled) {
                 item {
+                    val context = LocalContext.current
                     val dirPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
-                        uri?.let { viewModel.setBackupTargetPath(it.toString()) }
+                        uri?.let {
+                            // Persist SAF permission so backups survive reboot (was missing → Critical).
+                            runCatching {
+                                context.contentResolver.takePersistableUriPermission(
+                                    it,
+                                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                                        android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                                )
+                            }
+                            viewModel.setBackupTargetPath(it.toString())
+                        }
                     }
                     ListItem(
                         headlineContent = { Text(stringResource(R.string.target_path)) },
@@ -255,13 +265,28 @@ fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostControlle
                 }
                 item {
                     val context = LocalContext.current
+                    var pendingRestoreUri by remember { mutableStateOf<Uri?>(null) }
                     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-                        uri?.let { 
-                            val data = Data.Builder().putString("uri", it.toString()).build()
-                            val req = OneTimeWorkRequestBuilder<RestoreWorker>().setInputData(data).build()
-                            WorkManager.getInstance(context).enqueue(req)
-                            android.widget.Toast.makeText(context, context.getString(R.string.restore_started), android.widget.Toast.LENGTH_SHORT).show()
-                        }
+                        uri?.let { pendingRestoreUri = it }
+                    }
+                    pendingRestoreUri?.let { pending ->
+                        AlertDialog(
+                            onDismissRequest = { pendingRestoreUri = null },
+                            title = { Text(stringResource(R.string.restore_backup)) },
+                            text = { Text(stringResource(R.string.restore_desc)) },
+                            confirmButton = {
+                                Button(onClick = {
+                                    pendingRestoreUri = null
+                                    val data = Data.Builder().putString("uri", pending.toString()).build()
+                                    val req = OneTimeWorkRequestBuilder<RestoreWorker>().setInputData(data).build()
+                                    WorkManager.getInstance(context).enqueue(req)
+                                    android.widget.Toast.makeText(context, context.getString(R.string.restore_started), android.widget.Toast.LENGTH_SHORT).show()
+                                }) { Text(stringResource(R.string.restore_backup)) }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { pendingRestoreUri = null }) { Text(stringResource(R.string.cancel)) }
+                            },
+                        )
                     }
                     ListItem(
                         headlineContent = { Text(stringResource(R.string.restore_backup)) },

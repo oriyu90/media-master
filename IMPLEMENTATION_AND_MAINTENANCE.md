@@ -1,24 +1,62 @@
-# Media Master v0.3.0 実装・保守メモ
+# Media Master v1.0.0 実装・保守メモ
 
-最終更新: 2026-09-05
+最終更新: 2026-09-11
 
 ## リリース情報
 
 | 項目 | 内容 |
 | --- | --- |
-| バージョン | `0.3.0` (`versionCode 3`) |
+| バージョン | `1.0.0` (`versionCode 4`) |
 | アプリケーションID | `com.yukiorita.mediamaster` |
 | 最小 SDK / target SDK | 24 / 36 |
 | ライセンス | MIT |
 | 著作者 | Yuki_Orita |
-| release APK | `app/build/outputs/apk/release/app-release.apk`（R8 + resource shrink 有効） |
-| APK SHA-256 | `5f896b1bd15a65b4a947c428490ca63cc0ea0cac81332d89477029b5fe3d4bab` |
-| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0/v0.2.0 と同一鍵） |
-| GitHub Release | `v0.3.0` (GitHub Releases) |
+| release APK | `app/build/outputs/apk/release/app-release-signed.apk`（R8 + resource shrink 有効） |
+| APK SHA-256 | `255d8ed2b60e1f7a3dd51d1f933b08ae39cc7fa9a8398149202cb20d038b0082` |
+| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0/v0.2.0/v0.3.0 と同一鍵） |
+| GitHub Release | `v1.0.0` (GitHub Releases) |
 
-release APK は RSA 4096 ビット鍵・APK Signature Scheme v2 署名。署名鍵は `common-rules-document/keystores/media-master-upload-key.jks`（alias `upload`）。公開前には毎回 `apksigner verify --verbose` で署名を確認してください。
+release APK は RSA 4096 ビット鍵・APK Signature Scheme v2+v3 署名（`apksigner verify` で確認済み）。署名鍵は `common-rules-document/keystores/media-master-upload-key.jks`（alias `upload`）。公開前には毎回 `apksigner verify --verbose` で署名を確認してください。
 
-v0.3.0 は R8 有効ビルドで Android 14 (arm64) エミュレータのスモークテスト済み（主要画面・全 `mediamaster://` ディープリンク・回転・ダークモードで `com.yukiorita.mediamaster` プロセスのクラッシュ 0 件を確認）。DeX・RTL(ar)・TalkBack・分割画面・実 SMB/WebDAV サーバー疎通は未検証。
+v1.0.0 は R8 有効ビルドで `:app:assembleDebug` / `:app:assembleRelease` が成功し、署名 APK の `apksigner verify`（v2+v3）を通しています。実機・エミュレータのスモークテストは未実施のため、配布前に主要画面・削除確認・共有・バックアップ/復元の実機確認を推奨。DeX・RTL(ar)・TalkBack・分割画面・実 SMB/WebDAV サーバー疎通は引き続き未検証。旧 v0.3.0 の APK SHA-256 は `5f896b1bd15a65b4a947c428490ca63cc0ea0cac81332d89477029b5fe3d4bab`。
+
+## v1.0.0 の実装内容（正式リリース改修）
+
+### 危険設計の修正（Critical/High）
+
+- 全削除フローにアプリ内確認（`CommonUi.ConfirmDeleteDialog`）を追加：Files（複数）/ Category / Audio / Viewer / APK一括 / Clean単体 / 復元（`SettingsScreen`）。
+- `AppManagerScreen` の `Uri.fromFile(sourceDir)`（`/data/app` 共有で N+ クラッシュ）を除去し、APK共有は `FileProvider` + `FLAG_GRANT_READ_URI_PERMISSION` に統一。Library/Audio/Category/Documents の共有 Intent にも付与漏れを修正。
+- `SettingsScreen` の SAF フォルダ選択に `takePersistableUriPermission` を追加（再起動後の無効化を解消）。
+- `ImageEditor` / `VideoEditor` エクスポート / `DocumentsScreen` の `PdfRenderer`・`openFileDescriptor` をすべて `use{}` 化（例外時リーク解消）。`appendImagesToPdf` はページ単位 `use` + `finally close`。
+- `FileViewModel` の `_value` 直代入 20 箇所 + `NetworkViewModel` 9 箇所を `update{}` 化。`reload()` を単一 `reloadJob` でガードし、遅勝ちエラーによる成功上書きを防止。削除失敗は `deleteError` でトースト通知。
+- `ViewerScreen` の Error 握り潰し（無限スピナー）と裸 `?: return`（白画面）を `when` + `EmptyState`/`ErrorState` に置換。OCR は日英2並列→Japanese単独＋`close()`＋IO/Main 分離。OCRテキストを TalkBack に公開。
+- `VideoEditorScreen` の 100ms ホットポーリングを 250ms・`ensureActive()` 付きに緩和。
+- `FileProvider`（`file_paths.xml`）に `cache-path`/`files-path`/`external-cache-path`/`external-files-path` を追加（ネットワーク cache 共有の `IllegalArgumentException` を解消）。
+
+### ファイル管理の完成度向上
+
+- `Environment.getExternalStorageDirectory()` の直接利用を `getExternalFilesDirs()` 派生ルートに置換（`storageRoots()` の `exists()` は IO スレッドに隔離）。UI のハードコード `/storage/emulated/0` 比較を `isStorageRoot()` に統一。
+- MIME 表を拡張（`heic/heif/avif/bmp/tif/svg/mov/webm/3gp/flv/m4a/aac/opus/csv/json/md/html/epub/zip`、表計算/プレゼンの実 MIME）。`MediaCategory` の `Downloads` 判定を case-insensitive 化し、`DOCUMENTS`/`APPS` の定義を `FileViewModel` と一致。
+- 重複検出を先頭256KB＋末尾256KB＋サイズ混入のサンプルハッシュに修正（旧「フルハッシュ」は先頭1MBのみの名称詐称）。読取不可は `null` 返却で誤グルーピングを防止。
+- `getAllDocumentFiles` の打ち切り上限は維持（50,000件）するが、Paging3 本格導入・`MediaStore` 高速化は v1.1.0 以降の候補。
+
+### Hallmark 準拠 UI リメイク
+
+- `CommonUi.Hallmark` トークン（`ContentEdge 16dp`・`ItemGap 8dp`・`RowMinHeight 56dp`・`ControlMinHeight 40dp`・`IconSize 18dp`・半径 8/12/16）を新設し、Files/Clean に適用。`ConfirmDeleteDialog`・`HallmarkDivider` を共通化。
+- 全メディアリストに安定キー（`key={path}`、Audio の index ベースを除去、Category/Library/Documents/Apks/除外フォルダ）。
+- `MainActivity` と `MainNavigation` の `collectAsState()` を `collectAsStateWithLifecycle()` に統一。
+- `Album`/`Playlist`/`Settings`/`Network`/`Clean` の `contentWindowInsets = WindowInsets(0)` を除去し、既定インセット＋末尾パディングに戻した（3ボタンナビでの隠れを解消）。
+- `FileItemRow/Grid` に `modifier` 引数＋`selected` セマンティクス＋`Role.Checkbox` を追加。`VideoEditor` の RangeSlider サムに読み上げラベル、`DocumentsScreen` の日付区切りは既存の locale 対応を維持。
+- 新規文字列 `retry`・`parent_folder` を en/ja/zh/ar/nl に追加（`".."` 直書きを除去）。
+
+### 残課題（v1.1.0 以降の候補）
+
+- `FileViewModel`（約590行）の完全 MVI 分割（FilesBrowser / MediaLibrary / Duplicates / DeleteUseCase + Repository）。
+- 数万件規模の `Paging3` 導入、`MediaStore` クエリの `LIMIT` 化。
+- 除外フォルダの生 `SharedPreferences` → DataStore 統一（現在は atomic 化のみ）。
+- Firebase AI / AppCheck・Room の未使用依存の撤去。
+- `ViewerScreen` のページ毎 ExoPlayer 生成 → 単一 Player＋`setMediaItem` 化。
+- 実機スモーク（削除確認・共有・SAF永続・バックアップ/復元）、DeX・RTL・TalkBack・分割画面・実SMB/WebDAV疎通。
 
 ## v0.2.0 の実装内容
 

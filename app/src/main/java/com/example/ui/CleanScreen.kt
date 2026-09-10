@@ -10,6 +10,9 @@ import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -18,8 +21,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.example.FileViewModel
+import com.example.MediaFile
 import com.example.R
+import com.example.ui.components.ConfirmDeleteDialog
 import com.example.ui.components.EmptyState
+import com.example.ui.components.Hallmark
 import com.example.ui.components.LoadingButton
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -27,9 +33,23 @@ import com.example.ui.components.LoadingButton
 fun CleanScreen(viewModel: FileViewModel, navController: NavHostController) {
     val duplicates by viewModel.duplicateFiles.collectAsStateWithLifecycle()
     val isScanning by viewModel.isScanningDuplicates.collectAsStateWithLifecycle()
+    var pendingDelete by remember { mutableStateOf<MediaFile?>(null) }
+
+    pendingDelete?.let { target ->
+        ConfirmDeleteDialog(
+            title = stringResource(R.string.delete),
+            message = target.name,
+            confirmLabel = stringResource(R.string.delete),
+            dismissLabel = stringResource(R.string.cancel),
+            onDismiss = { pendingDelete = null },
+            onConfirm = {
+                pendingDelete = null
+                viewModel.deleteFile(target.path, target.contentUri)
+            },
+        )
+    }
 
     Scaffold(
-        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.clean_duplicates)) },
@@ -83,7 +103,7 @@ fun CleanScreen(viewModel: FileViewModel, navController: NavHostController) {
                                             overflow = TextOverflow.Ellipsis,
                                             modifier = Modifier.weight(1f)
                                         )
-                                        IconButton(onClick = { viewModel.deleteFile(file.path, file.contentUri) }) {
+                                        IconButton(onClick = { pendingDelete = file }) {
                                             Icon(
                                                 Icons.Default.Delete,
                                                 contentDescription = stringResource(R.string.delete),

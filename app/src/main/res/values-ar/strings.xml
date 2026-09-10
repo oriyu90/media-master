@@ -84,4 +84,6 @@
     <string name="external_storage">التخزين الخارجي</string>
     <string name="add_folder">إضافة مجلد</string>
 <string name="files">ملفات</string><string name="folders">مجلدات</string><string name="grant_all_files_access">السماح بالوصول إلى كل الملفات</string>    <string name="home_desc_apps">التطبيقات المثبّتة وملفات APK</string>
+    <string name="retry">إعادة المحاولة</string>
+    <string name="parent_folder">المجلد الأب</string>
 </resources>

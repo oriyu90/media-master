@@ -34,12 +34,16 @@ enum class MediaCategory(
 
     /** Whether [file] belongs to this category. Single definition, previously duplicated. */
     fun matches(file: MediaFile): Boolean = when (this) {
-        DOWNLOADS -> file.path.contains("Download")
+        DOWNLOADS -> file.path.contains("Download", ignoreCase = true) ||
+            file.path.contains("Downloads", ignoreCase = true)
         IMAGES -> file.mimeType.startsWith("image/")
         VIDEOS -> file.mimeType.startsWith("video/")
         AUDIO -> file.mimeType.startsWith("audio/")
-        DOCUMENTS -> file.mimeType.startsWith("application/") || file.mimeType.startsWith("text/")
-        APPS -> file.mimeType == "application/vnd.android.package-archive"
+        DOCUMENTS -> file.mimeType.startsWith("application/") || file.mimeType.startsWith("text/") ||
+            file.name.substringAfterLast('.', "").lowercase() in
+            setOf("pdf", "doc", "docx", "odt", "rtf", "txt", "md", "csv", "xls", "xlsx", "ods", "ppt", "pptx", "odp", "epub")
+        APPS -> file.mimeType == "application/vnd.android.package-archive" ||
+            file.name.endsWith(".apk", ignoreCase = true)
     }
 
     companion object {

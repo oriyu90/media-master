@@ -60,7 +60,7 @@ fun ExcludeFoldersScreen(viewModel: FileViewModel, navController: NavHostControl
                     )
                 }
             } else {
-                items(excludedFolders.toList()) { path ->
+                items(excludedFolders.toList(), key = { it }) { path ->
                     ListItem(
                         headlineContent = { Text(File(path).name) },
                         supportingContent = { Text(path) },
@@ -165,7 +165,7 @@ fun FolderPickerDialog(onDismiss: () -> Unit, onFolderSelected: (String) -> Unit
                     if (currentPath !in storageRoots) {
                         item {
                             ListItem(
-                                headlineContent = { Text("..") },
+                                headlineContent = { Text(stringResource(R.string.parent_folder)) },
                                 leadingContent = { Icon(Icons.Default.Folder, contentDescription = null) },
                                 modifier = Modifier.clickable {
                                     File(currentPath).parentFile?.let { parent ->
@@ -175,7 +175,7 @@ fun FolderPickerDialog(onDismiss: () -> Unit, onFolderSelected: (String) -> Unit
                             )
                         }
                     }
-                    items(files) { file ->
+                    items(files, key = { it.path }) { file ->
                         ListItem(
                             headlineContent = { Text(file.name) },
                             leadingContent = { Icon(Icons.Default.Folder, contentDescription = null) },

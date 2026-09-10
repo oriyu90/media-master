@@ -78,12 +78,10 @@ fun ImageEditorScreen(uriString: String, navController: NavHostController) {
 
     LaunchedEffect(uri) {
         withContext(Dispatchers.IO) {
-            try {
-                val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
-                bitmap = BitmapFactory.decodeStream(inputStream)
-                inputStream?.close()
-            } catch (e: Exception) {
-                e.printStackTrace()
+            runCatching {
+                context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                    bitmap = BitmapFactory.decodeStream(inputStream)
+                }
             }
         }
     }

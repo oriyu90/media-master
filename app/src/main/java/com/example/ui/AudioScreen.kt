@@ -46,6 +46,28 @@ fun AudioScreen(viewModel: FileViewModel, navController: NavHostController) {
     
     val selectedFiles = remember { mutableStateListOf<String>() }
     val isSelectionMode = selectedFiles.isNotEmpty()
+    var pendingDeleteCount by remember { mutableStateOf(0) }
+
+    if (pendingDeleteCount > 0) {
+        com.example.ui.components.ConfirmDeleteDialog(
+            title = stringResource(R.string.delete),
+            message = pluralStringResource(R.plurals.items_selected, pendingDeleteCount, pendingDeleteCount),
+            confirmLabel = stringResource(R.string.delete),
+            dismissLabel = stringResource(R.string.cancel),
+            onDismiss = { pendingDeleteCount = 0 },
+            onConfirm = {
+                val toDelete = selectedFiles.toList()
+                pendingDeleteCount = 0
+                val files = (viewState as? ViewState.Success)?.files.orEmpty()
+                selectedFiles.clear()
+                toDelete.forEach { path ->
+                    files.find { it.path == path }?.let {
+                        viewModel.deleteFile(it.path, it.contentUri)
+                    }
+                }
+            },
+        )
+    }
 
     LaunchedEffect(Unit) {
         viewModel.loadAllMedia()
@@ -75,6 +97,7 @@ fun AudioScreen(viewModel: FileViewModel, navController: NavHostController) {
                                 val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND_MULTIPLE).apply {
                                     type = "audio/*"
                                     putParcelableArrayListExtra(android.content.Intent.EXTRA_STREAM, ArrayList(uris))
+                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                 }
                                 context.startActivity(android.content.Intent.createChooser(shareIntent, context.getString(R.string.share_media)))
                             }
@@ -87,14 +110,8 @@ fun AudioScreen(viewModel: FileViewModel, navController: NavHostController) {
                         }) {
                             Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = stringResource(R.string.add_to_playlist))
                         }
-                        IconButton(onClick = { 
-                            selectedFiles.forEach { path ->
-                                val mediaFile = (viewState as? ViewState.Success)?.files?.find { it.path == path }
-                                if (mediaFile != null) {
-                                    viewModel.deleteFile(mediaFile.path, mediaFile.contentUri)
-                                }
-                            }
-                            selectedFiles.clear()
+                        IconButton(onClick = {
+                            pendingDeleteCount = selectedFiles.size
                         }) {
                             Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete))
                         }
@@ -247,8 +264,7 @@ fun TracksView(viewState: ViewState, navController: NavHostController, selectedF
                 }
                 
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(audioFiles.size) { index ->
-                        val file = audioFiles[index]
+                    items(audioFiles, key = { it.path }) { file ->
                         val isSelected = selectedFiles.contains(file.path)
                         ListItem(
                             headlineContent = { Text(file.name) },
@@ -264,7 +280,7 @@ fun TracksView(viewState: ViewState, navController: NavHostController, selectedF
                                     if (isSelectionMode) {
                                         if (isSelected) selectedFiles.remove(file.path) else selectedFiles.add(file.path)
                                     } else {
-                                        playAudioList(audioFiles, index)
+                                        playAudioList(audioFiles, audioFiles.indexOf(file).coerceAtLeast(0))
                                     }
                                 },
                                 onLongClick = {

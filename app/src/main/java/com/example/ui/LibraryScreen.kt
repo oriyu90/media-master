@@ -79,6 +79,7 @@ fun LibraryScreen(viewModel: FileViewModel, navController: NavHostController) {
                                 val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND_MULTIPLE).apply {
                                     type = "*/*"
                                     putParcelableArrayListExtra(android.content.Intent.EXTRA_STREAM, ArrayList(uris))
+                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                 }
                                 context.startActivity(android.content.Intent.createChooser(shareIntent, context.getString(R.string.share_media)))
                             }
@@ -151,7 +152,7 @@ fun PhotosView(viewState: ViewState, navController: NavHostController, selectedF
                 }
             } else if (viewMode == ViewMode.LIST) {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(photosAndVideos) { file ->
+                    items(photosAndVideos, key = { it.path }) { file ->
                         val isSelected = selectedFiles.contains(file.path)
                         com.example.FileItemRow(
                             file = file,
@@ -175,7 +176,7 @@ fun PhotosView(viewState: ViewState, navController: NavHostController, selectedF
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    items(photosAndVideos) { file ->
+                    items(photosAndVideos, key = { it.path }) { file ->
                         val isSelected = selectedFiles.contains(file.path)
                         MediaGridItem(
                             file = file,

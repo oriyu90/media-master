@@ -18,6 +18,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
@@ -33,6 +35,7 @@ import androidx.navigation.NavHostController
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -79,15 +82,16 @@ fun VideoEditorScreen(uriString: String, navController: NavHostController) {
         exoPlayer?.volume = if (isMuted) 0f else 1f
     }
 
-    LaunchedEffect(startTrimMs, endTrimMs) {
+    // Loop the trim range: cancellable poll, slower cadence than the old 100ms
+    // hot loop, exits cleanly when the effect restarts or leaves composition.
+    LaunchedEffect(startTrimMs, endTrimMs, exoPlayer) {
+        val player = exoPlayer ?: return@LaunchedEffect
         while (true) {
-            val player = exoPlayer ?: break
-            if (player.isPlaying) {
-                if (player.currentPosition > endTrimMs) {
-                    player.seekTo(startTrimMs)
-                }
+            ensureActive()
+            if (player.isPlaying && player.currentPosition > endTrimMs) {
+                player.seekTo(startTrimMs)
             }
-            delay(100)
+            delay(250)
         }
     }
 
@@ -179,7 +183,21 @@ fun VideoEditorScreen(uriString: String, navController: NavHostController) {
                                     endTrimMs = range.endInclusive.toLong()
                                     exoPlayer?.seekTo(startTrimMs)
                                 },
-                                valueRange = 0f..durationMs.toFloat()
+                                valueRange = 0f..durationMs.toFloat(),
+                                startThumb = {
+                                    androidx.compose.foundation.layout.Box(
+                                        modifier = Modifier.semantics {
+                                            contentDescription = "${formatTime(startTrimMs)}"
+                                        },
+                                    )
+                                },
+                                endThumb = {
+                                    androidx.compose.foundation.layout.Box(
+                                        modifier = Modifier.semantics {
+                                            contentDescription = "${formatTime(endTrimMs)}"
+                                        },
+                                    )
+                                },
                             )
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -274,15 +292,15 @@ suspend fun exportTrimmedVideo(context: Context, inputUri: Uri, startMs: Long, e
 
             val uri = context.contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, contentValues)
             if (uri != null) {
-                val outputStream = context.contentResolver.openOutputStream(uri)
-                val inputStream = outputFile.inputStream()
-                if (outputStream != null) {
-                    inputStream.copyTo(outputStream)
-                    outputStream.close()
+                runCatching {
+                    context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                        outputFile.inputStream().use { inputStream ->
+                            inputStream.copyTo(outputStream)
+                        }
+                    }
                 }
-                inputStream.close()
             }
         }
-        outputFile.delete()
+        runCatching { outputFile.delete() }
     }
 }

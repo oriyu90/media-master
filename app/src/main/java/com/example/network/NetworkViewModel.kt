@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -46,27 +47,27 @@ class NetworkViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             repo.delete(id)
             credentials.removePassword(id)
-            if ((_browse.value as? BrowseUiState.Ready)?.location?.id == id) _browse.value = BrowseUiState.Idle
+            if ((_browse.value as? BrowseUiState.Ready)?.location?.id == id) _browse.update { BrowseUiState.Idle }
         }
     }
 
-    fun closeBrowser() { _browse.value = BrowseUiState.Idle }
+    fun closeBrowser() { _browse.update { BrowseUiState.Idle } }
 
     fun open(location: NetworkLocation) = navigate(location, "")
 
     fun navigate(location: NetworkLocation, path: String) {
-        _browse.value = BrowseUiState.Loading
+        _browse.update { BrowseUiState.Loading }
         viewModelScope.launch {
             val pw = withContext(Dispatchers.IO) { credentials.getPassword(location.id) }
             client.list(location, pw, path)
-                .onSuccess { entries -> _browse.value = BrowseUiState.Ready(location, path, entries) }
-                .onFailure { e -> _browse.value = BrowseUiState.Error(e.message ?: "Connection failed") }
+                .onSuccess { entries -> _browse.update { BrowseUiState.Ready(location, path, entries) } }
+                .onFailure { e -> _browse.update { BrowseUiState.Error(e.message ?: "Connection failed") } }
         }
     }
 
     fun up() {
         val state = _browse.value as? BrowseUiState.Ready ?: return
-        if (state.path.isEmpty()) { _browse.value = BrowseUiState.Idle; return }
+        if (state.path.isEmpty()) { _browse.update { BrowseUiState.Idle }; return }
         navigate(state.location, state.path.substringBeforeLast('/', ""))
     }
 
@@ -82,14 +83,14 @@ class NetworkViewModel(app: Application) : AndroidViewModel(app) {
     private fun downloadAndView(location: NetworkLocation, entry: NetworkEntry) {
         viewModelScope.launch {
             val prev = _browse.value
-            _browse.value = BrowseUiState.Loading
+            _browse.update { BrowseUiState.Loading }
             val pw = withContext(Dispatchers.IO) { credentials.getPassword(location.id) }
             val ctx = getApplication<Application>()
             val cacheDir = File(ctx.cacheDir, "network").apply { mkdirs() }
             val dest = File(cacheDir, entry.name)
             client.download(location, pw, entry.relativePath, dest)
                 .onSuccess {
-                    _browse.value = prev
+                    _browse.update { prev }
                     runCatching {
                         val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", dest)
                         val mime = ctx.contentResolver.getType(uri)
@@ -103,7 +104,7 @@ class NetworkViewModel(app: Application) : AndroidViewModel(app) {
                         )
                     }
                 }
-                .onFailure { e -> _browse.value = BrowseUiState.Error(e.message ?: "Download failed") }
+                .onFailure { e -> _browse.update { BrowseUiState.Error(e.message ?: "Download failed") } }
         }
     }
 }

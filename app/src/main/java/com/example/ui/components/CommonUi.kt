@@ -176,3 +176,57 @@ fun StatusPill(
         )
     }
 }
+
+/**
+ * Hallmark design tokens — single source of truth for spacing, radii and
+ * control sizing. All remade screens align to these instead of ad-hoc dps.
+ */
+object Hallmark {
+    val ContentEdge = 16.dp
+    val SectionGap = 16.dp
+    val ItemGap = 8.dp
+    val RowMinHeight = 56.dp
+    val ControlMinHeight = 40.dp
+    val IconBox = 40.dp
+    val IconSize = 18.dp
+    val RadiusSmall = 8.dp
+    val RadiusNormal = 12.dp
+    val RadiusPanel = 16.dp
+}
+
+/** Destructive confirmation dialog used before every delete/uninstall/restore. */
+@Composable
+fun ConfirmDeleteDialog(
+    title: String,
+    message: String,
+    confirmLabel: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    dismissLabel: String,
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title, style = MaterialTheme.typography.titleLarge) },
+        text = { Text(message, style = MaterialTheme.typography.bodyMedium) },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = onConfirm) {
+                Text(confirmLabel, color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                Text(dismissLabel)
+            }
+        },
+    )
+}
+
+/** Standard 1px separator between regions (Hallmark: structure, not decoration). */
+@Composable
+fun HallmarkDivider(modifier: Modifier = Modifier) {
+    androidx.compose.material3.HorizontalDivider(
+        modifier = modifier.padding(horizontal = Hallmark.ContentEdge),
+        thickness = 1.dp,
+        color = MaterialTheme.colorScheme.outlineVariant,
+    )
+}

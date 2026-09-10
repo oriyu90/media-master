@@ -1,7 +1,17 @@
 # 設計書兼仕様書 (Media Master)
 
 ## バージョン情報
-- **Version:** 0.3.0
+- **Version:** 1.0.0
+
+## v1.0.0 の設計変更（要約）
+- **破壊的操作の確認**: 削除・アンインストール・復元はすべてアプリ内 `ConfirmDeleteDialog` を経由。
+  一括アンインストールは先頭1件のみシステム確認へ（N件Intent爆発を解消）。
+- **状態競合の排除**: 全 `MutableStateFlow` を `update{}` 化し、並列リロードを単一 `reloadJob` で
+  ガード。削除失敗は `deleteError` フローでUI通知。
+- **Viewer再設計**: `Loading/Error/Success` の網羅 `when`（無限スピナー・白画面の除去）、
+  ページリストの `remember` 安定化、OCR単一recognizer＋`close()`＋TalkBack公開。
+- **Hallmarkトークン**: `CommonUi.Hallmark` に間隔・角丸・操作サイズを集約し、
+  全リストに安定キー・既定インセット・選択セマンティクスを適用。
 
 ## v0.3.0 の設計変更（要約）
 - **外部連携**: `com.example.deeplink.DeepLinks` を単一 allowlist とし、`mediamaster://` スキームと

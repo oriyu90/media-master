@@ -4,6 +4,16 @@ Media Master is an open-source Android media and file manager built with Kotlin 
 
 Media Master は、Kotlin と Jetpack Compose で開発されたオープンソースのAndroid向けメディア・ファイル管理アプリです。写真・動画、音楽、書類、ストレージ、アプリ／APK、編集、バックアップを1つのアプリで扱えます。
 
+## v1.0.0
+
+- **Formal release:** version `1.0.0` (`versionCode 4`), signed with the same upload key as v0.1.0–v0.3.0 (APK Signature Scheme v2+v3 verified). SHA-256: `255d8ed2b60e1f7a3dd51d1f933b08ae39cc7fa9a8398149202cb20d038b0082`.
+- **Stability first:** every delete/uninstall/restore now asks for confirmation inside the app; bulk uninstall fires a single system prompt; `FileUriExposedException` crash paths removed; `FLAG_GRANT_READ_URI_PERMISSION` on all shares; SAF backup folders persist across reboots; all stream/`PdfRenderer` leaks closed with `use{}`.
+- **State races removed:** all `MutableStateFlow` writes go through `update{}`; parallel reloads are job-guarded so a late error can no longer clobber fresh data; delete failures surface as toasts instead of `printStackTrace`.
+- **Viewer fixed:** load errors show a retryable error state (no more infinite spinner), missing files show an empty state (no more blank `?: return` screens), OCR runs a single Japanese recognizer off the main thread with proper `close()`, OCR text is exposed to TalkBack.
+- **File engine:** deprecated storage APIs replaced, `Downloads` matching is case-insensitive, MIME table extended (`heic/heif/avif/bmp/svg/mov/webm/m4a/aac/opus/csv/json/md/html/epub/zip`, real office MIME types), duplicate detection uses head+tail sampled hashes and never groups unreadable files, `FileProvider` covers cache/files paths.
+- **Hallmark UI pass:** shared `Hallmark` spacing/radius/control tokens, `ConfirmDeleteDialog` + `HallmarkDivider`, stable `key={path}` on every media list (index-based rows removed), `collectAsStateWithLifecycle` everywhere including `MainActivity`, default Scaffold insets restored (no more `WindowInsets(0)` lists hidden behind navigation bars), `parent_folder`/`retry` strings localized in ja/zh/ar/nl.
+- Toolchain unchanged from v0.3.0 (Compose BOM 2025.05, Navigation 2.9, JDK 17, R8 + resource shrink).
+
 ## v0.3.0
 
 - **External access:** other apps can open a specific feature via the dedicated `mediamaster://` scheme (Library, Audio, Documents, Manage, Apps, Clean, Settings, `browse?path=`, `edit/image?uri=`, `edit/video?uri=`), and Media Master now appears in the system "Open with" / "Edit with" chooser for images, video, audio and folders. Malformed external intents open the app normally and never perform destructive actions.

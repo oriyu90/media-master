@@ -52,6 +52,28 @@ fun CategoryScreen(categoryName: String, viewModel: FileViewModel, navController
 
     val selectedFiles = remember { mutableStateListOf<String>() }
     val isSelectionMode = selectedFiles.isNotEmpty()
+    var pendingDeleteCount by remember { mutableStateOf(0) }
+
+    if (pendingDeleteCount > 0) {
+        com.example.ui.components.ConfirmDeleteDialog(
+            title = stringResource(R.string.delete),
+            message = pluralStringResource(R.plurals.items_selected, pendingDeleteCount, pendingDeleteCount),
+            confirmLabel = stringResource(R.string.delete),
+            dismissLabel = stringResource(R.string.cancel),
+            onDismiss = { pendingDeleteCount = 0 },
+            onConfirm = {
+                val toDelete = selectedFiles.toList()
+                pendingDeleteCount = 0
+                val files = (viewState as? ViewState.Success)?.files.orEmpty()
+                selectedFiles.clear()
+                toDelete.forEach { path ->
+                    files.find { it.path == path }?.let {
+                        viewModel.deleteFile(it.path, it.contentUri)
+                    }
+                }
+            },
+        )
+    }
 
     LaunchedEffect(Unit) {
         viewModel.loadAllMedia()
@@ -92,6 +114,7 @@ fun CategoryScreen(categoryName: String, viewModel: FileViewModel, navController
                                 val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND_MULTIPLE).apply {
                                     type = "*/*"
                                     putParcelableArrayListExtra(android.content.Intent.EXTRA_STREAM, ArrayList(uris))
+                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                 }
                                 context.startActivity(android.content.Intent.createChooser(shareIntent, context.getString(R.string.share_media)))
                             }
@@ -99,14 +122,8 @@ fun CategoryScreen(categoryName: String, viewModel: FileViewModel, navController
                         }) {
                             Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share))
                         }
-                        IconButton(onClick = { 
-                            selectedFiles.forEach { path ->
-                                val mediaFile = (viewState as? ViewState.Success)?.files?.find { it.path == path }
-                                if (mediaFile != null) {
-                                    viewModel.deleteFile(mediaFile.path, mediaFile.contentUri)
-                                }
-                            }
-                            selectedFiles.clear()
+                        IconButton(onClick = {
+                            pendingDeleteCount = selectedFiles.size
                         }) {
                             Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete))
                         }
@@ -177,7 +194,7 @@ fun CategoryScreen(categoryName: String, viewModel: FileViewModel, navController
                         } else {
                             if (categoryViewMode == ViewMode.LIST) {
                                 LazyColumn(modifier = Modifier.fillMaxSize()) {
-                                    items(filesToShow) { file ->
+                                    items(filesToShow, key = { it.path }) { file ->
                                         CategoryFileRow(
                                             file = file,
                                             selectedFiles = selectedFiles,
@@ -193,7 +210,7 @@ fun CategoryScreen(categoryName: String, viewModel: FileViewModel, navController
                                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                                     verticalArrangement = Arrangement.spacedBy(2.dp)
                                 ) {
-                                    items(filesToShow) { file ->
+                                    items(filesToShow, key = { it.path }) { file ->
                                         CategoryFileGridItem(
                                             file = file,
                                             selectedFiles = selectedFiles,

@@ -34,7 +34,6 @@ fun PlaylistScreen(playlistName: String, viewModel: FileViewModel, navController
     val viewState by viewModel.mediaState.collectAsStateWithLifecycle()
 
     Scaffold(
-        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title = { Text(playlistName, maxLines = 1, overflow = TextOverflow.Ellipsis) },

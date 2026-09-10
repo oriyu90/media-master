@@ -95,6 +95,7 @@ fun DocumentsScreen(viewModel: FileViewModel, navController: NavHostController) 
                                 val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND_MULTIPLE).apply {
                                     type = "*/*"
                                     putParcelableArrayListExtra(android.content.Intent.EXTRA_STREAM, ArrayList(uris))
+                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                 }
                                 context.startActivity(android.content.Intent.createChooser(shareIntent, context.getString(R.string.share_media)))
                             }
@@ -179,17 +180,13 @@ fun ScanView(navController: NavHostController, onDocumentsChanged: () -> Unit) {
             // Get max pages
             coroutineScope.launch {
                 withContext(Dispatchers.IO) {
-                    try {
-                        val pfd = context.contentResolver.openFileDescriptor(uri, "r")
-                        if (pfd != null) {
-                            val renderer = PdfRenderer(pfd)
-                            maxPages = renderer.pageCount
-                            renderer.close()
-                            pfd.close()
-                            insertAfterPage = maxPages
+                    runCatching {
+                        context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
+                            PdfRenderer(pfd).use { renderer ->
+                                maxPages = renderer.pageCount
+                                insertAfterPage = maxPages
+                            }
                         }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
                     }
                 }
             }
@@ -374,63 +371,58 @@ private suspend fun saveScannedJpegs(context: Context, pages: List<Uri>) = withC
 
 suspend fun appendImagesToPdf(context: Context, sourcePdfUri: Uri, imageUris: List<Uri>, destPdfUri: Uri, insertAfterPage: Int) {
     withContext(Dispatchers.IO) {
-        val pfd = context.contentResolver.openFileDescriptor(sourcePdfUri, "r") ?: throw Exception(context.getString(R.string.could_not_open_source_pdf))
-        val pdfRenderer = PdfRenderer(pfd)
-        
         val pdfDocument = PdfDocument()
-        
-        val renderExistingPage = { pageIndex: Int -> 
-            val page = pdfRenderer.openPage(pageIndex)
-            val bitmap = Bitmap.createBitmap(page.width, page.height, Bitmap.Config.ARGB_8888)
-            // White background
-            bitmap.eraseColor(android.graphics.Color.WHITE)
-            page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
-            page.close()
-            
-            val pageInfo = PdfDocument.PageInfo.Builder(bitmap.width, bitmap.height, pdfDocument.pages.size + 1).create()
-            val docPage = pdfDocument.startPage(pageInfo)
-            docPage.canvas.drawBitmap(bitmap, 0f, 0f, null)
-            pdfDocument.finishPage(docPage)
-        }
-        
-        val renderNewImages = {
-            for (imageUri in imageUris) {
-                val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, imageUri))
-                } else {
-                    @Suppress("DEPRECATION")
-                    MediaStore.Images.Media.getBitmap(context.contentResolver, imageUri)
+        try {
+            context.contentResolver.openFileDescriptor(sourcePdfUri, "r")?.use { pfd ->
+                PdfRenderer(pfd).use { pdfRenderer ->
+                    val renderNewImages = {
+                        for (imageUri in imageUris) {
+                            val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                                ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, imageUri))
+                            } else {
+                                @Suppress("DEPRECATION")
+                                MediaStore.Images.Media.getBitmap(context.contentResolver, imageUri)
+                            }
+
+                            val pageInfo = PdfDocument.PageInfo.Builder(bitmap.width, bitmap.height, pdfDocument.pages.size + 1).create()
+                            val docPage = pdfDocument.startPage(pageInfo)
+                            // White background
+                            docPage.canvas.drawColor(android.graphics.Color.WHITE)
+                            docPage.canvas.drawBitmap(bitmap, 0f, 0f, null)
+                            pdfDocument.finishPage(docPage)
+                        }
+                    }
+
+                    val totalPages = pdfRenderer.pageCount
+
+                    for (i in 0 until totalPages) {
+                        if (i == insertAfterPage) {
+                            renderNewImages()
+                        }
+                        pdfRenderer.openPage(i).use { page ->
+                            val bitmap = Bitmap.createBitmap(page.width, page.height, Bitmap.Config.ARGB_8888)
+                            bitmap.eraseColor(android.graphics.Color.WHITE)
+                            page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
+                            val pageInfo = PdfDocument.PageInfo.Builder(bitmap.width, bitmap.height, pdfDocument.pages.size + 1).create()
+                            val docPage = pdfDocument.startPage(pageInfo)
+                            docPage.canvas.drawBitmap(bitmap, 0f, 0f, null)
+                            pdfDocument.finishPage(docPage)
+                            bitmap.recycle()
+                        }
+                    }
+
+                    if (insertAfterPage >= totalPages) {
+                        renderNewImages()
+                    }
                 }
-                
-                val pageInfo = PdfDocument.PageInfo.Builder(bitmap.width, bitmap.height, pdfDocument.pages.size + 1).create()
-                val docPage = pdfDocument.startPage(pageInfo)
-                // White background
-                docPage.canvas.drawColor(android.graphics.Color.WHITE)
-                docPage.canvas.drawBitmap(bitmap, 0f, 0f, null)
-                pdfDocument.finishPage(docPage)
+            } ?: throw Exception(context.getString(R.string.could_not_open_source_pdf))
+
+            context.contentResolver.openOutputStream(destPdfUri)?.use { out ->
+                pdfDocument.writeTo(out)
             }
+        } finally {
+            pdfDocument.close()
         }
-        
-        val totalPages = pdfRenderer.pageCount
-        
-        for (i in 0 until totalPages) {
-            if (i == insertAfterPage) {
-                renderNewImages()
-            }
-            renderExistingPage(i)
-        }
-        
-        if (insertAfterPage >= totalPages) {
-            renderNewImages()
-        }
-        
-        pdfRenderer.close()
-        pfd.close()
-        
-        context.contentResolver.openOutputStream(destPdfUri)?.use { out ->
-            pdfDocument.writeTo(out)
-        }
-        pdfDocument.close()
     }
 }
 
@@ -454,7 +446,7 @@ fun DocumentListView(viewState: ViewState, navController: NavHostController, sel
                 }
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    itemsIndexed(documentFiles) { index, file ->
+                    itemsIndexed(documentFiles, key = { _, file -> file.path }) { index, file ->
                         val isSelected = selectedFiles.contains(file.path)
                         DocumentListRow(
                             file = file,
@@ -493,24 +485,20 @@ fun DocumentListRow(file: MediaFile, isSelected: Boolean, isSelectionMode: Boole
     LaunchedEffect(file.path) {
         if (file.mimeType != "application/pdf" && !file.name.endsWith(".pdf", ignoreCase = true)) return@LaunchedEffect
         withContext(Dispatchers.IO) {
-            try {
+            runCatching {
                 if (file.contentUri != null) {
-                    val pfd = context.contentResolver.openFileDescriptor(file.contentUri, "r")
-                    if (pfd != null) {
-                        val renderer = PdfRenderer(pfd)
-                        pageCount = renderer.pageCount
-                        renderer.close()
-                        pfd.close()
+                    context.contentResolver.openFileDescriptor(file.contentUri, "r")?.use { pfd ->
+                        PdfRenderer(pfd).use { renderer ->
+                            pageCount = renderer.pageCount
+                        }
                     }
                 } else {
-                    val pfd = android.os.ParcelFileDescriptor.open(File(file.path), android.os.ParcelFileDescriptor.MODE_READ_ONLY)
-                    val renderer = PdfRenderer(pfd)
-                    pageCount = renderer.pageCount
-                    renderer.close()
-                    pfd.close()
+                    android.os.ParcelFileDescriptor.open(File(file.path), android.os.ParcelFileDescriptor.MODE_READ_ONLY)?.use { pfd ->
+                        PdfRenderer(pfd).use { renderer ->
+                            pageCount = renderer.pageCount
+                        }
+                    }
                 }
-            } catch (e: Exception) {
-                // Ignore errors reading pdf
             }
         }
     }

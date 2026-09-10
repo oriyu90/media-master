@@ -35,10 +35,15 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.example.ui.components.SortViewMenu
+import com.example.ui.components.ConfirmDeleteDialog
+import com.example.ui.components.Hallmark
 import java.text.DateFormat
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
 import java.util.Date
 import java.util.Locale
 import java.io.File
@@ -60,12 +65,56 @@ fun FilesScreen(
 
     val selectedFiles = remember { mutableStateListOf<String>() }
     val isSelectionMode = selectedFiles.isNotEmpty()
+    var pendingDeletePaths by remember { mutableStateOf<List<String>>(emptyList()) }
+    val deleteError by viewModel.deleteError.collectAsStateWithLifecycle()
 
     LaunchedEffect(initialPath) {
         initialPath?.takeIf { it.startsWith("/") }?.let(viewModel::loadFiles)
     }
 
-    BackHandler(enabled = viewState is ViewState.Success && (viewState as ViewState.Success).currentPath != "/storage/emulated/0") {
+    if (pendingDeletePaths.isNotEmpty()) {
+        ConfirmDeleteDialog(
+            title = stringResource(R.string.delete),
+            message = pluralStringResource(R.plurals.items_selected, pendingDeletePaths.size, pendingDeletePaths.size),
+            confirmLabel = stringResource(R.string.delete),
+            dismissLabel = stringResource(R.string.cancel),
+            onDismiss = { pendingDeletePaths = emptyList() },
+            onConfirm = {
+                val toDelete = pendingDeletePaths
+                pendingDeletePaths = emptyList()
+                val files = (viewState as? ViewState.Success)?.files.orEmpty()
+                selectedFiles.clear()
+                coroutineScope.launch {
+                    withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        toDelete.forEach { path ->
+                            val mediaFile = files.find { it.path == path }
+                            if (mediaFile != null && !mediaFile.isDirectory) {
+                                // MediaStore delete stays on the ViewModel (handles scoped storage).
+                            } else {
+                                val f = File(path)
+                                runCatching { if (f.isDirectory) f.deleteRecursively() else f.delete() }
+                            }
+                        }
+                    }
+                    toDelete.forEach { path ->
+                        files.find { it.path == path }?.takeIf { !it.isDirectory }?.let {
+                            viewModel.deleteFile(it.path, it.contentUri)
+                        }
+                    }
+                    viewModel.reload()
+                }
+            },
+        )
+    }
+
+    deleteError?.let { message ->
+        LaunchedEffect(message) {
+            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+            viewModel.clearDeleteError()
+        }
+    }
+
+    BackHandler(enabled = viewState is ViewState.Success && !(viewModel.isStorageRoot((viewState as ViewState.Success).currentPath))) {
         if (isSelectionMode) {
             selectedFiles.clear()
         } else {
@@ -84,7 +133,7 @@ fun FilesScreen(
                         }
                     },
                     actions = {
-                        IconButton(onClick = { 
+                        IconButton(onClick = {
                             val uris = selectedFiles.mapNotNull { path ->
                                 (viewState as? ViewState.Success)?.files?.find { it.path == path }?.contentUri
                             }
@@ -92,6 +141,7 @@ fun FilesScreen(
                                 val shareIntent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
                                     type = "*/*"
                                     putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                 }
                                 context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.share_files)))
                             }
@@ -101,29 +151,7 @@ fun FilesScreen(
                         }
 
                         IconButton(onClick = {
-                            val toDelete = selectedFiles.toList()
-                            val files = (viewState as? ViewState.Success)?.files.orEmpty()
-                            selectedFiles.clear()
-                            coroutineScope.launch {
-                                withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                    toDelete.forEach { path ->
-                                        val mediaFile = files.find { it.path == path }
-                                        if (mediaFile != null && !mediaFile.isDirectory) {
-                                            // MediaStore delete stays on the ViewModel (handles scoped storage).
-                                        } else {
-                                            val f = File(path)
-                                            runCatching { if (f.isDirectory) f.deleteRecursively() else f.delete() }
-                                        }
-                                    }
-                                }
-                                // Non-directory entries go through the ViewModel's safe delete path.
-                                toDelete.forEach { path ->
-                                    files.find { it.path == path }?.takeIf { !it.isDirectory }?.let {
-                                        viewModel.deleteFile(it.path, it.contentUri)
-                                    }
-                                }
-                                viewModel.reload()
-                            }
+                            pendingDeletePaths = selectedFiles.toList()
                         }) {
                             Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete))
                         }
@@ -145,8 +173,8 @@ fun FilesScreen(
                         Text(text = title, maxLines = 1, overflow = TextOverflow.Ellipsis) 
                     },
                     navigationIcon = {
-                        IconButton(onClick = { 
-                            if (viewState is ViewState.Success && (viewState as ViewState.Success).currentPath != "/storage/emulated/0") {
+                        IconButton(onClick = {
+                            if (viewState is ViewState.Success && !viewModel.isStorageRoot((viewState as ViewState.Success).currentPath)) {
                                 viewModel.navigateUp()
                             } else {
                                 navController.popBackStack()
@@ -185,23 +213,31 @@ fun FilesScreen(
                 }
                 is ViewState.Success -> {
                     if (viewMode == ViewMode.LIST) {
-                        LazyColumn(modifier = Modifier.fillMaxSize()) {
-                            itemsIndexed(state.files) { index, file ->
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(
+                                horizontal = Hallmark.ContentEdge,
+                                vertical = Hallmark.ItemGap,
+                            ),
+                        ) {
+                            itemsIndexed(
+                                state.files,
+                                key = { _, file -> file.path },
+                                contentType = { _, file -> if (file.isDirectory) "dir" else "file" },
+                            ) { _, file ->
                                 val isSelected = selectedFiles.contains(file.path)
-                                Column {
-                                    FileItemRow(file, isSelected, isSelectionMode, onToggleSelect = {
-                                        if (isSelected) selectedFiles.remove(file.path) else selectedFiles.add(file.path)
-                                    }, onPinFolder = onPinFolder, onOpenFolderInNewTab = onOpenFolderInNewTab) {
-                                        if (isSelectionMode) {
-                                            if (!file.isDirectory) {
-                                                if (isSelected) selectedFiles.remove(file.path) else selectedFiles.add(file.path)
-                                            }
+                                FileItemRow(file, isSelected, isSelectionMode, onToggleSelect = {
+                                    if (isSelected) selectedFiles.remove(file.path) else selectedFiles.add(file.path)
+                                }, onPinFolder = onPinFolder, onOpenFolderInNewTab = onOpenFolderInNewTab) {
+                                    if (isSelectionMode) {
+                                        if (!file.isDirectory) {
+                                            if (isSelected) selectedFiles.remove(file.path) else selectedFiles.add(file.path)
+                                        }
+                                    } else {
+                                        if (file.isDirectory) {
+                                            viewModel.loadFiles(file.path)
                                         } else {
-                                            if (file.isDirectory) {
-                                                viewModel.loadFiles(file.path)
-                                            } else {
-                                                openMediaFile(context, file, navController)
-                                            }
+                                            openMediaFile(context, file, navController)
                                         }
                                     }
                                 }
@@ -211,11 +247,15 @@ fun FilesScreen(
                         LazyVerticalGrid(
                             columns = GridCells.Adaptive(minSize = 100.dp),
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            contentPadding = PaddingValues(Hallmark.ContentEdge),
+                            horizontalArrangement = Arrangement.spacedBy(Hallmark.ItemGap),
+                            verticalArrangement = Arrangement.spacedBy(Hallmark.ItemGap)
                         ) {
-                            items(state.files) { file ->
+                            items(
+                                state.files,
+                                key = { it.path },
+                                contentType = { if (it.isDirectory) "dir" else "file" },
+                            ) { file ->
                                 val isSelected = selectedFiles.contains(file.path)
                                 FileItemGrid(file, isSelected, isSelectionMode, onToggleSelect = {
                                     if (isSelected) selectedFiles.remove(file.path) else selectedFiles.add(file.path)
@@ -250,6 +290,7 @@ fun FileItemRow(
     onToggleSelect: () -> Unit,
     onPinFolder: (String) -> Unit = {},
     onOpenFolderInNewTab: (String) -> Unit = {},
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
@@ -298,22 +339,14 @@ fun FileItemRow(
         colors = androidx.compose.material3.ListItemDefaults.colors(
             containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surface
         ),
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .pointerInput(file.path) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        if (file.isDirectory && event.type == PointerEventType.Press && event.buttons.isSecondaryPressed) {
-                            menuExpanded = true
-                            event.changes.forEach { it.consume() }
-                        }
-                    }
-                }
-            }
+            .heightIn(min = Hallmark.RowMinHeight)
+            .semantics { selected = isSelected }
             .combinedClickable(
                 onClick = onClick,
-                onLongClick = { if (file.isDirectory && file.name != "..") menuExpanded = true else onToggleSelect() }
+                onLongClick = { if (file.isDirectory && file.name != "..") menuExpanded = true else onToggleSelect() },
+                role = if (isSelectionMode) Role.Checkbox else null,
             )
     )
         HorizontalDivider(
@@ -346,6 +379,7 @@ fun FileItemGrid(
     onToggleSelect: () -> Unit,
     onPinFolder: (String) -> Unit = {},
     onOpenFolderInNewTab: (String) -> Unit = {},
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
@@ -357,23 +391,12 @@ fun FileItemGrid(
             )
         })
     } else Modifier
-    Box(modifier = dragModifier) {
+    Box(modifier = modifier.then(dragModifier).semantics { selected = isSelected }) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 116.dp)
             .padding(4.dp)
-            .pointerInput(file.path) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        if (file.isDirectory && event.type == PointerEventType.Press && event.buttons.isSecondaryPressed) {
-                            menuExpanded = true
-                            event.changes.forEach { it.consume() }
-                        }
-                    }
-                }
-            }
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = { if (file.isDirectory && file.name != "..") menuExpanded = true else onToggleSelect() }
@@ -433,8 +456,14 @@ fun openMediaFile(context: android.content.Context, file: MediaFile, navControll
     if (file.mimeType.startsWith("image/") || file.mimeType.startsWith("video/") || file.mimeType.startsWith("audio/")) {
         navController.navigate("viewer/${Uri.encode(file.path)}")
     } else if (file.mimeType == "application/vnd.android.package-archive" || file.path.endsWith(".apk", ignoreCase = true)) {
+        val uri = runCatching {
+            androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", File(file.path))
+        }.getOrNull()
+        if (uri == null) {
+            android.widget.Toast.makeText(context, context.getString(R.string.could_not_open_apk), android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
         val intent = Intent(Intent.ACTION_VIEW).apply {
-            val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", File(file.path))
             setDataAndType(uri, "application/vnd.android.package-archive")
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
         }
@@ -460,10 +489,20 @@ fun openMediaFile(context: android.content.Context, file: MediaFile, navControll
 }
 
 fun formatSize(sizeBytes: Long): String {
+    // Non-composable fallback: locale-aware grouping, binary units.
     if (sizeBytes <= 0) return "0 B"
     val units = arrayOf("B", "KB", "MB", "GB", "TB")
     val digitGroups = (Math.log10(sizeBytes.toDouble()) / Math.log10(1024.0)).toInt()
-    return String.format(Locale.US, "%.1f %s", sizeBytes / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
+        .coerceIn(0, units.size - 1)
+    return String.format(Locale.getDefault(), "%.1f %s", sizeBytes / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
+}
+
+@Composable
+fun formatSizeLocalized(sizeBytes: Long): String {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    return remember(sizeBytes) {
+        android.text.format.Formatter.formatFileSize(context, sizeBytes.coerceAtLeast(0L))
+    }
 }
 
 fun formatDate(dateMs: Long): String {

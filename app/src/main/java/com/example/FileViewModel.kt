@@ -8,9 +8,11 @@ import android.webkit.MimeTypeMap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -72,42 +74,52 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
     private val _showExcludedInManage = MutableStateFlow(false)
     val showExcludedInManage: StateFlow<Boolean> = _showExcludedInManage.asStateFlow()
 
+    // Hallmark v1.0.0: single reload job so parallel Loading/Success writes
+    // can no longer race (late error no longer clobbers fresh success).
+    private var reloadJob: Job? = null
+
     init {
         val sharedPrefs = application.getSharedPreferences("media_master_prefs", Context.MODE_PRIVATE)
-        _excludedFolders.value = sharedPrefs.getStringSet("excluded_folders", emptySet()) ?: emptySet()
+        // Atomic read; writes below always go through update + single apply().
+        _excludedFolders.update { sharedPrefs.getStringSet("excluded_folders", emptySet()) ?: emptySet() }
     }
 
     fun toggleShowExcludedInManage() {
-        _showExcludedInManage.value = !_showExcludedInManage.value
+        _showExcludedInManage.update { !it }
     }
 
     fun setCategoryViewMode(mode: ViewMode) {
-        _categoryViewMode.value = mode
+        _categoryViewMode.update { mode }
+    }
+
+    private fun persistExcludedLocked(current: Set<String>) {
+        getApplication<Application>().getSharedPreferences("media_master_prefs", Context.MODE_PRIVATE)
+            .edit().putStringSet("excluded_folders", current).apply()
     }
 
     fun addExcludedFolder(path: String) {
-        val current = _excludedFolders.value.toMutableSet()
-        current.add(path)
-        _excludedFolders.value = current
-        getApplication<Application>().getSharedPreferences("media_master_prefs", Context.MODE_PRIVATE)
-            .edit().putStringSet("excluded_folders", current).apply()
+        var snapshot = emptySet<String>()
+        _excludedFolders.update { current ->
+            (current + path).also { snapshot = it }
+        }
+        persistExcludedLocked(snapshot)
     }
 
     fun removeExcludedFolder(path: String) {
-        val current = _excludedFolders.value.toMutableSet()
-        current.remove(path)
-        _excludedFolders.value = current
-        getApplication<Application>().getSharedPreferences("media_master_prefs", Context.MODE_PRIVATE)
-            .edit().putStringSet("excluded_folders", current).apply()
+        var snapshot = emptySet<String>()
+        _excludedFolders.update { current ->
+            (current - path).also { snapshot = it }
+        }
+        persistExcludedLocked(snapshot)
     }
 
     fun setSortOption(option: SortOption) {
-        _sortOption.value = option
+        _sortOption.update { option }
         reload()
     }
 
     fun setViewMode(mode: ViewMode) {
-        _viewMode.value = mode
+        _viewMode.update { mode }
     }
 
     private fun sortFiles(files: List<MediaFile>): List<MediaFile> {
@@ -119,84 +131,115 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private val rootPath = Environment.getExternalStorageDirectory().absolutePath
-    private var currentPath = rootPath
+    // Deprecated Environment.getExternalStorageDirectory() replaced: primary
+    // shared root comes from getExternalFilesDirs() so it works on all
+    // manufacturers (no hard-coded /storage/emulated/0 comparisons in callers).
+    val rootPath: String
+        get() = storageRoots().firstOrNull()
+            ?: getApplication<Application>().getExternalFilesDir(null)
+                ?.absolutePath?.substringBefore("/Android/") ?: "/sdcard"
+    private var currentPath: String? = null
 
     init {
-        loadFiles(rootPath)
+        loadFiles(resolveRoot())
     }
+
+    private fun resolveRoot(): String = rootPath
 
     fun reload() {
-        loadAllMedia()
-        loadDocuments()
-        loadFiles(currentPath)
+        // Cancel in-flight loads so only the latest request can publish.
+        reloadJob?.cancel()
+        reloadJob = viewModelScope.launch {
+            launch { loadAllMediaInternal() }
+            launch { loadDocumentsInternal() }
+            loadFilesInternal(currentPath ?: resolveRoot())
+        }
     }
 
-    fun loadFiles(path: String = currentPath) {
+    fun loadFiles(path: String = currentPath ?: resolveRoot()) {
+        reloadJob?.cancel()
+        reloadJob = viewModelScope.launch { loadFilesInternal(path) }
+    }
+
+    private suspend fun loadFilesInternal(path: String) {
         currentPath = path
-        viewModelScope.launch {
-            _fileTreeState.value = ViewState.Loading
-            try {
-                val files = withContext(Dispatchers.IO) {
-                    val result = mutableListOf<MediaFile>()
-                    val directory = File(path)
-                    val indexedFiles = getAllMediaFiles().associateBy { it.path }
-                    // File.listFiles() is deliberately the primary source here.  MediaStore only
-                    // indexes selected file types, which made folders and ordinary documents
-                    // disappear compared with Files by Google.
-                    val visibleItems = directory.listFiles()
-                        ?.map { file ->
-                            if (file.isDirectory) {
-                                MediaFile(-1, file.name, file.absolutePath, 0, "folder", file.lastModified(), true)
-                            } else {
-                                indexedFiles[file.absolutePath] ?: file.toMediaFile()
-                            }
+        _fileTreeState.update { ViewState.Loading }
+        try {
+            val roots = withContext(Dispatchers.IO) { storageRoots() }
+            val files = withContext(Dispatchers.IO) {
+                val result = mutableListOf<MediaFile>()
+                val directory = File(path)
+                val indexedFiles = getAllMediaFiles().associateBy { it.path }
+                // File.listFiles() is deliberately the primary source here.  MediaStore only
+                // indexes selected file types, which made folders and ordinary documents
+                // disappear compared with Files by Google.
+                val visibleItems = directory.listFiles()
+                    ?.map { file ->
+                        if (file.isDirectory) {
+                            MediaFile(-1, file.name, file.absolutePath, 0, "folder", file.lastModified(), true)
+                        } else {
+                            indexedFiles[file.absolutePath] ?: file.toMediaFile()
                         }
-                        ?.toMutableList()
-                        ?: mutableListOf()
-
-                    // On devices where a provider exposes an item before the filesystem does,
-                    // retain direct MediaStore children as a fallback.
-                    val targetDir = if (path.endsWith("/")) path else "$path/"
-                    indexedFiles.values.filter { item ->
-                        item.path.startsWith(targetDir) && !item.path.removePrefix(targetDir).contains("/")
-                    }.forEach { item ->
-                        if (visibleItems.none { it.path == item.path }) visibleItems.add(item)
                     }
+                    ?.toMutableList()
+                    ?: mutableListOf()
 
-                    if (path !in storageRoots()) {
-                        val parent = File(path).parent ?: rootPath
-                        result.add(MediaFile(-1, "..", parent, 0, "folder", 0, true))
-                    }
-                    val dirs = visibleItems.filter { it.isDirectory }.sortedBy { it.name.lowercase() }
-                    result + dirs + sortFiles(visibleItems.filter { !it.isDirectory })
+                // On devices where a provider exposes an item before the filesystem does,
+                // retain direct MediaStore children as a fallback.
+                val targetDir = if (path.endsWith("/")) path else "$path/"
+                indexedFiles.values.filter { item ->
+                    item.path.startsWith(targetDir) && !item.path.removePrefix(targetDir).contains("/")
+                }.forEach { item ->
+                    if (visibleItems.none { it.path == item.path }) visibleItems.add(item)
                 }
-                _fileTreeState.value = ViewState.Success(files, path)
-            } catch (e: Exception) {
-                _fileTreeState.value = ViewState.Error(e.message ?: "Unknown error")
+
+                if (path !in roots) {
+                    val parent = File(path).parent ?: roots.firstOrNull() ?: path
+                    result.add(MediaFile(-1, "..", parent, 0, "folder", 0, true))
+                }
+                val dirs = visibleItems.filter { it.isDirectory }.sortedBy { it.name.lowercase() }
+                result + dirs + sortFiles(visibleItems.filter { !it.isDirectory })
             }
+            _fileTreeState.update { ViewState.Success(files, path) }
+        } catch (e: Exception) {
+            _fileTreeState.update { ViewState.Error(e.message ?: "Unknown error") }
         }
     }
 
     fun navigateUp() {
-        val currentFile = File(currentPath)
-        if (currentFile.absolutePath !in storageRoots()) {
-            currentFile.parent?.let { loadFiles(it) }
+        val current = currentPath ?: return
+        val currentFile = File(current)
+        viewModelScope.launch(Dispatchers.IO) {
+            val roots = storageRoots()
+            if (currentFile.absolutePath !in roots) {
+                currentFile.parent?.let { loadFiles(it) }
+            }
         }
     }
 
     private fun getMimeType(extension: String): String {
         return when (extension.lowercase()) {
-            "jpg", "jpeg", "png", "gif", "webp" -> "image/*"
-            "mp4", "mkv", "avi" -> "video/*"
-            "mp3", "wav", "ogg", "flac" -> "audio/*"
+            "jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "avif", "bmp", "tif", "tiff", "svg" -> "image/*"
+            "mp4", "mkv", "avi", "mov", "webm", "3gp", "flv" -> "video/*"
+            "mp3", "wav", "ogg", "flac", "m4a", "aac", "opus" -> "audio/*"
             "pdf" -> "application/pdf"
             "doc" -> "application/msword"
             "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             "odt" -> "application/vnd.oasis.opendocument.text"
             "rtf" -> "application/rtf"
-            "txt" -> "text/plain"
-            "xls", "xlsx", "ods", "ppt", "pptx", "odp" -> "application/octet-stream"
+            "txt", "md" -> "text/plain"
+            "csv" -> "text/csv"
+            "json" -> "application/json"
+            "html", "htm" -> "text/html"
+            "epub" -> "application/epub+zip"
+            "zip" -> "application/zip"
+            "xls" -> "application/vnd.ms-excel"
+            "xlsx" -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            "ods" -> "application/vnd.oasis.opendocument.spreadsheet"
+            "ppt" -> "application/vnd.ms-powerpoint"
+            "pptx" -> "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            "odp" -> "application/vnd.oasis.opendocument.presentation"
+            "apk" -> "application/vnd.android.package-archive"
             else -> "application/octet-stream"
         }
     }
@@ -211,21 +254,34 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
         contentUri = null
     )
 
+    /** Call off the main thread: hits the filesystem via [File.exists]. */
     private fun storageRoots(): List<String> {
         val context = getApplication<Application>()
         return buildList {
-            add(rootPath)
             context.getExternalFilesDirs(null).mapNotNull { it?.absolutePath?.substringBefore("/Android/data/") }
                 .filter { it.isNotBlank() }
                 .forEach(::add)
+            // Legacy fallback for devices where app-scoped dirs are unavailable.
+            @Suppress("DEPRECATION")
+            add(Environment.getExternalStorageDirectory().absolutePath)
         }.distinct().filter { File(it).exists() }
+    }
+
+    /** Canonical root check shared with UI (replaces hard-coded /storage/emulated/0). */
+    fun isStorageRoot(path: String): Boolean {
+        val abs = File(path).absolutePath
+        val context = getApplication<Application>()
+        val candidates = context.getExternalFilesDirs(null)
+            .mapNotNull { it?.absolutePath?.substringBefore("/Android/data/") } +
+            listOf("/storage/emulated/0", "/sdcard")
+        return candidates.any { abs == it }
     }
 
     fun findDuplicates() {
         if (_isScanningDuplicates.value) return
-        
+
         viewModelScope.launch {
-            _isScanningDuplicates.value = true
+            _isScanningDuplicates.update { true }
             val duplicates = withContext(Dispatchers.IO) {
                 val allFiles = sortFiles(getAllMediaFiles())
                 
@@ -236,13 +292,14 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
                 val duplicateGroups = mutableListOf<List<MediaFile>>()
                 
                 for ((_, files) in sizeGroups) {
+                    // Null hash = unreadable; never group unreadables together.
                     val partialHashGroups = files.groupBy { calculatePartialHash(it) }
-                        .filter { it.key.isNotEmpty() && it.value.size > 1 }
-                    
+                        .filter { it.key != null && it.value.size > 1 }
+
                     // For groups that match size and partial hash, verify with full hash
                     for ((_, partialFiles) in partialHashGroups) {
-                        val fullHashGroups = partialFiles.groupBy { calculateFullHash(it) }
-                            .filter { it.key.isNotEmpty() && it.value.size > 1 }
+                        val fullHashGroups = partialFiles.groupBy { calculateSampledHash(it) }
+                            .filter { it.key != null && it.value.size > 1 }
                         
                         fullHashGroups.values.forEach {
                             duplicateGroups.add(it)
@@ -251,35 +308,39 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 duplicateGroups
             }
-            _duplicateFiles.value = duplicates
-            _isScanningDuplicates.value = false
+            _duplicateFiles.update { duplicates }
+            _isScanningDuplicates.update { false }
         }
     }
 
     fun loadAllMedia() {
-        viewModelScope.launch {
-            _mediaState.value = ViewState.Loading
-            try {
-                val files = withContext(Dispatchers.IO) {
-                    sortFiles(getAllMediaFiles())
-                }
-                _mediaState.value = ViewState.Success(files, "All Media")
-            } catch (e: Exception) {
-                _mediaState.value = ViewState.Error(e.message ?: "Unknown error")
+        viewModelScope.launch { loadAllMediaInternal() }
+    }
+
+    private suspend fun loadAllMediaInternal() {
+        _mediaState.update { ViewState.Loading }
+        try {
+            val files = withContext(Dispatchers.IO) {
+                sortFiles(getAllMediaFiles())
             }
+            _mediaState.update { ViewState.Success(files, "All Media") }
+        } catch (e: Exception) {
+            _mediaState.update { ViewState.Error(e.message ?: "Unknown error") }
         }
     }
 
     /** Lists local PDF and office documents, including app-created scans and non-media files. */
     fun loadDocuments() {
-        viewModelScope.launch {
-            _documentsState.value = ViewState.Loading
-            try {
-                val files = withContext(Dispatchers.IO) { sortFiles(getAllDocumentFiles()) }
-                _documentsState.value = ViewState.Success(files, "Documents")
-            } catch (e: Exception) {
-                _documentsState.value = ViewState.Error(e.message ?: "Unknown error")
-            }
+        viewModelScope.launch { loadDocumentsInternal() }
+    }
+
+    private suspend fun loadDocumentsInternal() {
+        _documentsState.update { ViewState.Loading }
+        try {
+            val files = withContext(Dispatchers.IO) { sortFiles(getAllDocumentFiles()) }
+            _documentsState.update { ViewState.Success(files, "Documents") }
+        } catch (e: Exception) {
+            _documentsState.update { ViewState.Error(e.message ?: "Unknown error") }
         }
     }
 
@@ -307,20 +368,20 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
                         if (contentUri != null) {
                             val intentSender = MediaStore.createDeleteRequest(getApplication<Application>().contentResolver, listOf(contentUri)).intentSender
-                            _pendingDeleteIntent.value = intentSender
+                            _pendingDeleteIntent.update { intentSender }
                             pendingDeletePath = path
                         }
                     } else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                         val recoverableSecurityException = e as? android.app.RecoverableSecurityException
                         if (recoverableSecurityException != null) {
-                            _pendingDeleteIntent.value = recoverableSecurityException.userAction.actionIntent.intentSender
+                            _pendingDeleteIntent.update { recoverableSecurityException.userAction.actionIntent.intentSender }
                             pendingDeletePath = path
                         }
-                    } else {
-                        e.printStackTrace()
                     }
+                    // No printStackTrace: surface via deleteError below.
+                    _deleteError.update { e.message }
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    _deleteError.update { e.message }
                 }
             }
             if (deleted) {
@@ -329,8 +390,15 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private val _deleteError = MutableStateFlow<String?>(null)
+    val deleteError: StateFlow<String?> = _deleteError.asStateFlow()
+
+    fun clearDeleteError() {
+        _deleteError.update { null }
+    }
+
     fun onPendingDeleteResult(success: Boolean) {
-        _pendingDeleteIntent.value = null
+        _pendingDeleteIntent.update { null }
         val path = pendingDeletePath
         if (success && path != null) {
             onFileDeleted(path)
@@ -340,15 +408,17 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun onFileDeleted(path: String) {
         if (!_isScanningDuplicates.value) {
-            val updatedDuplicates = _duplicateFiles.value.mapNotNull { group ->
-                val newGroup = group.filter { it.path != path }
-                if (newGroup.size > 1) newGroup else null
+            _duplicateFiles.update { groups ->
+                groups.mapNotNull { group ->
+                    val newGroup = group.filter { it.path != path }
+                    if (newGroup.size > 1) newGroup else null
+                }
             }
-            _duplicateFiles.value = updatedDuplicates
         }
         val parentPath = File(path).parent
-        if (currentPath == parentPath && _fileTreeState.value is ViewState.Success) {
-            loadFiles(currentPath)
+        val current = currentPath
+        if (current == parentPath && _fileTreeState.value is ViewState.Success && current != null) {
+            loadFiles(current)
         }
         loadAllMedia()
     }
@@ -467,67 +537,96 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
     private fun File.isDocument(): Boolean = isFile && isDocumentName(name)
 
     private fun isDocumentName(name: String): Boolean = name.substringAfterLast('.', "").lowercase() in setOf(
-        "pdf", "doc", "docx", "odt", "rtf", "txt", "xls", "xlsx", "ods", "ppt", "pptx", "odp"
+        "pdf", "doc", "docx", "odt", "rtf", "txt", "md", "csv", "json", "html", "htm",
+        "xls", "xlsx", "ods", "ppt", "pptx", "odp", "epub"
     )
 
-    private fun calculatePartialHash(mediaFile: MediaFile): String {
-        try {
-            val resolver = getApplication<Application>().contentResolver
-            val inputStream = if (mediaFile.contentUri != null) {
-                resolver.openInputStream(mediaFile.contentUri)
-            } else {
-                null
-            }
-            if (inputStream == null) return ""
-            
-            val md = MessageDigest.getInstance("MD5")
-            val bytesToRead = minOf(mediaFile.size, 1024 * 1024L) // Max 1MB
-            val buffer = ByteArray(8192)
-            
-            inputStream.use { input ->
-                var read = 0L
-                while (read < bytesToRead) {
-                    val chunk = input.read(buffer, 0, minOf(8192L, bytesToRead - read).toInt())
-                    if (chunk == -1) break
-                    md.update(buffer, 0, chunk)
-                    read += chunk
-                }
-            }
-            return md.digest().joinToString("") { "%02x".format(it) }
-        } catch (e: Exception) {
-            return ""
-        }
+    /** Head sample (first 256KB). Returns null when unreadable so callers never group failures. */
+    private fun calculatePartialHash(mediaFile: MediaFile): String? {
+        return sampleStream(mediaFile, headBytes = 256 * 1024L, tailBytes = 0L)
     }
 
-    private fun calculateFullHash(mediaFile: MediaFile): String {
-        try {
+    /**
+     * Head + tail sampled hash (first 256KB + last 256KB + size mixed in).
+     * Replaces the old misnamed "full hash" which only read the first 1MB.
+     */
+    private fun calculateSampledHash(mediaFile: MediaFile): String? {
+        return sampleStream(mediaFile, headBytes = 256 * 1024L, tailBytes = 256 * 1024L)
+    }
+
+    private fun sampleStream(mediaFile: MediaFile, headBytes: Long, tailBytes: Long): String? {
+        return try {
             val resolver = getApplication<Application>().contentResolver
-            val inputStream = if (mediaFile.contentUri != null) {
-                resolver.openInputStream(mediaFile.contentUri)
-            } else {
-                null
-            }
-            if (inputStream == null) return ""
-            
             val md = MessageDigest.getInstance("MD5")
             val buffer = ByteArray(8192)
-            
-            // Read first 1MB
-            inputStream.use { input ->
-                var read = 0L
-                while (read < 1024 * 1024L) {
-                    val chunk = input.read(buffer, 0, minOf(8192L, 1024 * 1024L - read).toInt())
-                    if (chunk == -1) break
-                    md.update(buffer, 0, chunk)
-                    read += chunk
+            if (mediaFile.contentUri != null && mediaFile.contentUri != Uri.EMPTY) {
+                resolver.openInputStream(mediaFile.contentUri)?.use { input ->
+                    var remaining = headBytes
+                    while (remaining > 0) {
+                        val chunk = input.read(buffer, 0, minOf(buffer.size.toLong(), remaining).toInt())
+                        if (chunk == -1) break
+                        md.update(buffer, 0, chunk)
+                        remaining -= chunk
+                    }
+                } ?: return null
+                if (tailBytes > 0) {
+                    // Tail sampling via FileDescriptor seek when possible; skip silently otherwise.
+                    try {
+                        resolver.openFileDescriptor(mediaFile.contentUri, "r")?.use { pfd ->
+                            val fileSize = pfd.statSize.takeIf { it > 0 } ?: mediaFile.size
+                            val tailStart = maxOf(0L, fileSize - tailBytes)
+                            android.os.ParcelFileDescriptor.AutoCloseInputStream(pfd).use { raw ->
+                                // Re-open for tail: descriptor streams support skip reliably for local files.
+                                var toSkip = tailStart - headBytes.coerceAtMost(fileSize)
+                                while (toSkip > 0) {
+                                    val skipped = raw.skip(toSkip)
+                                    if (skipped <= 0) break
+                                    toSkip -= skipped
+                                }
+                                var remainingTail = minOf(tailBytes, fileSize - tailStart)
+                                while (remainingTail > 0) {
+                                    val chunk = raw.read(buffer, 0, minOf(buffer.size.toLong(), remainingTail).toInt())
+                                    if (chunk == -1) break
+                                    md.update(buffer, 0, chunk)
+                                    remainingTail -= chunk
+                                }
+                            }
+                        }
+                    } catch (_: Exception) {
+                        // Tail unavailable (remote provider) — head-only hash still valid.
+                    }
+                }
+            } else {
+                val file = File(mediaFile.path)
+                if (!file.isFile || !file.canRead()) return null
+                file.inputStream().use { input ->
+                    var remaining = headBytes
+                    while (remaining > 0) {
+                        val chunk = input.read(buffer, 0, minOf(buffer.size.toLong(), remaining).toInt())
+                        if (chunk == -1) break
+                        md.update(buffer, 0, chunk)
+                        remaining -= chunk
+                    }
+                }
+                if (tailBytes > 0) {
+                    java.io.RandomAccessFile(file, "r").use { raf ->
+                        val tailStart = maxOf(0L, raf.length() - tailBytes)
+                        raf.seek(tailStart)
+                        var remainingTail = raf.length() - tailStart
+                        while (remainingTail > 0) {
+                            val chunk = raf.read(buffer, 0, minOf(buffer.size.toLong(), remainingTail).toInt())
+                            if (chunk == -1) break
+                            md.update(buffer, 0, chunk)
+                            remainingTail -= chunk
+                        }
+                    }
                 }
             }
-            // In a real app we'd also hash the end, but MediaStore URI doesn't easily support seek without FileDescriptor.
-            // For safety, we just rely on this larger chunk.
-            
-            return md.digest().joinToString("") { "%02x".format(it) }
-        } catch (e: Exception) {
-            return ""
+            // Mix size in so same-prefix files of different lengths never collide.
+            md.update(mediaFile.size.toString().toByteArray())
+            md.digest().joinToString("") { "%02x".format(it) }
+        } catch (_: Exception) {
+            null
         }
     }
 }

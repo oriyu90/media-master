@@ -2,7 +2,7 @@ package com.example.viewer
 
 /** Which built-in renderer [com.example.ui.viewer.DocumentViewerScreen] should use for a file. */
 enum class ViewerKind {
-    TEXT, CSV, JSON, MARKDOWN, PDF, DOCX, PPTX, HEX, EXTERNAL_ONLY
+    TEXT, CSV, JSON, MARKDOWN, LATEX_SOURCE, PDF, DOCX, PPTX, HEX, EXTERNAL_ONLY
 }
 
 /**
@@ -30,6 +30,7 @@ object ViewerKindClassifier {
             ext == "csv" || ext == "tsv" || mime == "text/csv" -> ViewerKind.CSV
             ext == "json" || mime == "application/json" -> ViewerKind.JSON
             ext == "md" || ext == "markdown" || mime == "text/markdown" -> ViewerKind.MARKDOWN
+            ext == "tex" || ext == "ltx" || mime == "text/x-tex" -> ViewerKind.LATEX_SOURCE
             ext == "pdf" || mime == "application/pdf" -> ViewerKind.PDF
             ext == "docx" || mime == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" -> ViewerKind.DOCX
             ext == "pptx" || mime == "application/vnd.openxmlformats-officedocument.presentationml.presentation" -> ViewerKind.PPTX

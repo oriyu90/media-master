@@ -210,7 +210,7 @@ class MediaRepository(private val context: Context) {
 
     fun isDocumentName(name: String): Boolean = name.substringAfterLast('.', "").lowercase() in setOf(
         "pdf", "doc", "docx", "odt", "rtf", "txt", "md", "markdown", "log", "csv", "tsv", "json", "html", "htm",
-        "xls", "xlsx", "ods", "ppt", "pptx", "odp", "epub"
+        "xls", "xlsx", "ods", "ppt", "pptx", "odp", "epub", "tex", "ltx"
     )
 
     fun getMimeType(extension: String): String {
@@ -225,6 +225,7 @@ class MediaRepository(private val context: Context) {
             "rtf" -> "application/rtf"
             "txt", "log", "ini", "conf", "cfg", "yaml", "yml", "properties" -> "text/plain"
             "md", "markdown" -> "text/markdown"
+            "tex", "ltx" -> "text/x-tex"
             "csv", "tsv" -> "text/csv"
             "json" -> "application/json"
             "html", "htm" -> "text/html"

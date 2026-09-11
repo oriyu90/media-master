@@ -1,4 +1,4 @@
-# Media Master v1.2.0 実装・保守メモ
+# Media Master v1.3.0 実装・保守メモ
 
 最終更新: 2026-09-11
 
@@ -6,19 +6,84 @@
 
 | 項目 | 内容 |
 | --- | --- |
-| バージョン | `1.2.0` (`versionCode 6`) |
+| バージョン | `1.3.0` (`versionCode 7`) |
 | アプリケーションID | `com.yukiorita.mediamaster` |
 | 最小 SDK / target SDK | 24 / 36 |
 | ライセンス | MIT |
 | 著作者 | Yuki_Orita |
 | release APK | `app/build/outputs/apk/release/app-release-signed.apk`（R8 + resource shrink 有効） |
-| APK SHA-256 | `a9be2530fc51397582a820b9e9c7404dad3d1374d685838e0170de495e591c33` |
-| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.1.0 と同一鍵） |
-| GitHub Release | `v1.2.0` (GitHub Releases) |
+| APK SHA-256 | `09fd2522298ff8503137eef81475f1a3b8237920a5da4a3b925b2a68d43ac0db` |
+| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.2.0 と同一鍵） |
+| GitHub Release | `v1.3.0` (GitHub Releases) |
 
 release APK は RSA 4096 ビット鍵・APK Signature Scheme v2+v3 署名（`apksigner verify` で確認済み）。署名鍵は `common-rules-document/keystores/media-master-upload-key.jks`（alias `upload`）。公開前には毎回 `apksigner verify --verbose` で署名を確認してください。
 
-v1.2.0 は JDK 21 + R8 有効ビルドで `:app:assembleDebug` / `:app:assembleRelease` が成功。単体テスト43件全て通過（`DeepLinksTest` を含む — v1.1.0時点でJDK17起因のRobolectric失敗が記録されていたが、JDK21で解消を確認）。`lintDebug` はエラー0件。実機・エミュレータのスモークテストは未実施のため、配布前に新規追加した各ドキュメント形式（CSV/JSON/TXT/バイナリ/MD/PDF/DOCX/PPTX/DOC/PPT）を開く確認、既定アプリ選択、DeX・RTL(ar)・TalkBack・分割画面・実SMB/WebDAV疎通を推奨（下記チェックリスト参照）。旧リリースの APK SHA-256: v1.1.0 `fe75d958b3c811a48582058903d95947b1f97ad108b8c23fd5338ec6ae8eb9a3`、v1.0.0 `255d8ed2b60e1f7a3dd51d1f933b08ae39cc7fa9a8398149202cb20d038b0082`、v0.3.0 `5f896b1bd15a65b4a947c428490ca63cc0ea0cac81332d89477029b5fe3d4bab`。
+v1.3.0 は JDK 21 + R8 有効ビルドで `:app:assembleDebug` / `:app:assembleRelease` が成功。単体テスト68件全て通過（`DeepLinksTest`含む）。`lintDebug` はエラー0件。実機・エミュレータのスモークテストは未実施のため、配布前にMarkdown数式・`.tex`ファイル・削除ボタン（文書系ファイル）の実機確認を推奨（下記チェックリスト参照）。旧リリースの APK SHA-256: v1.2.0 `a9be2530fc51397582a820b9e9c7404dad3d1374d685838e0170de495e591c33`、v1.1.0 `fe75d958b3c811a48582058903d95947b1f97ad108b8c23fd5338ec6ae8eb9a3`、v1.0.0 `255d8ed2b60e1f7a3dd51d1f933b08ae39cc7fa9a8398149202cb20d038b0082`、v0.3.0 `5f896b1bd15a65b4a947c428490ca63cc0ea0cac81332d89477029b5fe3d4bab`。
+
+## v1.3.0 の実装内容（Markdown/`.tex`のLaTeX数式表示、削除ボタン修正）
+
+### LaTeX数式（Markdown）
+
+- `viewer/MathExtractor`: CommonMark解析前に `$...$`/`$$...$$` を抽出し、ASCII制御文字
+  （STX/ETX）ベースのプレースホルダに置換（実文書との衝突なし）。`\$`はエスケープとして
+  数式化しない。
+- `MarkdownParser`にプレースホルダ復元処理を追加。`MdBlock.MathBlock`（表示数式）／
+  `MdInline.Math`（インライン数式）を新設し、太字・リンク等と共存可能。
+- `ui/viewer/LatexView`: `androidx.webkit:webkit`の`WebViewAssetLoader`で
+  `assets/katex/`（KaTeX 0.16.11本体・`auto-render`拡張・フォントwoff2一式のみ、
+  MITライセンス、npm registryから取得）を仮想オリジン経由で読み込みKaTeX描画。
+  ブロック数式は`@JavascriptInterface`でJSからscrollWidth/Heightを報告させ自己サイズ調整。
+  インライン数式はCompose`InlineTextContent`/`Placeholder`で埋め込み、初回は文字数
+  ヒューリスティックでサイズ推定→実測値が届き次第そのformula専用キーで補正（1回だけ
+  再レイアウトが起きる設計、以降は同じ数式なら即正確なサイズ）。
+  `trust:false`（KaTeX既定）を維持し`\href`等の危険コマンドは無効のまま。
+- セキュリティ: 数式文字列はJSON文字列としてエスケープした上で、さらに`</`を`<\/`へ
+  置換してから`<script>`ブロックへ埋め込む（`</script>`断片によるスクリプトタグ早期終了
+  を防止）。ネットワークアクセスは一切なし（全アセットローカル）。
+- R8: `@android.webkit.JavascriptInterface`メソッドの`-keepclassmembers`を追加
+  （未追加でもビルドは通るが、名前がobfuscateされJSブリッジが実行時に静かに壊れる
+  ため必須）。
+
+### `.tex` ソースビューアー
+
+- `viewer/LatexSourceParser`: `$...$`/`$$...$$`/`\(...\)`/`\[...\]`/
+  `equation`・`align`・`gather`・`eqnarray`・`multline`（`*`付き含む）環境を検出し、
+  数式区間とプレーンテキスト区間に分割する最左優先トークナイザ。完全なLaTeXコンパイルは
+  端末上では非現実的なため、数式以外は原文をそのまま等幅表示する簡易ビューアー。
+- `ViewerKind.LATEX_SOURCE`（拡張子`tex`/`ltx`、MIME `text/x-tex`）として分類、
+  `AndroidManifest.xml`の`ACTION_VIEW` intent-filterと`DeepLinks`のdocViewer
+  ルーティング対象にも追加。
+
+### 削除ボタンの修正（全ビューアー共通）
+
+- 従来 `DocumentViewerScreen` の削除ボタンは `FileViewModel.mediaState`
+  （画像/動画/音声のみを保持）内を検索して対象ファイルを探しており、CSV/JSON/PDF/
+  Office等の文書ファイルでは常にヒットせず削除ボタンが表示されない潜在バグがあった。
+  ナビゲーションルートを `docViewer/{uri}?path={path}` に拡張し、呼び出し元
+  （`FilesScreen.openMediaFile`）が実ファイルパスを渡した場合のみ削除を許可する設計に
+  変更（`FileViewModel.deleteFile(path, uri)`をそのまま利用、既存の削除フローと同一）。
+  外部Intent由来の未知URI（`path`なし）では引き続き削除不可＝「破壊的操作は外部から
+  到達不可」の設計を維持。共有ボタンは元々無条件動作で変更なし。
+
+### 新規依存
+
+- `androidx.webkit:webkit:1.17.0`（AndroidX公式、`WebViewAssetLoader`用）。
+- KaTeX本体はGradle依存ではなく `app/src/main/assets/katex/` にオフライン同梱
+  （npm registryの `katex@0.16.11` tarballから`dist/katex.min.js`・`dist/katex.min.css`・
+  `dist/contrib/auto-render.min.js`・`dist/fonts/*.woff2`のみ抽出、ttf/woff は
+  APKサイズ削減のため同梱せず——CSSの`@font-face`はwoff2を最優先で参照するため
+  モダンWebViewでは未使用）。
+
+### 新規テスト
+
+- `MathExtractorTest`（6件）、`LatexSourceParserTest`（8件）、`KatexHtmlTest`（5件、
+  `</script>`注入対策の検証含む）、`MarkdownParserTest`に数式関連4件追加。
+  全68件通過。
+
+### 残課題（v1.4.0以降の候補）
+
+- インライン数式が多いドキュメントはWebView数に比例して描画が遅くなる（既知の制約）。
+- `.tex`のマクロ・パッケージ・非数式コマンドは反映されない（意図的な簡易実装）。
 
 ## v1.2.0 の実装内容（汎用ドキュメントビューアー・既定アプリ化）
 
@@ -456,13 +521,20 @@ v1.2.0 は JDK 21 + R8 有効ビルドで `:app:assembleDebug` / `:app:assembleR
 2. 署名済み APK を実機へ導入し**全機能スモーク**（ライブラリ/ビューア/編集/オーディオ/
    ドキュメントスキャン/管理/重複クリーン/APK管理/バックアップ/復元/ネットワーク/
    全ディープリンク `am start`）。
-3. **新規: 汎用ドキュメントビューアー**（v1.2.0〜）— CSV/JSON/TXT/バイナリ/MD/PDF/DOCX/PPTX/
+3. **汎用ドキュメントビューアー**（v1.2.0〜）— CSV/JSON/TXT/バイナリ/MD/PDF/DOCX/PPTX/
    DOC/PPT をFiles/Documentsから開き、文字化け・レイアウト崩れ・クラッシュがないこと（巨大/破損
    ファイルを含む）。DOC/PPTは外部アプリへの委譲になることを確認。「既定のアプリ」設定から
    システム設定画面に遷移できること。外部アプリの共有シートからMedia Masterで対応形式を
    開けること。
-4. 回転・分割・DeX・RTL(ar)・ダーク・TalkBack を確認。
-5. `apksigner verify --verbose --print-certs` と SHA-256 記録。
+4. **新規: LaTeX数式表示・`.tex`ビューアー・削除ボタン**（v1.3.0〜）— Markdownの `$x^2$`・
+   `$$...$$` が正しく組版表示されること（太字/リンク内の数式含む）。`.tex` ファイルを開き、
+   数式部分がKaTeX表示、それ以外が原文表示になること。CSV/JSON/PDF等の文書ファイルを
+   Files/Documentsから開いた際に削除ボタンが表示され実際に削除できること。外部アプリの
+   `ACTION_VIEW` で開いたファイル（Media Masterが管理しないURI）では削除ボタンが
+   表示されないこと（意図通り）。WebViewでの数式描画がオフライン（機内モード）でも
+   動作すること。
+5. 回転・分割・DeX・RTL(ar)・ダーク・TalkBack を確認。
+6. `apksigner verify --verbose --print-certs` と SHA-256 記録。
 
 ## 主要ファイル
 
@@ -474,6 +546,9 @@ v1.2.0 は JDK 21 + R8 有効ビルドで `:app:assembleDebug` / `:app:assembleR
 | `app/src/main/java/com/example/ui/viewer/DocumentViewerScreen.kt` | 汎用ドキュメントビューアー本体（v1.2.0〜） |
 | `app/src/main/java/com/example/viewer/` | 文字コード判定・CSV/JSON/Markdown/HEX/PDFの各パーサ・レンダラ（v1.2.0〜） |
 | `app/src/main/java/com/example/office/` | `.docx`/`.pptx` 自前zip+XMLパーサ（v1.2.0〜） |
+| `app/src/main/java/com/example/ui/viewer/LatexView.kt` | KaTeX WebViewレンダラ（v1.3.0〜） |
+| `app/src/main/java/com/example/viewer/MathExtractor.kt`・`LatexSourceParser.kt` | Markdown/`.tex`の数式抽出（v1.3.0〜） |
+| `app/src/main/assets/katex/` | オフライン同梱KaTeX本体・フォント（MIT、v1.3.0〜） |
 | `app/src/main/java/com/example/SettingsRepository.kt` | DataStore設定（ピン留めを含む） |
 | `app/src/main/java/com/example/SettingsViewModel.kt` | 設定操作のViewModel |
 | `app/src/main/res/values*/strings*.xml` | UI翻訳リソース |
@@ -538,4 +613,5 @@ shasum -a 256 app/build/outputs/apk/release/app-release.apk
 - `QUERY_ALL_PACKAGES`、`REQUEST_INSTALL_PACKAGES` はストア配布時に審査対象となるため、アプリ／APK管理機能の必要性をストア申請で説明してください。
 - Lintはエラー0件。依存関係の更新提案、未使用リソース、既存APIの非推奨警告などの非ブロッキング警告は残り得ます。機能変更時は `lintDebug` を再実行してください。
 - release APKは現時点でv2署名を使用しています。Play App Signingを利用する場合は、作成済みのアップロード鍵を安全なバックアップ先へ保管してください。
-- `commonmark`（Markdownパーサ、v1.2.0で追加）以外に汎用ビューアー機能の新規依存はありません。**Apache POI（旧形式.doc/.ppt向け）は検証の上、意図的に不採用**（`java.lang.invoke.MethodHandle`がminSdk26未満でdex化できないため）。将来再検討する場合は、minSdk引き上げの可否をまず確認してください。
+- `commonmark`（Markdownパーサ、v1.2.0で追加）・`androidx.webkit:webkit`（`WebViewAssetLoader`、v1.3.0で追加）以外に汎用ビューアー機能の新規依存はありません。**Apache POI（旧形式.doc/.ppt向け）は検証の上、意図的に不採用**（`java.lang.invoke.MethodHandle`がminSdk26未満でdex化できないため）。将来再検討する場合は、minSdk引き上げの可否をまず確認してください。
+- KaTeX（`app/src/main/assets/katex/`、v1.3.0で追加）はGradle依存ではなくアセット同梱。バージョン更新時は `npm registry` から `katex@<version>` のtarballを取得し `dist/katex.min.js`・`dist/katex.min.css`・`dist/contrib/auto-render.min.js`・`dist/fonts/*.woff2`（ttf/woffは同梱不要）を差し替える。ライセンスファイル（`LICENSE`、MIT）も一緒に更新すること。

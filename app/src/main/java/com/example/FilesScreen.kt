@@ -499,7 +499,7 @@ fun openMediaFile(context: android.content.Context, file: MediaFile, navControll
             return
         }
         try {
-            navController.navigate("docViewer/${Uri.encode(uri.toString())}") { launchSingleTop = true }
+            navController.navigate("docViewer/${Uri.encode(uri.toString())}?path=${Uri.encode(file.path)}") { launchSingleTop = true }
         } catch (_: Exception) {
             android.widget.Toast.makeText(context, context.getString(R.string.invalid_file_path), android.widget.Toast.LENGTH_SHORT).show()
         }

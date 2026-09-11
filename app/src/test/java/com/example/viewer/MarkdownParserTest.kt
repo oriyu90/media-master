@@ -59,4 +59,39 @@ class MarkdownParserTest {
     fun `empty input yields an empty block list`() {
         assertTrue(MarkdownParser.parse("").isEmpty())
     }
+
+    @Test
+    fun `a standalone display-math block becomes a MathBlock`() {
+        val blocks = MarkdownParser.parse("Intro\n\n\$\$\\sum_{i=1}^n i\$\$\n\nOutro")
+        assertEquals(3, blocks.size)
+        assertEquals(MdBlock.MathBlock("\\sum_{i=1}^n i"), blocks[1])
+    }
+
+    @Test
+    fun `inline math inside a sentence becomes a Math inline node between text`() {
+        val blocks = MarkdownParser.parse("The value \$x^2\$ is positive.")
+        val paragraph = blocks.single() as MdBlock.Paragraph
+        assertEquals(
+            listOf(
+                MdInline.PlainText("The value "),
+                MdInline.Math("x^2"),
+                MdInline.PlainText(" is positive."),
+            ),
+            paragraph.inline,
+        )
+    }
+
+    @Test
+    fun `inline math survives inside bold text`() {
+        val blocks = MarkdownParser.parse("**important: \$x\$**")
+        val paragraph = blocks.single() as MdBlock.Paragraph
+        val bold = paragraph.inline.single() as MdInline.Bold
+        assertTrue(bold.children.any { it is MdInline.Math })
+    }
+
+    @Test
+    fun `a document with no math is unaffected by the math pass`() {
+        val blocks = MarkdownParser.parse("# Title\n\nJust text, no formulas.")
+        assertTrue(blocks.none { it is MdBlock.MathBlock })
+    }
 }

@@ -86,6 +86,13 @@
 # --- commonmark (Markdown viewer parsing) ---
 -dontwarn org.commonmark.**
 
+# --- WebView JS bridge (LatexView's size-reporting @JavascriptInterface) ---
+# WebView finds this method by name via reflection from JS; R8 renaming it
+# would silently break the bridge (no build error) rather than crash.
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
+
 # NOTE: Apache POI was evaluated for legacy .doc/.ppt viewing and rejected —
 # POI core uses java.lang.invoke.MethodHandle in a way D8 refuses to dex
 # below minSdk 26, which would break Android 7.0/7.1 compatibility. Legacy

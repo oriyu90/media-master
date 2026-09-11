@@ -37,6 +37,7 @@ mlkitTextRecognitionJapanese = "16.0.1"
 smbj = "0.13.0"
 securityCrypto = "1.1.0-alpha06"
 commonmark = "0.22.0"
+webkit = "1.17.0"
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -89,6 +90,7 @@ mlkit-text-recognition-japanese = { group = "com.google.mlkit", name = "text-rec
 smbj = { group = "com.hierynomus", name = "smbj", version.ref = "smbj" }
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
 commonmark = { group = "org.commonmark", name = "commonmark", version.ref = "commonmark" }
+androidx-webkit = { group = "androidx.webkit", name = "webkit", version.ref = "webkit" }
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }

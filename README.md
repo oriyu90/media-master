@@ -4,6 +4,13 @@ Media Master is an open-source Android media and file manager built with Kotlin 
 
 Media Master は、Kotlin と Jetpack Compose で開発されたオープンソースのAndroid向けメディア・ファイル管理アプリです。写真・動画、音楽、書類、ストレージ、アプリ／APK、編集、バックアップを1つのアプリで扱えます。
 
+## v1.3.0
+
+- **LaTeX math in Markdown:** `$...$` inline and `$$...$$` display math now render as proper typeset formulas via a bundled, fully offline copy of [KaTeX](https://katex.org/) (MIT license, no network access — assets ship under `app/src/main/assets/katex/`). Math is extracted from the Markdown source before CommonMark parsing, so it composes correctly with bold/italic/links around an inline formula.
+- **`.tex` source viewer:** Media Master can now open raw LaTeX source files. Full compilation isn't feasible on-device, so this is intentionally a simple viewer: everything outside a recognised math delimiter (`$...$`, `$$...$$`, `\(...\)`, `\[...\]`, and the `equation`/`align`/`gather`/`eqnarray`/`multline` environments, starred variants included) shows as verbatim monospace source text, and each math region is typeset with the same KaTeX renderer as Markdown.
+- **Delete now works for every viewer-supported file, not just photos/videos/audio:** the document viewer's delete action previously only appeared for files already indexed in the media library, silently omitting it for CSV/JSON/text/PDF/Office files opened from Files or Documents. It now works for any file Media Master itself resolved a path for; files opened from another app via `ACTION_VIEW` (where Media Master doesn't own the storage) still correctly omit delete, keeping the existing "no destructive action reachable from an external intent" guarantee. Share was already unconditional and is unchanged.
+- Version `1.3.0` (`versionCode 7`), signed with the same upload key as v0.1.0–v1.2.0 (APK Signature Scheme v2+v3 verified). SHA-256: `09fd2522298ff8503137eef81475f1a3b8237920a5da4a3b925b2a68d43ac0db`.
+
 ## v1.2.0
 
 - **Universal document viewer:** Media Master can now open text/log, CSV/TSV, JSON, Markdown, PDF, and `.docx`/`.pptx` files inside the app — no more automatic hand-off to another app for these types. A hex/ASCII fallback view means any other file can still be inspected in-app rather than being refused.
@@ -163,7 +170,7 @@ Media Master also registers for the system chooser:
 - `ACTION_EDIT` with `image/*` or `video/*` → the corresponding editor
 - `ACTION_VIEW` with `image/*`, `video/*`, or `audio/*` → opens the app at Library
 - `ACTION_VIEW` with `vnd.android.document/directory` → file browser at that folder
-- `ACTION_VIEW` with `text/plain`, `text/csv`, `text/markdown`, `application/json`, `application/pdf`, `.docx`, or `.pptx` → opens the universal document viewer directly on the incoming URI (v1.2.0+). Legacy `application/msword`/`application/vnd.ms-powerpoint` are intentionally not registered — see the v1.2.0 changelog.
+- `ACTION_VIEW` with `text/plain`, `text/csv`, `text/markdown`, `text/x-tex`, `application/json`, `application/pdf`, `.docx`, or `.pptx` → opens the universal document viewer directly on the incoming URI (v1.2.0+, `.tex` added in v1.3.0). Legacy `application/msword`/`application/vnd.ms-powerpoint` are intentionally not registered — see the v1.2.0 changelog.
 
 Unknown or malformed requests simply open the app normally. Destructive
 operations (delete, uninstall, restore-from-backup) are never performed from an

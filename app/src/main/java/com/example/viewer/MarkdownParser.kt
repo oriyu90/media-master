@@ -33,6 +33,8 @@ sealed class MdBlock {
     data class Quote(val blocks: List<MdBlock>) : MdBlock()
     data object Rule : MdBlock()
     data class ImageBlock(val url: String, val alt: String) : MdBlock()
+    /** A `$$...$$` display-math block, rendered full-width via KaTeX. */
+    data class MathBlock(val latex: String) : MdBlock()
 }
 
 sealed class MdInline {
@@ -42,6 +44,8 @@ sealed class MdInline {
     data class InlineCode(val text: String) : MdInline()
     data class LinkText(val url: String, val children: List<MdInline>) : MdInline()
     data object LineBreak : MdInline()
+    /** A `$...$` inline-math span, rendered via KaTeX. */
+    data class Math(val latex: String) : MdInline()
 }
 
 /** Parses CommonMark source into [MdBlock] trees. Never throws — falls back to an empty document. */
@@ -50,8 +54,56 @@ object MarkdownParser {
     private val parser: Parser = Parser.builder().build()
 
     fun parse(markdown: String): List<MdBlock> {
-        val document = runCatching { parser.parse(markdown) }.getOrNull() ?: return emptyList()
-        return convertChildren(document)
+        val extraction = MathExtractor.extract(markdown)
+        val document = runCatching { parser.parse(extraction.text) }.getOrNull() ?: return emptyList()
+        val blocks = convertChildren(document)
+        return if (extraction.blockMath.isEmpty() && extraction.inlineMath.isEmpty()) {
+            blocks
+        } else {
+            substituteMath(blocks, extraction)
+        }
+    }
+
+    private fun substituteMath(blocks: List<MdBlock>, extraction: MathExtractor.Extraction): List<MdBlock> =
+        blocks.map { block ->
+            when (block) {
+                is MdBlock.Paragraph -> {
+                    val onlyText = (block.inline.singleOrNull() as? MdInline.PlainText)?.text?.trim()
+                    val blockMatch = onlyText?.let { MathExtractor.blockPlaceholderRegex.find(it) }
+                    val latex = blockMatch?.groupValues?.get(1)?.toIntOrNull()?.let { extraction.blockMath.getOrNull(it) }
+                    if (latex != null) MdBlock.MathBlock(latex) else MdBlock.Paragraph(substituteInlineMath(block.inline, extraction))
+                }
+                is MdBlock.Heading -> MdBlock.Heading(block.level, substituteInlineMath(block.inline, extraction))
+                is MdBlock.BulletListBlock -> MdBlock.BulletListBlock(block.items.map { substituteMath(it, extraction) })
+                is MdBlock.OrderedListBlock -> MdBlock.OrderedListBlock(block.startNumber, block.items.map { substituteMath(it, extraction) })
+                is MdBlock.Quote -> MdBlock.Quote(substituteMath(block.blocks, extraction))
+                else -> block
+            }
+        }
+
+    private fun substituteInlineMath(inline: List<MdInline>, extraction: MathExtractor.Extraction): List<MdInline> =
+        inline.flatMap { node ->
+            when (node) {
+                is MdInline.PlainText -> splitPlainTextMath(node.text, extraction)
+                is MdInline.Bold -> listOf(MdInline.Bold(substituteInlineMath(node.children, extraction)))
+                is MdInline.Italic -> listOf(MdInline.Italic(substituteInlineMath(node.children, extraction)))
+                is MdInline.LinkText -> listOf(MdInline.LinkText(node.url, substituteInlineMath(node.children, extraction)))
+                else -> listOf(node)
+            }
+        }
+
+    private fun splitPlainTextMath(text: String, extraction: MathExtractor.Extraction): List<MdInline> {
+        if (!MathExtractor.inlinePlaceholderRegex.containsMatchIn(text)) return listOf(MdInline.PlainText(text))
+        val result = mutableListOf<MdInline>()
+        var lastEnd = 0
+        for (match in MathExtractor.inlinePlaceholderRegex.findAll(text)) {
+            if (match.range.first > lastEnd) result.add(MdInline.PlainText(text.substring(lastEnd, match.range.first)))
+            val latex = match.groupValues[1].toIntOrNull()?.let { extraction.inlineMath.getOrNull(it) }
+            result.add(if (latex != null) MdInline.Math(latex) else MdInline.PlainText(match.value))
+            lastEnd = match.range.last + 1
+        }
+        if (lastEnd < text.length) result.add(MdInline.PlainText(text.substring(lastEnd)))
+        return result
     }
 
     private fun convertChildren(parent: Node): List<MdBlock> {

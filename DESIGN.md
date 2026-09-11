@@ -1,7 +1,35 @@
 # 設計書兼仕様書 (Media Master)
 
 ## バージョン情報
-- **Version:** 1.2.0
+- **Version:** 1.3.0
+
+## v1.3.0 の設計変更（要約）
+- **Markdown数式(LaTeX)対応**: `$...$`/`$$...$$` をCommonMark解析前に抽出する
+  `viewer/MathExtractor`（制御文字プレースホルダ方式）を新設。抽出結果は
+  `MdBlock.MathBlock`/`MdInline.Math` として木構造に統合され、太字/リンクなど
+  他のインライン書式と共存できる。
+- **KaTeXのオフライン同梱描画**: 新規 `ui/viewer/LatexView`（WebView +
+  `androidx.webkit.WebViewAssetLoader`）が `assets/katex/`（KaTeX本体・
+  `auto-render`拡張・フォントwoff2一式、MITライセンス、ネットワーク接続なし）を
+  仮想オリジン `https://appassets.androidplatform.net/assets/katex/` 経由で読み込み、
+  1数式=1WebViewとしてレンダリングする。ブロック数式は自己サイズ調整
+  （JS→`@JavascriptInterface`でscrollWidth/Heightを報告）、インライン数式は
+  Composeの`InlineTextContent`/`Placeholder`機構でテキスト内に埋め込み、
+  初回は文字数ヒューリスティックでサイズ推定→実測値で1回だけ補正する設計。
+  `trust:false`（既定）を維持し`\href`等の危険なコマンドは無効のまま。
+  R8向けに`@android.webkit.JavascriptInterface`メソッドのkeepルールを追加
+  （JSブリッジ名がobfuscateされるとビルドは通るが実行時に静かに壊れるため）。
+- **`.tex`ソースビューアー**: 完全なLaTeXコンパイルは端末上では非現実的なため、
+  数式部分（`$...$`/`$$...$$`/`\(...\)`/`\[...\]`/`equation`等の環境）のみ
+  KaTeXで組版し、それ以外は原文をそのまま等幅テキストで表示する簡易ビューアー
+  （`viewer/LatexSourceParser`+`ui/viewer/DocumentViewerScreen`の
+  `LatexSourceBody`）。`ViewerKind.LATEX_SOURCE`として独立分類。
+- **削除ボタンの修正**: `DocumentViewerScreen`の削除操作が
+  `FileViewModel.mediaState`（画像/動画/音声のみを含む）内の検索に依存しており、
+  CSV/JSON/PDF/Officeなど文書系ファイルでは常に非表示だった潜在バグを修正。
+  ナビゲーションルートに実ファイルパスを追加で渡す設計（`docViewer/{uri}?path=`）
+  に変更し、呼び出し元がパスを渡した場合のみ削除を許可（外部Intent由来の
+  未知URIには従来通り削除を許可しない設計を維持）。共有は元々無条件で動作していた。
 
 ## v1.2.0 の設計変更（要約）
 - **汎用ドキュメントビューアー**: 既存の `ViewerScreen`（画像/動画/音声、OCR、単一Player設計）は変更せず、
@@ -89,11 +117,12 @@
 - 共有アクション。
 
 ### 5b. 汎用ドキュメントビューアー (v1.2.0〜)
-- テキスト/ログ・CSV/TSV・JSON・Markdown・PDF・`.docx`・`.pptx` をアプリ内で表示。
+- テキスト/ログ・CSV/TSV・JSON・Markdown・PDF・`.docx`・`.pptx`・`.tex`(v1.3.0〜) をアプリ内で表示。
 - 上記以外の任意のファイルは16進+ASCIIダンプで表示（「開けないファイル」を作らない設計）。
 - 旧形式 `.doc`/`.ppt` は互換性上の理由でアプリ内表示対象外（外部アプリで開く）。
-- 各ビューアーに共通のトップバー: 戻る・外部アプリで開く・共有・（自アプリ管理下のファイルのみ）削除。
+- 各ビューアーに共通のトップバー: 戻る・外部アプリで開く・共有・（自アプリが実パスを把握しているファイルのみ）削除。
 - `AndroidManifest.xml` の intent-filter により、対応形式で Media Master を既定アプリ候補として選択可能。
+- Markdown・`.tex`ソースの数式（LaTeX）はKaTeX（オフライン同梱）で組版表示（v1.3.0〜）。
 
 ### 6. 設定機能 (Settings)
 - **テーマ設定:** Light / Dark / System Default の切り替え。

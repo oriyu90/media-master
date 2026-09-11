@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -62,12 +63,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.example.FileViewModel
-import com.example.MediaFile
 import com.example.R
-import com.example.ViewState
 import com.example.office.DocBlock
 import com.example.office.DocRun
 import com.example.office.OoxmlDocumentReader
@@ -81,7 +79,9 @@ import com.example.viewer.CsvParser
 import com.example.viewer.HexFormatter
 import com.example.viewer.HexPageReader
 import com.example.viewer.JsonPretty
+import com.example.viewer.LatexSourceParser
 import com.example.viewer.MarkdownParser
+import com.example.viewer.TexSegment
 import com.example.viewer.MdBlock
 import com.example.viewer.MdInline
 import com.example.viewer.PdfPageRenderer
@@ -105,7 +105,12 @@ import java.io.File
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DocumentViewerScreen(uriString: String?, viewModel: FileViewModel?, navController: NavHostController) {
+fun DocumentViewerScreen(
+    uriString: String?,
+    path: String?,
+    viewModel: FileViewModel?,
+    navController: NavHostController,
+) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
@@ -119,19 +124,18 @@ fun DocumentViewerScreen(uriString: String?, viewModel: FileViewModel?, navContr
         return
     }
 
-    val displayName = remember(uri) { resolveDisplayName(context, uri) }
+    val displayName = remember(uri, path) { path?.let { File(it).name } ?: resolveDisplayName(context, uri) }
     val mimeType = remember(uri, displayName) {
         context.contentResolver.getType(uri)
             ?: MimeTypeMap.getSingleton().getMimeTypeFromExtension(displayName.substringAfterLast('.', "").lowercase())
     }
     val kind = remember(displayName, mimeType) { ViewerKindClassifier.classify(displayName, mimeType) }
 
-    val mediaState = viewModel?.mediaState?.collectAsStateWithLifecycle()?.value
-    val ownedFile: MediaFile? = remember(mediaState, uri) {
-        (mediaState as? ViewState.Success)?.files?.find { candidate ->
-            candidate.contentUri == uri || runCatching { Uri.fromFile(File(candidate.path)) == uri }.getOrDefault(false)
-        }
-    }
+    // Delete is only offered when the caller told us the real on-device path
+    // (Files/Documents/Category screens pass it) — never for an arbitrary
+    // external content:// URI another app handed us via ACTION_VIEW, since
+    // we have no business deleting storage we don't manage.
+    val canDelete = path != null && viewModel != null
     var confirmDelete by remember(uri) { mutableStateOf(false) }
 
     val openExternally: () -> Unit = {
@@ -165,7 +169,7 @@ fun DocumentViewerScreen(uriString: String?, viewModel: FileViewModel?, navContr
                     }) {
                         Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share))
                     }
-                    if (ownedFile != null && viewModel != null) {
+                    if (canDelete) {
                         IconButton(onClick = { confirmDelete = true }) {
                             Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete))
                         }
@@ -174,19 +178,17 @@ fun DocumentViewerScreen(uriString: String?, viewModel: FileViewModel?, navContr
             )
         },
     ) { innerPadding ->
-        if (confirmDelete && ownedFile != null && viewModel != null) {
+        if (confirmDelete && path != null && viewModel != null) {
             ConfirmDeleteDialog(
                 title = stringResource(R.string.delete),
-                message = ownedFile.name,
+                message = displayName,
                 confirmLabel = stringResource(R.string.delete),
                 dismissLabel = stringResource(R.string.cancel),
                 onDismiss = { confirmDelete = false },
                 onConfirm = {
                     confirmDelete = false
-                    val path = ownedFile.path
-                    val contentUri = ownedFile.contentUri
                     coroutineScope.launch {
-                        viewModel.deleteFile(path, contentUri)
+                        viewModel.deleteFile(path, uri)
                         navController.popBackStack()
                     }
                 },
@@ -198,6 +200,7 @@ fun DocumentViewerScreen(uriString: String?, viewModel: FileViewModel?, navContr
                 ViewerKind.CSV -> CsvViewerBody(context, uri)
                 ViewerKind.JSON -> JsonViewerBody(context, uri)
                 ViewerKind.MARKDOWN -> MarkdownViewerBody(context, uri)
+                ViewerKind.LATEX_SOURCE -> LatexSourceBody(context, uri)
                 ViewerKind.PDF -> PdfViewerBody(context, uri)
                 ViewerKind.DOCX -> DocxViewerBody(context, uri)
                 ViewerKind.PPTX -> PptxViewerBody(context, uri)
@@ -435,8 +438,9 @@ private fun MarkdownViewerBody(context: Context, uri: Uri) {
                         EmptyState(icon = Icons.Default.Description, title = stringResource(R.string.doc_empty), modifier = Modifier.fillMaxSize())
                     } else {
                         val linkColor = MaterialTheme.colorScheme.primary
+                        val mathSizeCache = remember(uri) { androidx.compose.runtime.mutableStateMapOf<String, androidx.compose.ui.unit.IntSize>() }
                         LazyColumn(Modifier.fillMaxSize().padding(horizontal = Hallmark.ContentEdge)) {
-                            items(blocks.size) { i -> MarkdownBlockView(blocks[i], linkColor) }
+                            items(blocks.size) { i -> MarkdownBlockView(blocks[i], linkColor, mathSizeCache) }
                         }
                     }
                 }
@@ -446,23 +450,41 @@ private fun MarkdownViewerBody(context: Context, uri: Uri) {
 }
 
 @Composable
-private fun MarkdownBlockView(block: MdBlock, linkColor: androidx.compose.ui.graphics.Color) {
+private fun MarkdownBlockView(
+    block: MdBlock,
+    linkColor: androidx.compose.ui.graphics.Color,
+    mathSizeCache: androidx.compose.runtime.snapshots.SnapshotStateMap<String, androidx.compose.ui.unit.IntSize>,
+) {
     when (block) {
-        is MdBlock.Heading -> Text(
-            text = inlineToAnnotatedString(block.inline, linkColor),
-            style = when (block.level) {
-                1 -> MaterialTheme.typography.headlineMedium
-                2 -> MaterialTheme.typography.headlineSmall
-                3 -> MaterialTheme.typography.titleLarge
-                else -> MaterialTheme.typography.titleMedium
-            },
-            modifier = Modifier.padding(vertical = 8.dp),
-        )
-        is MdBlock.Paragraph -> Text(
-            text = inlineToAnnotatedString(block.inline, linkColor),
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.padding(vertical = 4.dp),
-        )
+        is MdBlock.Heading -> {
+            val (text, inlineContent) = rememberMarkdownInlineContent(block.inline, linkColor, mathSizeCache)
+            Text(
+                text = text,
+                inlineContent = inlineContent,
+                style = when (block.level) {
+                    1 -> MaterialTheme.typography.headlineMedium
+                    2 -> MaterialTheme.typography.headlineSmall
+                    3 -> MaterialTheme.typography.titleLarge
+                    else -> MaterialTheme.typography.titleMedium
+                },
+                modifier = Modifier.padding(vertical = 8.dp),
+            )
+        }
+        is MdBlock.Paragraph -> {
+            val (text, inlineContent) = rememberMarkdownInlineContent(block.inline, linkColor, mathSizeCache)
+            Text(
+                text = text,
+                inlineContent = inlineContent,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(vertical = 4.dp),
+            )
+        }
+        is MdBlock.MathBlock -> Box(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).horizontalScroll(rememberScrollState()),
+            contentAlignment = Alignment.Center,
+        ) {
+            LatexView(latex = block.latex, displayMode = true, selfSizing = true)
+        }
         is MdBlock.CodeBlock -> androidx.compose.material3.Surface(
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             shape = androidx.compose.foundation.shape.RoundedCornerShape(Hallmark.RadiusSmall),
@@ -479,7 +501,7 @@ private fun MarkdownBlockView(block: MdBlock, linkColor: androidx.compose.ui.gra
             block.items.forEach { item ->
                 Row {
                     Text("•  ", style = MaterialTheme.typography.bodyLarge)
-                    Column { item.forEach { MarkdownBlockView(it, linkColor) } }
+                    Column { item.forEach { MarkdownBlockView(it, linkColor, mathSizeCache) } }
                 }
             }
         }
@@ -487,7 +509,7 @@ private fun MarkdownBlockView(block: MdBlock, linkColor: androidx.compose.ui.gra
             block.items.forEachIndexed { i, item ->
                 Row {
                     Text("${block.startNumber + i}.  ", style = MaterialTheme.typography.bodyLarge)
-                    Column { item.forEach { MarkdownBlockView(it, linkColor) } }
+                    Column { item.forEach { MarkdownBlockView(it, linkColor, mathSizeCache) } }
                 }
             }
         }
@@ -496,7 +518,7 @@ private fun MarkdownBlockView(block: MdBlock, linkColor: androidx.compose.ui.gra
             shape = androidx.compose.foundation.shape.RoundedCornerShape(Hallmark.RadiusSmall),
             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         ) {
-            Column(Modifier.padding(12.dp)) { block.blocks.forEach { MarkdownBlockView(it, linkColor) } }
+            Column(Modifier.padding(12.dp)) { block.blocks.forEach { MarkdownBlockView(it, linkColor, mathSizeCache) } }
         }
         MdBlock.Rule -> HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
         is MdBlock.ImageBlock -> Text(
@@ -508,34 +530,124 @@ private fun MarkdownBlockView(block: MdBlock, linkColor: androidx.compose.ui.gra
     }
 }
 
-private fun inlineToAnnotatedString(inline: List<MdInline>, linkColor: androidx.compose.ui.graphics.Color): AnnotatedString =
-    buildAnnotatedString { appendMarkdownInline(inline, linkColor) }
+/**
+ * Builds the paragraph/heading [AnnotatedString] plus its `inlineContent` map
+ * (one entry per [MdInline.Math] span, each a tiny self-measuring [LatexView]
+ * placed via Compose's `InlineTextContent`). Sizes come from [mathSizeCache]
+ * once KaTeX has measured a given formula; before that, a rough
+ * character-count heuristic avoids a zero-size placeholder popping in — the
+ * cache means the correction only has to happen once per distinct formula.
+ */
+@Composable
+private fun rememberMarkdownInlineContent(
+    inline: List<MdInline>,
+    linkColor: androidx.compose.ui.graphics.Color,
+    mathSizeCache: androidx.compose.runtime.snapshots.SnapshotStateMap<String, androidx.compose.ui.unit.IntSize>,
+): Pair<AnnotatedString, Map<String, androidx.compose.foundation.text.InlineTextContent>> {
+    val density = LocalDensity.current
+    val inlineContentMap = remember(inline) { mutableMapOf<String, androidx.compose.foundation.text.InlineTextContent>() }
+    var mathCounter = 0
+    val text = buildAnnotatedString {
+        fun appendNodes(nodes: List<MdInline>) {
+            nodes.forEach { node ->
+                when (node) {
+                    is MdInline.PlainText -> append(node.text)
+                    is MdInline.Bold -> {
+                        pushStyle(SpanStyle(fontWeight = FontWeight.Bold))
+                        appendNodes(node.children)
+                        pop()
+                    }
+                    is MdInline.Italic -> {
+                        pushStyle(SpanStyle(fontStyle = FontStyle.Italic))
+                        appendNodes(node.children)
+                        pop()
+                    }
+                    is MdInline.InlineCode -> {
+                        pushStyle(SpanStyle(fontFamily = FontFamily.Monospace))
+                        append(node.text)
+                        pop()
+                    }
+                    is MdInline.LinkText -> {
+                        pushStyle(SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline))
+                        appendNodes(node.children)
+                        pop()
+                    }
+                    MdInline.LineBreak -> append("\n")
+                    is MdInline.Math -> {
+                        val id = "math_${mathCounter++}"
+                        val cacheKey = "inline|${node.latex}"
+                        val cachedSize = mathSizeCache[cacheKey]
+                        val (widthSp, heightSp) = with(density) {
+                            if (cachedSize != null) {
+                                cachedSize.width.toDp().toSp() to cachedSize.height.toDp().toSp()
+                            } else {
+                                val guessWidthDp = (node.latex.length.coerceIn(1, 24) * 7).dp
+                                guessWidthDp.toSp() to 20.dp.toSp()
+                            }
+                        }
+                        appendInlineContent(id, node.latex)
+                        inlineContentMap[id] = androidx.compose.foundation.text.InlineTextContent(
+                            androidx.compose.ui.text.Placeholder(
+                                width = widthSp,
+                                height = heightSp,
+                                placeholderVerticalAlign = androidx.compose.ui.text.PlaceholderVerticalAlign.TextCenter,
+                            ),
+                        ) {
+                            LatexView(
+                                latex = node.latex,
+                                displayMode = false,
+                                selfSizing = false,
+                                modifier = Modifier.fillMaxSize(),
+                                onMeasured = { w, h -> mathSizeCache[cacheKey] = androidx.compose.ui.unit.IntSize(w, h) },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        appendNodes(inline)
+    }
+    return text to inlineContentMap
+}
 
-private fun AnnotatedString.Builder.appendMarkdownInline(inline: List<MdInline>, linkColor: androidx.compose.ui.graphics.Color) {
-    inline.forEach { node ->
-        when (node) {
-            is MdInline.PlainText -> append(node.text)
-            is MdInline.Bold -> {
-                pushStyle(SpanStyle(fontWeight = FontWeight.Bold))
-                appendMarkdownInline(node.children, linkColor)
-                pop()
+// ---------------------------------------------------------------------------
+// LaTeX source (.tex) — not compiled (impractical on-device); math regions
+// are typeset with KaTeX, everything else shown verbatim as source text.
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun LatexSourceBody(context: Context, uri: Uri) {
+    when (val loadable = rememberLoadable(uri) { TextCharsetReader.read(context, uri, 4 * 1024 * 1024) }) {
+        Loadable.Loading -> CenteredProgress()
+        Loadable.Failed -> ErrorState(message = stringResource(R.string.doc_parse_error), modifier = Modifier.fillMaxSize())
+        is Loadable.Ready -> {
+            val raw = loadable.value.text
+            val segments = remember(raw) { LatexSourceParser.parse(raw) }
+            if (segments.isEmpty()) {
+                EmptyState(icon = Icons.Default.Description, title = stringResource(R.string.doc_empty), modifier = Modifier.fillMaxSize())
+            } else {
+                LazyColumn(Modifier.fillMaxSize().padding(horizontal = Hallmark.ContentEdge)) {
+                    items(segments.size) { i ->
+                        when (val segment = segments[i]) {
+                            is TexSegment.PlainText -> if (segment.text.isNotBlank()) {
+                                SelectionContainer {
+                                    Text(
+                                        text = segment.text,
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                                        modifier = Modifier.padding(vertical = 2.dp),
+                                    )
+                                }
+                            }
+                            is TexSegment.Math -> Box(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).horizontalScroll(rememberScrollState()),
+                                contentAlignment = if (segment.displayMode) Alignment.Center else Alignment.CenterStart,
+                            ) {
+                                LatexView(latex = segment.latex, displayMode = segment.displayMode, selfSizing = true)
+                            }
+                        }
+                    }
+                }
             }
-            is MdInline.Italic -> {
-                pushStyle(SpanStyle(fontStyle = FontStyle.Italic))
-                appendMarkdownInline(node.children, linkColor)
-                pop()
-            }
-            is MdInline.InlineCode -> {
-                pushStyle(SpanStyle(fontFamily = FontFamily.Monospace))
-                append(node.text)
-                pop()
-            }
-            is MdInline.LinkText -> {
-                pushStyle(SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline))
-                appendMarkdownInline(node.children, linkColor)
-                pop()
-            }
-            MdInline.LineBreak -> append("\n")
         }
     }
 }

@@ -176,9 +176,17 @@ private fun MediaNavHost(
             val path = backStackEntry.arguments?.getString("path")?.let(Uri::decode)
             ViewerScreen(path, fileViewModel, navController)
         }
-        composable("docViewer/{uriString}") { backStackEntry ->
+        composable(
+            route = "docViewer/{uriString}?path={path}",
+            arguments = listOf(androidx.navigation.navArgument("path") {
+                type = androidx.navigation.NavType.StringType
+                nullable = true
+                defaultValue = null
+            })
+        ) { backStackEntry ->
             val uriString = backStackEntry.arguments?.getString("uriString")?.let(Uri::decode)
-            DocumentViewerScreen(uriString, fileViewModel, navController)
+            val path = backStackEntry.arguments?.getString("path")?.let(Uri::decode)
+            DocumentViewerScreen(uriString, path, fileViewModel, navController)
         }
         composable("imageEditor/{uriString}") { backStackEntry ->
             backStackEntry.arguments?.getString("uriString")?.let(Uri::decode)?.let { ImageEditorScreen(it, navController) }

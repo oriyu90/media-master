@@ -122,7 +122,7 @@ object DeepLinks {
      * Legacy `.doc`/`.ppt` are intentionally excluded — see [com.example.viewer.ViewerKind.EXTERNAL_ONLY].
      */
     private val DOCUMENT_VIEWER_TYPES = setOf(
-        "text/plain", "text/csv", "text/markdown", "application/json", "application/pdf",
+        "text/plain", "text/csv", "text/markdown", "text/x-tex", "application/json", "application/pdf",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     )

@@ -4,6 +4,19 @@ Media Master is an open-source Android media and file manager built with Kotlin 
 
 Media Master は、Kotlin と Jetpack Compose で開発されたオープンソースのAndroid向けメディア・ファイル管理アプリです。写真・動画、音楽、書類、ストレージ、アプリ／APK、編集、バックアップを1つのアプリで扱えます。
 
+## v1.2.0
+
+- **Universal document viewer:** Media Master can now open text/log, CSV/TSV, JSON, Markdown, PDF, and `.docx`/`.pptx` files inside the app — no more automatic hand-off to another app for these types. A hex/ASCII fallback view means any other file can still be inspected in-app rather than being refused.
+  - Text/CSV/JSON use a lightweight built-in charset sniffer (BOM, UTF-8 validity, Shift_JIS heuristic) so Japanese text files decode correctly instead of showing mojibake; large files are capped with a "load more" control instead of loading unbounded data into memory.
+  - CSV/TSV render as a fixed-header, horizontally-scrollable table.
+  - Markdown renders with headings/bold/italic/lists/quotes/code blocks (via `commonmark`), with a source/rendered toggle.
+  - PDF pages render one at a time via the platform `PdfRenderer` (bitmaps are recycled per page, so large PDFs don't balloon memory).
+  - `.docx`/`.pptx` are read with a dependency-free zip+XML parser (paragraph text, bold/italic, headings, inline images) rather than a full office library.
+  - Legacy binary `.doc`/`.ppt` (pre-2007) are **not** rendered in-app: Apache POI was evaluated and rejected because it fails to `dex` below `minSdk 26`, which would have dropped Android 7.0/7.1 support. They keep the previous "open in another app" behaviour.
+- **Default-app candidate:** new `ACTION_VIEW` intent-filters (text/plain, text/csv, text/markdown, application/json, application/pdf, docx, pptx) let Android offer Media Master in the "Open with"/default-app chooser for these types; Settings → Default apps links to the system screen where a default choice can be reviewed/cleared.
+- **ja/en complete, zh/ar/nl kept in sync:** all new viewer strings ship in the same 5 locales as the rest of the app.
+- Version `1.2.0` (`versionCode 6`), signed with the same upload key as v0.1.0–v1.1.0 (APK Signature Scheme v2+v3 verified). SHA-256: `a9be2530fc51397582a820b9e9c7404dad3d1374d685838e0170de495e591c33`.
+
 ## v1.1.0
 
 - **Release:** version `1.1.0` (`versionCode 5`), signed with the same upload key as v0.1.0–v1.0.0 (APK Signature Scheme v2+v3 verified). SHA-256: `fe75d958b3c811a48582058903d95947b1f97ad108b8c23fd5338ec6ae8eb9a3`.
@@ -150,6 +163,7 @@ Media Master also registers for the system chooser:
 - `ACTION_EDIT` with `image/*` or `video/*` → the corresponding editor
 - `ACTION_VIEW` with `image/*`, `video/*`, or `audio/*` → opens the app at Library
 - `ACTION_VIEW` with `vnd.android.document/directory` → file browser at that folder
+- `ACTION_VIEW` with `text/plain`, `text/csv`, `text/markdown`, `application/json`, `application/pdf`, `.docx`, or `.pptx` → opens the universal document viewer directly on the incoming URI (v1.2.0+). Legacy `application/msword`/`application/vnd.ms-powerpoint` are intentionally not registered — see the v1.2.0 changelog.
 
 Unknown or malformed requests simply open the app normally. Destructive
 operations (delete, uninstall, restore-from-backup) are never performed from an
@@ -161,6 +175,9 @@ external intent — they always require an explicit in-app confirmation.
 `BROWSABLE` を付けていないため、Web ページからは起動できず、端末上のアプリが明示的に
 Intent を組み立てた場合のみ動作します。対応する URI は上表のとおりです。標準の
 `ACTION_EDIT`（`image/*`・`video/*`）、`ACTION_VIEW`（メディア／フォルダ）にも登録されます。
+v1.2.0 からは `ACTION_VIEW` の `text/plain`・`text/csv`・`text/markdown`・
+`application/json`・`application/pdf`・`.docx`・`.pptx` も汎用ドキュメントビューアーへ
+直接ルーティングされます（旧形式の `.doc`/`.ppt` は意図的に対象外）。
 未知・不正なリクエストは通常どおりアプリを開くだけで、削除・アンインストール・バックアップ復元
 などの破壊的操作が外部 Intent から実行されることはありません。
 

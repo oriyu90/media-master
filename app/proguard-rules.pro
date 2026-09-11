@@ -83,3 +83,12 @@
     public static ** valueOf(java.lang.String);
 }
 
+# --- commonmark (Markdown viewer parsing) ---
+-dontwarn org.commonmark.**
+
+# NOTE: Apache POI was evaluated for legacy .doc/.ppt viewing and rejected —
+# POI core uses java.lang.invoke.MethodHandle in a way D8 refuses to dex
+# below minSdk 26, which would break Android 7.0/7.1 compatibility. Legacy
+# .doc/.ppt intentionally fall back to "open in another app" instead. See
+# IMPLEMENTATION_AND_MAINTENANCE.md.
+

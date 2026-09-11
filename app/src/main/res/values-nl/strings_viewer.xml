@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="doc_open_externally">Openen in een andere app</string>
+    <string name="doc_truncated_notice">Er wordt een ingekorte weergave van dit bestand getoond.</string>
+    <string name="doc_load_more">Meer laden</string>
+    <string name="doc_parse_error">Dit bestand kon niet worden geopend.</string>
+    <string name="doc_empty">Er is geen inhoud om weer te geven.</string>
+    <string name="doc_json_invalid">Dit is geen geldige JSON — de originele tekst wordt getoond.</string>
+    <string name="doc_view_source">Bron bekijken</string>
+    <string name="doc_view_rendered">Opgemaakt bekijken</string>
+    <string name="doc_unsupported_title">Deze indeling kan niet worden weergegeven</string>
+    <string name="doc_unsupported_desc">Oude .doc/.ppt-bestanden worden nog niet ondersteund voor weergave in de app. Open ze met een andere app.</string>
+    <string name="default_apps_title">Standaard-apps</string>
+    <string name="default_apps_desc">Stel Media Master in de systeeminstellingen in als standaardviewer voor bestandstypen.</string>
+</resources>

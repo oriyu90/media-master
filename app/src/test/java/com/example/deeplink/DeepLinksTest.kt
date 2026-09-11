@@ -72,6 +72,27 @@ class DeepLinksTest {
     }
 
     @Test
+    fun actionView_documentTypes_openDocViewerWithTheIncomingUri() {
+        val types = listOf(
+            "text/plain", "text/csv", "text/markdown", "application/json", "application/pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        )
+        for (type in types) {
+            val i = Intent(Intent.ACTION_VIEW).apply { setDataAndType(Uri.parse("content://x/doc"), type) }
+            assertEquals("docViewer/${Uri.encode("content://x/doc")}", DeepLinks.resolve(i))
+        }
+    }
+
+    @Test
+    fun actionView_legacyOfficeTypes_areNotRoutedToDocViewer() {
+        val doc = Intent(Intent.ACTION_VIEW).apply { setDataAndType(Uri.parse("content://x/old"), "application/msword") }
+        assertNull(DeepLinks.resolve(doc))
+        val ppt = Intent(Intent.ACTION_VIEW).apply { setDataAndType(Uri.parse("content://x/old"), "application/vnd.ms-powerpoint") }
+        assertNull(DeepLinks.resolve(ppt))
+    }
+
+    @Test
     fun actionView_directory_opensFileBrowser() {
         val i = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(Uri.parse("file:///storage/emulated/0/DCIM"), "vnd.android.document/directory")

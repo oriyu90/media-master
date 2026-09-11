@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="doc_open_externally">他のアプリで開く</string>
+    <string name="doc_truncated_notice">このファイルの一部のみを表示しています。</string>
+    <string name="doc_load_more">さらに読み込む</string>
+    <string name="doc_parse_error">このファイルを開けませんでした。</string>
+    <string name="doc_empty">表示できる内容がありません。</string>
+    <string name="doc_json_invalid">有効なJSONではないため、元のテキストを表示しています。</string>
+    <string name="doc_view_source">ソースを表示</string>
+    <string name="doc_view_rendered">整形表示</string>
+    <string name="doc_unsupported_title">この形式は表示できません</string>
+    <string name="doc_unsupported_desc">旧形式の.doc/.pptファイルはアプリ内表示に対応していません。他のアプリで開いてください。</string>
+    <string name="default_apps_title">既定のアプリ</string>
+    <string name="default_apps_desc">システム設定でMedia Masterを各ファイル形式の既定のビューアーに設定できます。</string>
+</resources>

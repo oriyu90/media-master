@@ -29,6 +29,7 @@ import com.example.R
 import com.example.SettingsViewModel
 import com.example.FilesScreen
 import com.example.ViewerScreen
+import com.example.ui.viewer.DocumentViewerScreen
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.google.accompanist.permissions.isGranted
@@ -174,6 +175,10 @@ private fun MediaNavHost(
         composable("viewer/{path}") { backStackEntry ->
             val path = backStackEntry.arguments?.getString("path")?.let(Uri::decode)
             ViewerScreen(path, fileViewModel, navController)
+        }
+        composable("docViewer/{uriString}") { backStackEntry ->
+            val uriString = backStackEntry.arguments?.getString("uriString")?.let(Uri::decode)
+            DocumentViewerScreen(uriString, fileViewModel, navController)
         }
         composable("imageEditor/{uriString}") { backStackEntry ->
             backStackEntry.arguments?.getString("uriString")?.let(Uri::decode)?.let { ImageEditorScreen(it, navController) }

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="doc_open_externally">用其他应用打开</string>
+    <string name="doc_truncated_notice">仅显示此文件的部分内容。</string>
+    <string name="doc_load_more">加载更多</string>
+    <string name="doc_parse_error">无法打开此文件。</string>
+    <string name="doc_empty">没有可显示的内容。</string>
+    <string name="doc_json_invalid">不是有效的JSON,正在显示原始文本。</string>
+    <string name="doc_view_source">查看源代码</string>
+    <string name="doc_view_rendered">查看渲染效果</string>
+    <string name="doc_unsupported_title">无法显示此格式</string>
+    <string name="doc_unsupported_desc">旧版.doc/.ppt文件暂不支持应用内查看,请使用其他应用打开。</string>
+    <string name="default_apps_title">默认应用</string>
+    <string name="default_apps_desc">可在系统设置中将Media Master设为各文件类型的默认查看器。</string>
+</resources>

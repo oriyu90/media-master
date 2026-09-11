@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="doc_open_externally">افتح باستخدام تطبيق آخر</string>
+    <string name="doc_truncated_notice">يتم عرض جزء فقط من هذا الملف.</string>
+    <string name="doc_load_more">تحميل المزيد</string>
+    <string name="doc_parse_error">تعذر فتح هذا الملف.</string>
+    <string name="doc_empty">لا يوجد محتوى لعرضه.</string>
+    <string name="doc_json_invalid">هذا ليس JSON صالحًا، يتم عرض النص الأصلي.</string>
+    <string name="doc_view_source">عرض المصدر</string>
+    <string name="doc_view_rendered">عرض التنسيق</string>
+    <string name="doc_unsupported_title">تعذر عرض هذا التنسيق</string>
+    <string name="doc_unsupported_desc">ملفات ‎.doc/.ppt‎ القديمة غير مدعومة للعرض داخل التطبيق بعد. افتحها باستخدام تطبيق آخر.</string>
+    <string name="default_apps_title">التطبيقات الافتراضية</string>
+    <string name="default_apps_desc">يمكنك تعيين Media Master كعارض افتراضي لأنواع الملفات من إعدادات النظام.</string>
+</resources>

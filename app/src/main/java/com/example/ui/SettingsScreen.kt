@@ -93,6 +93,19 @@ fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostControlle
                 )
             }
             item {
+                val context = LocalContext.current
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.default_apps_title)) },
+                    supportingContent = { Text(stringResource(R.string.default_apps_desc)) },
+                    modifier = Modifier.clickable {
+                        val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = Uri.fromParts("package", context.packageName, null)
+                        }
+                        runCatching { context.startActivity(intent) }
+                    }
+                )
+            }
+            item {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                 Text(
                     text = stringResource(R.string.backup_settings),

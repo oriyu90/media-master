@@ -19,6 +19,7 @@ Media Master is a comprehensive Android application designed to manage, browse, 
 2. **Audio Player**: Browse tracks and playlists, with an embedded Media3 playback service supporting background audio, shuffle, and skip capabilities.
 3. **File Manager**: Explore internal and external storage directories with standard file operations (copy, move, delete).
 4. **Document Scanner**: Built-in integration with GMS Document Scanner to digitize physical documents to PDF or JPEG formats.
+4b. **Universal Document Viewer** (v1.2.0+): Text/log, CSV/TSV, JSON, Markdown, PDF, and `.docx`/`.pptx` files open inside the app (no automatic hand-off to another app); any other file falls back to a paged hex/ASCII view rather than being refused. A lightweight built-in charset sniffer (BOM/UTF-8/Shift_JIS) avoids mojibake on non-UTF-8 text files. Legacy binary `.doc`/`.ppt` remain external-only — see "Known limitations" below. Media Master registers `ACTION_VIEW` intent-filters for the supported types so it can be chosen as a default app.
 5. **Video Editor**: Trim and mute videos using ExoPlayer + MediaMuxer/MediaExtractor.
 6. **Backup System**: WorkManager-based scheduled backup engine. Archives target directories into ZIP files based on custom constraints (charging, Wi-Fi).
 7. **Storage Cleaning**: Analyzes storage and identifies duplicate files across the device using MD5 hashing.
@@ -39,3 +40,7 @@ Media Master is a comprehensive Android application designed to manage, browse, 
 - **Minimum SDK**: 24 (Android 7.0)
 - **Target SDK**: 36
 - **Form Factors**: Adaptive layouts tailored for Phones, Foldables, and Tablets.
+
+## 7. Known limitations
+- Legacy binary Office formats (`.doc`, `.ppt` — pre-2007) are not rendered in-app. Apache POI was evaluated as the renderer but rejected: its core module uses `java.lang.invoke.MethodHandle` in a way D8 cannot dex below `minSdk 26`, which would drop Android 7.0/7.1 support. These files keep the "open in another app" behavior instead.
+- `.docx`/`.pptx` rendering favors correct, mojibake-free text and inline images over pixel-perfect page layout (no full office-document layout engine is used).

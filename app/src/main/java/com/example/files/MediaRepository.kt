@@ -192,7 +192,9 @@ class MediaRepository(private val context: Context) {
     fun MediaFile.isDocument(): Boolean = isDocumentName(name) ||
         mimeType == "application/pdf" || mimeType.startsWith("application/vnd.openxmlformats-officedocument") ||
         mimeType.startsWith("application/vnd.oasis.opendocument") || mimeType == "application/msword" ||
-        mimeType == "application/rtf" || mimeType == "text/plain"
+        mimeType == "application/vnd.ms-powerpoint" || mimeType == "application/rtf" ||
+        mimeType == "text/plain" || mimeType == "text/csv" || mimeType == "text/markdown" ||
+        mimeType == "application/json" || mimeType == "text/html"
 
     fun File.isDocument(): Boolean = isFile && isDocumentName(name)
 
@@ -207,7 +209,7 @@ class MediaRepository(private val context: Context) {
     )
 
     fun isDocumentName(name: String): Boolean = name.substringAfterLast('.', "").lowercase() in setOf(
-        "pdf", "doc", "docx", "odt", "rtf", "txt", "md", "csv", "json", "html", "htm",
+        "pdf", "doc", "docx", "odt", "rtf", "txt", "md", "markdown", "log", "csv", "tsv", "json", "html", "htm",
         "xls", "xlsx", "ods", "ppt", "pptx", "odp", "epub"
     )
 
@@ -221,8 +223,9 @@ class MediaRepository(private val context: Context) {
             "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             "odt" -> "application/vnd.oasis.opendocument.text"
             "rtf" -> "application/rtf"
-            "txt", "md" -> "text/plain"
-            "csv" -> "text/csv"
+            "txt", "log", "ini", "conf", "cfg", "yaml", "yml", "properties" -> "text/plain"
+            "md", "markdown" -> "text/markdown"
+            "csv", "tsv" -> "text/csv"
             "json" -> "application/json"
             "html", "htm" -> "text/html"
             "epub" -> "application/epub+zip"

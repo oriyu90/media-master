@@ -33,6 +33,11 @@ import android.net.Uri
  *                                          a later phase once the viewer accepts
  *                                          a stand-alone URI)
  *       ACTION_VIEW  of a directory    -> file browser at that path
+ *       ACTION_VIEW  of text/csv/json/markdown/pdf/word/powerpoint
+ *                                      -> the universal document viewer, opened
+ *                                         directly on the incoming URI (Media
+ *                                         Master does not need to already know
+ *                                         about the file)
  *
  * [resolve] converts an incoming [Intent] into an internal navigation route
  * string, or `null` when the request is not understood. Callers must treat
@@ -78,6 +83,7 @@ object DeepLinks {
                 type?.startsWith("image/") == true ||
                     type?.startsWith("video/") == true ||
                     type?.startsWith("audio/") == true -> "library"
+                data != null && isDocumentViewerType(type) -> route("docViewer", data.toString())
                 else -> null
             }
             else -> null
@@ -110,4 +116,16 @@ object DeepLinks {
     }
 
     private fun route(base: String, arg: String) = "$base/${Uri.encode(arg)}"
+
+    /**
+     * MIME types the universal document viewer (`docViewer`) can open.
+     * Legacy `.doc`/`.ppt` are intentionally excluded — see [com.example.viewer.ViewerKind.EXTERNAL_ONLY].
+     */
+    private val DOCUMENT_VIEWER_TYPES = setOf(
+        "text/plain", "text/csv", "text/markdown", "application/json", "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    )
+
+    private fun isDocumentViewerType(type: String?): Boolean = type != null && type in DOCUMENT_VIEWER_TYPES
 }

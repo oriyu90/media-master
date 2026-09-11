@@ -1,7 +1,34 @@
 # 設計書兼仕様書 (Media Master)
 
 ## バージョン情報
-- **Version:** 1.1.0
+- **Version:** 1.2.0
+
+## v1.2.0 の設計変更（要約）
+- **汎用ドキュメントビューアー**: 既存の `ViewerScreen`（画像/動画/音声、OCR、単一Player設計）は変更せず、
+  新規 `ui/viewer/DocumentViewerScreen`（ルート `docViewer/{uri}`）を追加。テキスト/CSV/JSON/Markdown/
+  PDF/`.docx`/`.pptx` をアプリ内で表示し、それ以外の全ファイルは16進+ASCIIダンプ（`viewer/HexPageReader`、
+  ページ単位遅延読込）へフォールバックするため「開けないファイル」が存在しない設計。
+  URIを直接受け取る設計（`MediaFile`経由の path 参照に依存しない）とし、外部アプリからの
+  `ACTION_VIEW` 単体URIも同一画面で表示できる（`DeepLinks` 経由）。
+- **文字コード判定**: 新規依存を追加せず、BOM検出→UTF-8妥当性検証→Shift_JISヒューリスティックの
+  自前実装（`viewer/TextCharsetReader`）。大きすぎるテキスト/CSVは既定上限（5〜10MB）まで読み込み、
+  「さらに読み込む」で段階拡張しメモリを保護。
+- **Office文書**: `.docx`/`.pptx` は Apache POI 等を使わず、`java.util.zip` + 標準 `XmlPullParser` による
+  自前パーサ（`office/OoxmlDocumentReader`・`office/OoxmlSlideReader`）で段落/書式/画像を抽出。
+  **旧形式 `.doc`/`.ppt` は内蔵表示の対象外**とした: Apache POI (core) の導入を検証したところ
+  `java.lang.invoke.MethodHandle` 使用箇所が D8 の dex 化を `minSdk 26` 未満で失敗させることが判明し
+  （実行時クラッシュではなくビルド不能）、`minSdk 24` 互換性を優先して不採用。`ViewerKind.EXTERNAL_ONLY`
+  として従来通り外部アプリへ委譲する。
+- **Markdown**: `commonmark`（Apache-2.0, 純Java）1件のみを新規依存として追加し、パース結果を
+  Compose用の独自モデル（`viewer/MarkdownParser`の`MdBlock`/`MdInline`）へ変換して描画。ソース/
+  レンダリング切替つき。
+- **既定アプリ化**: `AndroidManifest.xml` に `text/plain`・`text/csv`・`text/markdown`・
+  `application/json`・`application/pdf`・docx・pptx の `ACTION_VIEW` intent-filter を追加。
+  Android の仕様上アプリ側から既定を強制することはできないため、設定画面に
+  `ACTION_APPLICATION_DETAILS_SETTINGS` へ誘導する「既定のアプリ」導線を追加するに留める。
+- **安全性**: PDFはページ単位でBitmapを生成・`recycle()`、HEXビューアはページ遅延読込、
+  Office/Markdown/JSONパーサはすべて例外を握りつぶし失敗時は空表示かフォールバックに留める
+  （既存の `runCatching`/`when` 網羅方針を踏襲）。
 
 ## v1.0.0 の設計変更（要約）
 - **破壊的操作の確認**: 削除・アンインストール・復元はすべてアプリ内 `ConfirmDeleteDialog` を経由。
@@ -61,6 +88,13 @@
   - 音声向け: トリム（切り出し）機能のプレースホルダーUI。
 - 共有アクション。
 
+### 5b. 汎用ドキュメントビューアー (v1.2.0〜)
+- テキスト/ログ・CSV/TSV・JSON・Markdown・PDF・`.docx`・`.pptx` をアプリ内で表示。
+- 上記以外の任意のファイルは16進+ASCIIダンプで表示（「開けないファイル」を作らない設計）。
+- 旧形式 `.doc`/`.ppt` は互換性上の理由でアプリ内表示対象外（外部アプリで開く）。
+- 各ビューアーに共通のトップバー: 戻る・外部アプリで開く・共有・（自アプリ管理下のファイルのみ）削除。
+- `AndroidManifest.xml` の intent-filter により、対応形式で Media Master を既定アプリ候補として選択可能。
+
 ### 6. 設定機能 (Settings)
 - **テーマ設定:** Light / Dark / System Default の切り替え。
 - **言語設定:** 日本語 / 英語 / System Default の切り替え（Compose の `LocalContext` と `Configuration.setLocale` を利用した動的切り替え）。
@@ -78,7 +112,8 @@
 - **権限管理:** Accompanist Permissions (ランタイムパーミッション管理) + `MANAGE_EXTERNAL_STORAGE` (Android 11+)
 - **メディア再生:** AndroidX Media3 (ExoPlayer)
 - **画像読み込み:** Coil (非同期ロードとキャッシュ処理)
-- **ドキュメント表示:** AndroidView を介した PDF レンダリング（必要に応じて拡張）
+- **ドキュメント表示:** `android.graphics.pdf.PdfRenderer` によるPDFページレンダリング、`commonmark`
+  によるMarkdown解析、`java.util.zip`+`XmlPullParser` による自前 `.docx`/`.pptx` パーサ
 - **デスクトップUI:** `Configuration.UI_MODE_TYPE_DESK` のみでDeX/Finder風UIを有効化。画面幅では判定しない。
 
 ## ディレクトリ構造・設計方針

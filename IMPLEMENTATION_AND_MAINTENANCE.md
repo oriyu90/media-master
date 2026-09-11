@@ -1,4 +1,4 @@
-# Media Master v1.1.0 実装・保守メモ
+# Media Master v1.2.0 実装・保守メモ
 
 最終更新: 2026-09-11
 
@@ -6,19 +6,105 @@
 
 | 項目 | 内容 |
 | --- | --- |
-| バージョン | `1.1.0` (`versionCode 5`) |
+| バージョン | `1.2.0` (`versionCode 6`) |
 | アプリケーションID | `com.yukiorita.mediamaster` |
 | 最小 SDK / target SDK | 24 / 36 |
 | ライセンス | MIT |
 | 著作者 | Yuki_Orita |
 | release APK | `app/build/outputs/apk/release/app-release-signed.apk`（R8 + resource shrink 有効） |
-| APK SHA-256 | `fe75d958b3c811a48582058903d95947b1f97ad108b8c23fd5338ec6ae8eb9a3` |
-| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0/v0.2.0/v0.3.0/v1.0.0 と同一鍵） |
-| GitHub Release | `v1.1.0` (GitHub Releases) |
+| APK SHA-256 | `a9be2530fc51397582a820b9e9c7404dad3d1374d685838e0170de495e591c33` |
+| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.1.0 と同一鍵） |
+| GitHub Release | `v1.2.0` (GitHub Releases) |
 
 release APK は RSA 4096 ビット鍵・APK Signature Scheme v2+v3 署名（`apksigner verify` で確認済み）。署名鍵は `common-rules-document/keystores/media-master-upload-key.jks`（alias `upload`）。公開前には毎回 `apksigner verify --verbose` で署名を確認してください。
 
-v1.1.0 は R8 有効ビルドで `:app:assembleDebug` / `:app:assembleRelease` が成功。単体テストは非 Robolectric（`BackupPathsTest`・`ExampleUnitTest`）が通過、`DeepLinksTest` のみ実行環境制約（Robolectric が SDK 36 に Java 21 を要求、手元は JDK 17）で失敗＝コード由来の失敗ではない。実機・エミュレータのスモークテストは未実施のため、配布前に主要画面・削除確認・共有・バックアップ/復元の実機確認を推奨。DeX 実機・RTL(ar)・TalkBack・分割画面・実 SMB/WebDAV サーバー疎通は引き続き未検証。旧リリースの APK SHA-256: v1.0.0 `255d8ed2b60e1f7a3dd51d1f933b08ae39cc7fa9a8398149202cb20d038b0082`、v0.3.0 `5f896b1bd15a65b4a947c428490ca63cc0ea0cac81332d89477029b5fe3d4bab`。
+v1.2.0 は JDK 21 + R8 有効ビルドで `:app:assembleDebug` / `:app:assembleRelease` が成功。単体テスト43件全て通過（`DeepLinksTest` を含む — v1.1.0時点でJDK17起因のRobolectric失敗が記録されていたが、JDK21で解消を確認）。`lintDebug` はエラー0件。実機・エミュレータのスモークテストは未実施のため、配布前に新規追加した各ドキュメント形式（CSV/JSON/TXT/バイナリ/MD/PDF/DOCX/PPTX/DOC/PPT）を開く確認、既定アプリ選択、DeX・RTL(ar)・TalkBack・分割画面・実SMB/WebDAV疎通を推奨（下記チェックリスト参照）。旧リリースの APK SHA-256: v1.1.0 `fe75d958b3c811a48582058903d95947b1f97ad108b8c23fd5338ec6ae8eb9a3`、v1.0.0 `255d8ed2b60e1f7a3dd51d1f933b08ae39cc7fa9a8398149202cb20d038b0082`、v0.3.0 `5f896b1bd15a65b4a947c428490ca63cc0ea0cac81332d89477029b5fe3d4bab`。
+
+## v1.2.0 の実装内容（汎用ドキュメントビューアー・既定アプリ化）
+
+### 新設ビューアー
+
+- `ui/viewer/DocumentViewerScreen`（ルート `docViewer/{uri}`）: 既存 `ViewerScreen`（画像/動画/音声）とは
+  別画面。URI文字列を直接受け取り、`viewer/ViewerKindClassifier` が拡張子/MIMEから種別判定して
+  子Composableへ委譲。トップバーは戻る/外部アプリで開く/共有/（自アプリ管理下ファイルのみ）削除で統一。
+- 対応形式と実装:
+  - **テキスト**: `viewer/TextCharsetReader`（BOM検出→UTF-8妥当性検証→Shift_JISヒューリスティック、
+    新規依存なし）。既定5MBまで読み込み、超過時は「さらに読み込む」で段階拡張。
+  - **CSV/TSV**: `viewer/CsvParser`（区切り文字自動判定、引用符/エスケープ対応の簡易RFC4180）。
+    固定ヘッダー + 横スクロール表（`LazyColumn`+共有`ScrollState`）。1万行超は切り詰め表示。
+  - **JSON**: 既存の `kotlinx.serialization.json` で整形表示。パース失敗時は生テキストへ自動フォールバック
+    （クラッシュ・空表示なし）。
+  - **Markdown**: `viewer/MarkdownParser`（`commonmark` 依存、新規追加）でパースし、独自モデル
+    (`MdBlock`/`MdInline`) をCompose側で描画。見出し/太字/斜体/リスト/引用/コードブロック/リンク対応。
+    ソース/レンダリング切替可。
+  - **PDF**: `viewer/PdfPageRenderer`（既存で実績のある `android.graphics.pdf.PdfRenderer` を流用）。
+    ページ単位で `Bitmap` を生成し表示後 `recycle()`、複数ページを同時にメモリへ持たない。
+  - **`.docx`/`.pptx`**: `office/OoxmlDocumentReader`・`office/OoxmlSlideReader`。追加ライブラリなしで
+    `java.util.zip` + 標準 `XmlPullParser` により zip+XML を直接パースし、段落テキスト・太字/斜体・
+    見出しレベル・インライン画像（`.docx`）/スライド単位テキスト・画像（`.pptx`）を抽出。全エントリに
+    サイズ上限（zip 1エントリ10MB、画像枚数上限）を設け decompression-bomb 的な入力でもメモリを保護。
+  - **バイナリ全般**: `viewer/HexPageReader`（ページ単位ランダムアクセス、既定4KB/ページ）+
+    `HexFormatter` によるオフセット+16進+ASCIIダンプ。`LazyColumn`でページ遅延読込。
+- **旧形式 `.doc`/`.ppt` は内蔵表示の対象外（`ViewerKind.EXTERNAL_ONLY`）**: Apache POI (`org.apache.poi:poi`
+  core) を実装・ビルド検証したところ、`org.apache.poi.poifs.nio.CleanerUtil` が
+  `java.lang.invoke.MethodHandle.invoke` を使用しており、D8 が `minSdk 26` 未満では
+  dex 化できずビルド自体が失敗することが判明（`mergeExtDexDebug`/`mergeDebugGlobalSynthetics` エラー）。
+  `minSdk 24`（Android 7.0/7.1）の互換性維持を優先し、POI 依存を撤去。これら2形式は従来通り
+  `Intent.ACTION_VIEW` + `Intent.createChooser` で外部アプリへ委譲する（`FilesScreen.openMediaFile`・
+  `DeepLinks`・Manifest intent-filter のいずれからも対象外）。
+
+### 既定アプリ化
+
+- `AndroidManifest.xml` に `ACTION_VIEW`(DEFAULT+BROWSABLE) intent-filter を追加：`text/plain`・
+  `text/csv`・`text/markdown`・`application/json`・`application/pdf`・
+  `application/vnd.openxmlformats-officedocument.wordprocessingml.document`・
+  `application/vnd.openxmlformats-officedocument.presentationml.presentation`。
+- `DeepLinks.resolve()` が上記MIMEの `ACTION_VIEW` を `docViewer/{受信URI}` へ直接ルーティング
+  （`MediaFile`一覧に無い外部URIも表示可能。旧コードの「後続フェーズ」コメントを解消）。
+- Android は「アプリ側から既定を強制する」手段を提供しないため（初回起動時の「常時」選択、または
+  設定→アプリ情報からの解除のみ）、`SettingsScreen` に「既定のアプリ」行を追加し
+  `Settings.ACTION_APPLICATION_DETAILS_SETTINGS` へ誘導。誇大表現を避け、実際の挙動をja/en文言で説明。
+
+### MIME判定の細部修正
+
+- `MediaRepository.isDocument()` に `text/csv`・`text/markdown`・`application/json`・`text/html`・
+  `application/vnd.ms-powerpoint` を明示追加（従来は拡張子一致のみに依存していた抜け穴）。
+- `MediaCategory.DOCUMENTS.matches()` の拡張子集合に `json`・`html`・`htm` を追加し `isDocumentName()` と一致させた。
+- `getMimeType()` に `tsv`→`text/csv`、`md`/`markdown`→`text/markdown`（従来`txt`と同一の`text/plain`だった点を分離）、
+  `log`/`ini`/`conf`/`cfg`/`yaml`/`yml`/`properties`→`text/plain` を追加。
+
+### 新規依存
+
+- `org.commonmark:commonmark`（Apache-2.0、純Java、Markdown解析のみに使用）。
+- それ以外はゼロ（CSV/JSON/文字コード判定/`.docx`/`.pptx`/HEX/PDFはすべて標準APIまたは自前実装）。
+- 検証済みで**不採用**: `org.apache.poi:poi`/`poi-scratchpad`（上記「旧形式」節参照）。
+
+### 多言語対応
+
+- 新規 `strings_viewer.xml` を5ロケール（en/ja/zh/ar/nl）に同数（12キー）で追加。既存の
+  `strings_network.xml` と同じ1行1`<string>`形式。全ロケール合計 **220キー**（v1.1.0時点208キー+12）。
+  正確な値は `LocaleStringParityTest` が継続的に検証する。
+- **新規テスト `LocaleStringParityTest`**（`app/src/test/java/com/example/LocaleStringParityTest.kt`）：
+  5ロケールの `strings*.xml` キー集合とキー数が完全一致することを検証。従来手作業で維持していた
+  「言語間で文字列数を揃える」不変条件を初めて自動テスト化した（IMPLEMENTATION_AND_MAINTENANCE.md
+  の残課題として指摘されていたもの）。
+
+### 新規テスト
+
+- `CsvParserTest`（7件）：区切り文字判定、引用符/エスケープ、改行入り引用フィールド、行数切り詰め。
+- `TextCharsetReaderTest`（5件）：BOM検出、UTF-8/Shift_JIS判定と往復一致（文字化けしないことを保証）。
+- `ViewerKindClassifierTest`（4件）：拡張子/MIME判定、旧形式のEXTERNAL_ONLY化、未知バイナリのHEXフォールバック。
+- `MarkdownParserTest`（7件）：見出し/強調/コードブロック/リスト/不正入力での非クラッシュ。
+- `DeepLinksTest` に新形式のACTION_VIEWルーティングとレガシー形式除外の2ケースを追加。
+- `LocaleStringParityTest`（2件、上記）。
+
+### 残課題（v1.3.0以降の候補）
+
+- `.docx`/`.pptx` のリスト番号付け（`w:numPr`）は未解決で、箇条書き/番号付きリストは通常段落として表示される。
+- `.pptx` のスライド順序はファイル名の数値サフィックス依存（大幅な並べ替え後のファイルでは順序がずれる可能性）。
+- Markdown表（GFMテーブル拡張）は未対応（テーブル行はプレーンテキストとして表示される）。
+- 旧形式 `.doc`/`.ppt` の内蔵表示は、D8制約が解消されない限り対象外の方針を維持。
+- 実機・エミュレータでの新形式スモークテスト、DeX・RTL・TalkBack確認は未実施。
 
 ## v1.1.0 の実装内容（残課題の解消 + DeX/通常モード堅牢化）
 
@@ -370,8 +456,13 @@ v1.1.0 は R8 有効ビルドで `:app:assembleDebug` / `:app:assembleRelease` �
 2. 署名済み APK を実機へ導入し**全機能スモーク**（ライブラリ/ビューア/編集/オーディオ/
    ドキュメントスキャン/管理/重複クリーン/APK管理/バックアップ/復元/ネットワーク/
    全ディープリンク `am start`）。
-3. 回転・分割・DeX・RTL(ar)・ダーク・TalkBack を確認。
-4. `apksigner verify --verbose --print-certs` と SHA-256 記録。
+3. **新規: 汎用ドキュメントビューアー**（v1.2.0〜）— CSV/JSON/TXT/バイナリ/MD/PDF/DOCX/PPTX/
+   DOC/PPT をFiles/Documentsから開き、文字化け・レイアウト崩れ・クラッシュがないこと（巨大/破損
+   ファイルを含む）。DOC/PPTは外部アプリへの委譲になることを確認。「既定のアプリ」設定から
+   システム設定画面に遷移できること。外部アプリの共有シートからMedia Masterで対応形式を
+   開けること。
+4. 回転・分割・DeX・RTL(ar)・ダーク・TalkBack を確認。
+5. `apksigner verify --verbose --print-certs` と SHA-256 記録。
 
 ## 主要ファイル
 
@@ -380,10 +471,13 @@ v1.1.0 は R8 有効ビルドで `:app:assembleDebug` / `:app:assembleRelease` �
 | `app/src/main/java/com/example/ui/DesktopNavigation.kt` | DeX / 大画面のサイドバー、タブ、ホーム |
 | `app/src/main/java/com/example/ui/MainNavigation.kt` | 通常UI・デスクトップUIの振り分け、ナビゲーション定義 |
 | `app/src/main/java/com/example/FilesScreen.kt` | ファイル一覧、区切り線、フォルダのDnDとコンテキスト操作 |
+| `app/src/main/java/com/example/ui/viewer/DocumentViewerScreen.kt` | 汎用ドキュメントビューアー本体（v1.2.0〜） |
+| `app/src/main/java/com/example/viewer/` | 文字コード判定・CSV/JSON/Markdown/HEX/PDFの各パーサ・レンダラ（v1.2.0〜） |
+| `app/src/main/java/com/example/office/` | `.docx`/`.pptx` 自前zip+XMLパーサ（v1.2.0〜） |
 | `app/src/main/java/com/example/SettingsRepository.kt` | DataStore設定（ピン留めを含む） |
 | `app/src/main/java/com/example/SettingsViewModel.kt` | 設定操作のViewModel |
 | `app/src/main/res/values*/strings*.xml` | UI翻訳リソース |
-| `app/build.gradle.kts` | アプリID、v0.2.0、署名設定、依存関係 |
+| `app/build.gradle.kts` | アプリID、バージョン、署名設定、依存関係 |
 | `README.md` | 利用・ビルド・公開の概要 |
 | `LICENSE` | MITライセンス |
 | `index.html` / `tokens.css` / `assets/site.css` | 紹介サイト。Cloudflare Pages([https://studio-rizi.pages.dev/projects/media-master/](https://studio-rizi.pages.dev/projects/media-master/))へデプロイ済み |
@@ -444,3 +538,4 @@ shasum -a 256 app/build/outputs/apk/release/app-release.apk
 - `QUERY_ALL_PACKAGES`、`REQUEST_INSTALL_PACKAGES` はストア配布時に審査対象となるため、アプリ／APK管理機能の必要性をストア申請で説明してください。
 - Lintはエラー0件。依存関係の更新提案、未使用リソース、既存APIの非推奨警告などの非ブロッキング警告は残り得ます。機能変更時は `lintDebug` を再実行してください。
 - release APKは現時点でv2署名を使用しています。Play App Signingを利用する場合は、作成済みのアップロード鍵を安全なバックアップ先へ保管してください。
+- `commonmark`（Markdownパーサ、v1.2.0で追加）以外に汎用ビューアー機能の新規依存はありません。**Apache POI（旧形式.doc/.ppt向け）は検証の上、意図的に不採用**（`java.lang.invoke.MethodHandle`がminSdk26未満でdex化できないため）。将来再検討する場合は、minSdk引き上げの可否をまず確認してください。

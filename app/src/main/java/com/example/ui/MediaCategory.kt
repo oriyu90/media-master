@@ -41,7 +41,7 @@ enum class MediaCategory(
         AUDIO -> file.mimeType.startsWith("audio/")
         DOCUMENTS -> file.mimeType.startsWith("application/") || file.mimeType.startsWith("text/") ||
             file.name.substringAfterLast('.', "").lowercase() in
-            setOf("pdf", "doc", "docx", "odt", "rtf", "txt", "md", "csv", "xls", "xlsx", "ods", "ppt", "pptx", "odp", "epub")
+            setOf("pdf", "doc", "docx", "odt", "rtf", "txt", "md", "csv", "json", "html", "htm", "xls", "xlsx", "ods", "ppt", "pptx", "odp", "epub")
         APPS -> file.mimeType == "application/vnd.android.package-archive" ||
             file.name.endsWith(".apk", ignoreCase = true)
     }

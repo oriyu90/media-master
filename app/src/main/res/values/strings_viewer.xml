@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="doc_open_externally">Open in another app</string>
+    <string name="doc_truncated_notice">Showing a truncated preview of this file.</string>
+    <string name="doc_load_more">Load more</string>
+    <string name="doc_parse_error">Couldn\'t open this file.</string>
+    <string name="doc_empty">This file has no content to show.</string>
+    <string name="doc_json_invalid">This isn\'t valid JSON — showing the raw text.</string>
+    <string name="doc_view_source">View source</string>
+    <string name="doc_view_rendered">View rendered</string>
+    <string name="doc_unsupported_title">Can\'t display this format</string>
+    <string name="doc_unsupported_desc">Legacy .doc/.ppt files aren\'t supported for in-app viewing yet. Open with another app instead.</string>
+    <string name="default_apps_title">Default apps</string>
+    <string name="default_apps_desc">Choose Media Master as the default viewer for file types in system settings.</string>
+</resources>

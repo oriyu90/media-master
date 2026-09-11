@@ -472,7 +472,9 @@ fun openMediaFile(context: android.content.Context, file: MediaFile, navControll
         } catch (_: Exception) {
             android.widget.Toast.makeText(context, context.getString(R.string.could_not_open_apk), android.widget.Toast.LENGTH_SHORT).show()
         }
-    } else {
+    } else if (com.example.viewer.ViewerKindClassifier.classify(file.name, file.mimeType) == com.example.viewer.ViewerKind.EXTERNAL_ONLY) {
+        // Legacy binary Office formats (.doc/.ppt): no safe in-app renderer
+        // (see ViewerKindClassifier), so keep the original external hand-off.
         val uri = file.contentUri ?: runCatching {
             androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", File(file.path))
         }.getOrNull() ?: return
@@ -482,6 +484,22 @@ fun openMediaFile(context: android.content.Context, file: MediaFile, navControll
         }
         try {
             context.startActivity(Intent.createChooser(intent, file.name))
+        } catch (_: Exception) {
+            android.widget.Toast.makeText(context, context.getString(R.string.invalid_file_path), android.widget.Toast.LENGTH_SHORT).show()
+        }
+    } else {
+        // Everything else opens in Media Master's own universal document viewer
+        // (text/CSV/JSON/Markdown/PDF/Office/hex fallback) instead of always
+        // handing off to another app.
+        val uri = file.contentUri ?: runCatching {
+            androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", File(file.path))
+        }.getOrNull()
+        if (uri == null) {
+            android.widget.Toast.makeText(context, context.getString(R.string.invalid_file_path), android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        try {
+            navController.navigate("docViewer/${Uri.encode(uri.toString())}") { launchSingleTop = true }
         } catch (_: Exception) {
             android.widget.Toast.makeText(context, context.getString(R.string.invalid_file_path), android.widget.Toast.LENGTH_SHORT).show()
         }

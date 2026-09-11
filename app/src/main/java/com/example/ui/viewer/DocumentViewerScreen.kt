@@ -480,7 +480,10 @@ private fun MarkdownBlockView(
             )
         }
         is MdBlock.MathBlock -> Box(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).horizontalScroll(rememberScrollState()),
+            // NOTE: deliberately no horizontalScroll here — that gives its child an unbounded
+            // width constraint, which defeats LatexView's internal fillMaxWidth() and makes
+            // KaTeX wrap its own output character-by-character instead of laying out normally.
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
             contentAlignment = Alignment.Center,
         ) {
             LatexView(latex = block.latex, displayMode = true, selfSizing = true)
@@ -639,7 +642,9 @@ private fun LatexSourceBody(context: Context, uri: Uri) {
                                 }
                             }
                             is TexSegment.Math -> Box(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).horizontalScroll(rememberScrollState()),
+                                // See the equivalent MdBlock.MathBlock note: no horizontalScroll —
+                                // it gives the child unbounded width and breaks KaTeX's layout.
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
                                 contentAlignment = if (segment.displayMode) Alignment.Center else Alignment.CenterStart,
                             ) {
                                 LatexView(latex = segment.latex, displayMode = segment.displayMode, selfSizing = true)

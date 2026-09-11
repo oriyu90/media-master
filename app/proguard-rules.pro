@@ -77,6 +77,23 @@
 -keep class com.google.crypto.tink.** { *; }
 -dontwarn com.google.crypto.tink.**
 
+# --- WorkManager's internal Room database (backup scheduling) ---
+# CRITICAL: without these, R8 breaks WorkManager's reflective instantiation of
+# its generated Room `_Impl` class and the app crashes on *every* launch with
+# "Failed to create an instance of class ...WorkDatabase..." — before any UI
+# ever shows, because androidx.startup.InitializationProvider (a ContentProvider)
+# runs WorkManagerInitializer at process bind time. Found via on-device testing
+# of the release build (no automated test/lint catches this: it's an R8+reflection
+# interaction, not a compile-time error). Keep Room-generated classes verbatim.
+-keep class * extends androidx.room.RoomDatabase
+-keep @androidx.room.Database class * { *; }
+-keepclassmembers @androidx.room.Database class * { *; }
+-keep class **_Impl { *; }
+-keep class **_Impl$* { *; }
+-keep class androidx.work.impl.** { *; }
+-dontwarn androidx.room.**
+-dontwarn androidx.work.**
+
 # --- Enums used across serialization boundaries ---
 -keepclassmembers enum * {
     public static **[] values();

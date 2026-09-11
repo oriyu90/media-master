@@ -97,12 +97,29 @@ class MediaRepository(private val context: Context) {
         val fallbackRoot = rootPath()
         val contentUri = MediaStore.Files.getContentUri(volume)
 
+        // Bounded, provider-safe paging: LIMIT/OFFSET must go through the query-args Bundle
+        // (API 26+) rather than being appended to the sortOrder string. Appending
+        // "LIMIT n OFFSET m" directly to sortOrder — which this used to do — works on some
+        // MediaProvider builds but is rejected as "Invalid token LIMIT" on others (confirmed
+        // via on-device testing, API 34), which broke every media/document listing. On
+        // API 24/25, where the Bundle overload doesn't exist, fall back to one unpaged query:
+        // CursorWindow already streams results from the provider a window at a time, so this
+        // does not materialise the whole result set in process memory.
+        val sortColumn = MediaStore.Files.FileColumns._ID
         var offset = 0
         while (true) {
-            // Stable _ID order keeps page boundaries deterministic across chunks.
-            val sortOrder = "${MediaStore.Files.FileColumns._ID} ASC LIMIT $MEDIA_PAGE_SIZE OFFSET $offset"
             var rows = 0
-            context.contentResolver.query(contentUri, projection, null, null, sortOrder)?.use {
+            val cursor = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                val queryArgs = android.os.Bundle().apply {
+                    putString(android.content.ContentResolver.QUERY_ARG_SQL_SORT_ORDER, "$sortColumn ASC")
+                    putInt(android.content.ContentResolver.QUERY_ARG_SQL_LIMIT, MEDIA_PAGE_SIZE)
+                    putInt(android.content.ContentResolver.QUERY_ARG_OFFSET, offset)
+                }
+                context.contentResolver.query(contentUri, projection, queryArgs, null)
+            } else {
+                context.contentResolver.query(contentUri, projection, null, null, "$sortColumn ASC")
+            }
+            cursor?.use {
                 val idCol = it.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID)
                 val nameCol = it.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DISPLAY_NAME)
                 val sizeCol = it.getColumnIndexOrThrow(MediaStore.Files.FileColumns.SIZE)
@@ -151,6 +168,9 @@ class MediaRepository(private val context: Context) {
                     }
                 }
             }
+            // Pre-O (no query-args paging): the single unpaged query already returned
+            // everything, so stop after one pass regardless of row count.
+            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O) break
             if (rows < MEDIA_PAGE_SIZE) break
             offset += MEDIA_PAGE_SIZE
         }

@@ -17,8 +17,11 @@ sealed class TexSegment {
 
 object LatexSourceParser {
 
+    // NOTE: literal '}' must be escaped as '\}' — Android's ICU regex engine (unlike desktop
+    // JVM regex, where unit tests run) rejects an unescaped '}' with PatternSyntaxException.
+    // Found via on-device testing; the JVM unit tests could not have caught this.
     private val environmentPattern =
-        Regex("\\\\begin\\{(equation\\*?|align\\*?|gather\\*?|eqnarray\\*?|multline\\*?)}([\\s\\S]*?)\\\\end\\{\\1}")
+        Regex("\\\\begin\\{(equation\\*?|align\\*?|gather\\*?|eqnarray\\*?|multline\\*?)\\}([\\s\\S]*?)\\\\end\\{\\1\\}")
     private val dollarBlockPattern = Regex("(?<!\\\\)\\$\\$([\\s\\S]+?)(?<!\\\\)\\$\\$")
     private val bracketBlockPattern = Regex("\\\\\\[([\\s\\S]+?)\\\\]")
     private val dollarInlinePattern = Regex("(?<!\\\\)\\$(?!\\$)([^$\\n]+?)(?<!\\\\)\\$(?!\\$)")

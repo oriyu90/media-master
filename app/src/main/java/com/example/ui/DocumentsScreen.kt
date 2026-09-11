@@ -508,8 +508,14 @@ fun DocumentListRow(file: MediaFile, isSelected: Boolean, isSelectionMode: Boole
         supportingContent = {
             val dateString = java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM, Locale.getDefault())
                 .format(Date(file.dateModified))
-            val pageString = if (pageCount > 0) stringResource(R.string.page_count, pageCount) else stringResource(R.string.pdf_document)
-            Text("$dateString · $pageString")
+            val isPdf = file.mimeType == "application/pdf" || file.name.endsWith(".pdf", ignoreCase = true)
+            val typeLabel = when {
+                pageCount > 0 -> stringResource(R.string.page_count, pageCount)
+                isPdf -> stringResource(R.string.pdf_document)
+                else -> file.name.substringAfterLast('.', "").uppercase()
+                    .ifBlank { file.mimeType.substringAfterLast('/').uppercase() }
+            }
+            Text("$dateString · $typeLabel")
         },
         leadingContent = { 
             Icon(

@@ -12,13 +12,86 @@
 | ライセンス | MIT |
 | 著作者 | Yuki_Orita |
 | release APK | `app/build/outputs/apk/release/app-release-signed.apk`（R8 + resource shrink 有効） |
-| APK SHA-256 | `09fd2522298ff8503137eef81475f1a3b8237920a5da4a3b925b2a68d43ac0db` |
+| APK SHA-256 | `500ec32227858828e81370fc6b5d90f39495fc8b081a398a860610953ad06058`（実機デバッグ後の最終版。初回署名版 `09fd2522…ac0db` は4件のバグを含み**配布前に破棄・差し替え済み**、下記「v1.3.0 実機デバッグ」参照） |
 | 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.2.0 と同一鍵） |
 | GitHub Release | `v1.3.0` (GitHub Releases) |
 
 release APK は RSA 4096 ビット鍵・APK Signature Scheme v2+v3 署名（`apksigner verify` で確認済み）。署名鍵は `common-rules-document/keystores/media-master-upload-key.jks`（alias `upload`）。公開前には毎回 `apksigner verify --verbose` で署名を確認してください。
 
-v1.3.0 は JDK 21 + R8 有効ビルドで `:app:assembleDebug` / `:app:assembleRelease` が成功。単体テスト68件全て通過（`DeepLinksTest`含む）。`lintDebug` はエラー0件。実機・エミュレータのスモークテストは未実施のため、配布前にMarkdown数式・`.tex`ファイル・削除ボタン（文書系ファイル）の実機確認を推奨（下記チェックリスト参照）。旧リリースの APK SHA-256: v1.2.0 `a9be2530fc51397582a820b9e9c7404dad3d1374d685838e0170de495e591c33`、v1.1.0 `fe75d958b3c811a48582058903d95947b1f97ad108b8c23fd5338ec6ae8eb9a3`、v1.0.0 `255d8ed2b60e1f7a3dd51d1f933b08ae39cc7fa9a8398149202cb20d038b0082`、v0.3.0 `5f896b1bd15a65b4a947c428490ca63cc0ea0cac81332d89477029b5fe3d4bab`。
+v1.3.0 は JDK 21 + R8 有効ビルドで `:app:assembleDebug` / `:app:assembleRelease` が成功。単体テスト68件全て通過（`DeepLinksTest`含む）。`lintDebug` はエラー0件。**実機デバッグ実施済み**（下記「v1.3.0 実機デバッグ」節参照、Android 14 arm64エミュレータ）。旧リリースの APK SHA-256: v1.2.0 `a9be2530fc51397582a820b9e9c7404dad3d1374d685838e0170de495e591c33`、v1.1.0 `fe75d958b3c811a48582058903d95947b1f97ad108b8c23fd5338ec6ae8eb9a3`、v1.0.0 `255d8ed2b60e1f7a3dd51d1f933b08ae39cc7fa9a8398149202cb20d038b0082`、v0.3.0 `5f896b1bd15a65b4a947c428490ca63cc0ea0cac81332d89477029b5fe3d4bab`。
+
+## v1.3.0 実機デバッグ（2026-09、リリース後・配布前に発見）
+
+GitHub Release `v1.3.0` を一度公開した直後、ユーザー依頼により初めてAndroidエミュレータ
+（API 34 arm64、Google APIs）へ実際にインストールして動作確認したところ、**単体テスト・lint・
+R8ビルドのいずれも検出できない4件の重大バグ**が見つかった。いずれも修正し、release APKを
+差し替えた（バージョン番号・versionCodeは据え置き、署名は同じ鍵で再実施）。
+
+### 1. リリースビルドが起動直後に必ずクラッシュ（最重要）
+
+- 症状: `app-release-signed.apk` をインストールして起動すると「Media Master keeps stopping」で
+  即座に落ちる。`FATAL EXCEPTION: ... Failed to create an instance of class
+  androidx.work.impl.WorkDatabase...`。
+- 原因: `androidx.startup.InitializationProvider`（`ContentProvider`、プロセス起動時に必ず生成
+  される）が`WorkManagerInitializer`を実行し、WorkManager内部のRoomデータベース
+  （`WorkDatabase`/`WorkDatabase_Impl`）を生成しようとするが、R8にRoom/WorkManager向けの
+  keepルールが一つも無く、リフレクションによる生成が失敗していた。
+- **影響範囲**: R8（`isMinifyEnabled=true`）が有効化されたv0.3.0以降の**全リリースビルドが
+  同じ理由でクラッシュしていた可能性が高い**（バックアップ機能でWorkManagerを使用しているため）。
+  これまで一度も実機・エミュレータへ署名済みAPKをインストールして起動確認していなかったため
+  発覚しなかった。「実機スモーク未実施」が実際にリリースを壊していた実例。
+- 修正: `app/proguard-rules.pro`に`androidx.room.RoomDatabase`のサブクラス・`@Database`
+  アノテーション付きクラス・`*_Impl`命名のRoom生成クラス・`androidx.work.impl.**`を
+  keepするルールを追加。
+
+### 2. ライブラリ/ドキュメント/オーディオ一覧が"Invalid token LIMIT"で読み込み失敗
+
+- 症状: Documents画面の「Document List」タブが赤字の「Invalid token LIMIT」で表示され、
+  ファイルが一件も表示されない。Library/Audioも同様に空になる。
+- 原因: v1.1.0で導入したMediaStoreページングが、`sortOrder`文字列に直接
+  `"_ID ASC LIMIT n OFFSET m"`を連結する方式だった。この方式は一部のMediaProvider実装では
+  動作するが、Android 14（API 34）のMediaProviderは`sortOrder`内の`LIMIT`トークンを拒否し
+  `IllegalArgumentException: Invalid token LIMIT`を投げる。
+- 修正: `MediaRepository.queryMediaVolume()`をAPI 26以上では`ContentResolver`の
+  クエリ引数`Bundle`（`QUERY_ARG_SQL_SORT_ORDER`/`QUERY_ARG_SQL_LIMIT`/`QUERY_ARG_OFFSET`、
+  いずれも公式サポートAPI）経由に変更。API 24/25では単一の無ページングクエリにフォールバック
+  （`CursorWindow`がIPC層で自動的に部分読み込みするため、全件を一度に読んでもメモリ問題は生じない）。
+
+### 3. `.tex`ファイルを開くと正規表現の構文エラーでクラッシュ
+
+- 症状: `.tex`ファイルを開くと`PatternSyntaxException: Syntax error in regexp pattern`で
+  クラッシュ。
+- 原因: `LatexSourceParser`の環境検出用正規表現内の閉じ`}`がエスケープされていなかった。
+  デスクトップJVMの`java.util.regex`はエスケープなしの`}`を許容するため、**JVM上で動く
+  単体テストは合格していた**が、Android実機のICU正規表現エンジンはこれを拒否する。
+  構造的にJVM単体テストでは検出不可能なクラスのバグ。
+- 修正: `\}`へエスケープ。今後新規に正規表現を追加する際は実機・エミュレータでの動作確認を
+  必須とする（本件をレビュー観点として残す）。
+
+### 4. Markdown/`.tex`のインライン数式が1文字ずつ改行されて表示される
+
+- 症状: `.tex`の`\(a+b=c\)`のようなインライン数式が、"a +" "b =" "c" のように文字単位で
+  縦に折り返されて表示される。
+- 原因: `LatexView`の自己サイズ調整（`selfSizing`）は、KaTeXからの実測値が届くまでの初期状態で
+  幅をほぼ0pxにしていた。加えて呼び出し側が`horizontalScroll`でラップしていたため、
+  Compose側の`fillMaxWidth()`が無限幅制約下で機能せず、極小ビューポートでKaTeXが数式を
+  文字単位に折り返し、その"折り返された"レイアウトのまま実測値が確定してしまっていた。
+- 修正: `LatexView`は幅を測定値で固定せず`fillMaxWidth()`のみに委ね（高さのみ測定値で調整）、
+  さらに数式表示側の`horizontalScroll`ラッパーを撤去（無限幅制約の発生源を除去）。
+
+### 副次的な修正: Documentsリストの種別ラベル
+
+- 全ての非PDFファイルの種別表示が常に「PDF document」になっていた（`pageCount`が-1のときの
+  フォールバック文言が固定だったため）。ファイル拡張子（`CSV`/`DOCX`等）を表示するよう修正。
+
+### 検証方法
+
+Android SDK cmdline-tools経由でAPI 34 arm64（Google APIs）システムイメージ・emulatorパッケージを
+その場でインストールし、`mm_debug` AVDを新規作成してheadless起動。`adb install`で
+（デバッグ鍵署名の）release APKを導入し、テキスト/CSV/JSON/Markdown/PDF/DOCX/PPTX/`.tex`/
+Shift_JIS/バイナリの全形式を実際にタップで開き、削除・共有・既定アプリ設定導線を含めて
+スクリーンショットとlogcat（`-b crash`）で確認。上記4件を検出・修正後、同じ手順で再検証し
+問題なしを確認してから、本番署名鍵で最終APKを作成しGitHub Releaseを差し替えた。
 
 ## v1.3.0 の実装内容（Markdown/`.tex`のLaTeX数式表示、削除ボタン修正）
 
@@ -213,6 +286,13 @@ v1.3.0 は JDK 21 + R8 有効ビルドで `:app:assembleDebug` / `:app:assembleR
 
 - `MediaRepository.queryMediaVolume()` がボリューム毎に 2000 行ページング（`_ID ASC LIMIT … OFFSET …`）で取得し、巨大ライブラリでも単一 CursorWindow を肥大化させない。`mediaState` を消費する 6 画面の API は不変（インメモリのソート/フィルタ維持）。
 - Paging3 の全画面移行は `mediaState` 共有設計と両立しないため v1.2.0 候補に据え置き（本改修が Repository 側の土台）。
+- **[v1.3.0で修正]** 上記の`LIMIT … OFFSET …`を`sortOrder`文字列へ直接連結する方式は、
+  Android 14（API 34）のMediaProviderでは`IllegalArgumentException: Invalid token LIMIT`で
+  拒否されることが実機テストで判明（v1.1.0〜v1.2.0は未検出のまま公開されていた）。
+  API 26以上は`ContentResolver`のクエリ引数`Bundle`（`QUERY_ARG_SQL_SORT_ORDER`/
+  `QUERY_ARG_SQL_LIMIT`/`QUERY_ARG_OFFSET`）経由に変更し、API 24/25は無ページングの
+  単一クエリへフォールバックする設計に修正済み。詳細は本ファイル末尾の
+  「v1.3.0 実機デバッグ」参照。
 
 ### 日英完全対応
 

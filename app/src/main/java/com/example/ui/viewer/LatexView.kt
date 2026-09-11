@@ -8,8 +8,8 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -48,13 +48,19 @@ fun LatexView(
 ) {
     val density = LocalDensity.current
     val textColor = MaterialTheme.colorScheme.onSurface
-    var measuredWidthPx by remember(latex, displayMode) { mutableIntStateOf(0) }
     var measuredHeightPx by remember(latex, displayMode) { mutableIntStateOf(0) }
 
+    // IMPORTANT: never constrain *width* to the measured value here. The WebView must be
+    // given its full available width (fillMaxWidth) up front — if it starts at a near-zero
+    // width (e.g. before the first measurement callback), KaTeX's inline (non-display) output
+    // wraps character-by-character inside that tiny viewport, and the resulting scrollWidth
+    // report then "confirms" that wrapped-narrow layout instead of correcting it. Found via
+    // on-device testing of inline LaTeX in the .tex viewer (block/display math happened not to
+    // exhibit this, but relying on that would be fragile). Height still grows from 0 safely,
+    // since a too-small height only clips content the reportSize() callback then corrects.
     val resolvedModifier = if (selfSizing) {
-        val widthDp: Dp = with(density) { measuredWidthPx.coerceAtLeast(1).toDp() }
         val heightDp: Dp = with(density) { measuredHeightPx.coerceAtLeast(1).toDp() }
-        modifier.width(widthDp).height(heightDp)
+        modifier.fillMaxWidth().height(heightDp)
     } else {
         modifier
     }
@@ -86,7 +92,6 @@ fun LatexView(
                             val widthPxValue = (widthCss * resources.displayMetrics.density).toInt()
                             val heightPxValue = (heightCss * resources.displayMetrics.density).toInt()
                             Handler(Looper.getMainLooper()).post {
-                                measuredWidthPx = widthPxValue
                                 measuredHeightPx = heightPxValue
                                 onMeasured(widthPxValue, heightPxValue)
                             }

@@ -147,6 +147,24 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
             imageSize = IntSize.Zero
         }
 
+        // Single player for the whole viewer session: pages share it instead of
+        // each building an ExoPlayer (pager keeps neighbours composed, which
+        // previously held up to 3 decoder instances alive at once).
+        val viewerPlayer = remember { ExoPlayer.Builder(context).build() }
+        DisposableEffect(viewerPlayer) {
+            onDispose { viewerPlayer.release() }
+        }
+        LaunchedEffect(currentFile) {
+            if (isVideo || isAudio) {
+                viewerPlayer.setMediaItem(MediaItem.fromUri(contentUri))
+                viewerPlayer.prepare()
+                viewerPlayer.playWhenReady = true
+            } else {
+                viewerPlayer.playWhenReady = false
+                viewerPlayer.stop()
+            }
+        }
+
         Scaffold(
             topBar = {
                 if (!isFullScreen) {
@@ -273,40 +291,35 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
                     contentAlignment = Alignment.Center
                 ) {
                     if (pageIsVideo || pageIsAudio) {
-                        val exoPlayer = remember(pageUri) {
-                            ExoPlayer.Builder(context).build().apply {
-                                setMediaItem(MediaItem.fromUri(pageUri))
-                                prepare()
-                                playWhenReady = (page == pagerState.currentPage)
+                        // Only the settled page owns the surface: binding the shared
+                        // player to several PlayerViews would move the video output
+                        // to an off-screen page. Neighbours show a placeholder.
+                        if (page == pagerState.currentPage) {
+                            AndroidView(
+                                factory = {
+                                    PlayerView(context).apply {
+                                        player = viewerPlayer
+                                        setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { visibility ->
+                                            isFullScreen = visibility != android.view.View.VISIBLE
+                                        })
+                                    }
+                                },
+                                update = { it.player = viewerPlayer },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    if (pageIsVideo) Icons.Default.Movie else Icons.Default.MusicNote,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(64.dp),
+                                    tint = ViewerOnSurface.copy(alpha = 0.6f)
+                                )
                             }
                         }
-                        
-                        DisposableEffect(exoPlayer) {
-                            onDispose {
-                                exoPlayer.release()
-                            }
-                        }
-
-                        LaunchedEffect(pagerState.currentPage) {
-                            if (page == pagerState.currentPage) {
-                                exoPlayer.playWhenReady = true
-                            } else {
-                                exoPlayer.playWhenReady = false
-                                exoPlayer.seekTo(0)
-                            }
-                        }
-
-                        AndroidView(
-                            factory = {
-                                PlayerView(context).apply {
-                                    player = exoPlayer
-                                    setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { visibility ->
-                                        isFullScreen = visibility != android.view.View.VISIBLE
-                                    })
-                                }
-                            },
-                            modifier = Modifier.fillMaxSize()
-                        )
                     } else if (pageIsImage) {
                         ImageWithOcrOverlay(
                             uri = pageUri,

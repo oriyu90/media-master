@@ -55,15 +55,9 @@
 -keep class com.google.android.gms.internal.mlkit_** { *; }
 -dontwarn com.google.mlkit.**
 
-# --- Moshi / Retrofit / OkHttp (network storage, future remote features) ---
--keepclasseswithmembers class * { @com.squareup.moshi.* <methods>; }
--keep @com.squareup.moshi.JsonQualifier @interface *
--keepclassmembers @com.squareup.moshi.JsonClass class * { <init>(...); <fields>; }
--keep,allowobfuscation,allowshrinking interface retrofit2.Call
--keep,allowobfuscation,allowshrinking class retrofit2.Response
+# --- OkHttp (WebDAV network storage; Moshi/Retrofit removed in v1.1.0, unused) ---
 -dontwarn okhttp3.**
 -dontwarn okio.**
--dontwarn retrofit2.**
 
 # --- Coil ---
 -dontwarn coil.**

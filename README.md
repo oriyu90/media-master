@@ -4,6 +4,16 @@ Media Master is an open-source Android media and file manager built with Kotlin 
 
 Media Master は、Kotlin と Jetpack Compose で開発されたオープンソースのAndroid向けメディア・ファイル管理アプリです。写真・動画、音楽、書類、ストレージ、アプリ／APK、編集、バックアップを1つのアプリで扱えます。
 
+## v1.1.0
+
+- **Release:** version `1.1.0` (`versionCode 5`), signed with the same upload key as v0.1.0–v1.0.0 (APK Signature Scheme v2+v3 verified). SHA-256: `fe75d958b3c811a48582058903d95947b1f97ad108b8c23fd5338ec6ae8eb9a3`.
+- **DeX + normal mode:** the desktop shell now requires desk `uiMode` *and* ≥600 dp window width (small DeX windows keep the touch UI); `density|layoutDirection|uiMode` added to `configChanges` so docking no longer recreates the activity and wipes navigation; MiniPlayer is now overlaid in DeX too; the DeX sidebar, Manage dashboard and folder picker all resolve volumes through the single `MediaRepository.storageRoots()` (internal/SD/USB incl. `SECONDARY_STORAGE`), so both shells always see identical files.
+- **File engine:** `FileViewModel` split into MVI layers (`files/MediaRepository`, `files/DuplicateFinder`, `MediaFile.kt` models); MediaStore queries run in bounded 2000-row LIMIT/OFFSET pages with stable `_ID` order (no giant CursorWindow); excluded folders migrated from raw `SharedPreferences` to DataStore with a one-time union migration.
+- **Player:** the viewer shares one `ExoPlayer` per session (`setMediaItem` on page change; neighbours show placeholders) instead of up to three per-page instances. Audio playback keeps using the single shared `PlaybackManager` controller.
+- **Leaner build:** unused `retrofit`/`moshi`/`firebase-ai`/`firebase-appcheck`/`room` dependencies and the `ksp`/`secrets`/`google-services` plugins removed (`kotlinx-coroutines-play-services` is now a direct dependency for ML Kit `await()`); `.env.example` no longer advertises a dead `GEMINI_API_KEY`.
+- **ja/en complete:** backup time labels (`hour_abbrev`/`minute_abbrev`: h/m, 時/分) and trim slider TalkBack labels are now resources in en/ja/zh/ar/nl; dates/sizes stay locale-aware; no hardcoded UI text remains.
+- Paging3 full-UI adoption (one `mediaState` feeds six screens) stays a v1.2.0 candidate by design: the repository paging groundwork above is the safe intermediate step.
+
 ## v1.0.0
 
 - **Formal release:** version `1.0.0` (`versionCode 4`), signed with the same upload key as v0.1.0–v0.3.0 (APK Signature Scheme v2+v3 verified). SHA-256: `255d8ed2b60e1f7a3dd51d1f933b08ae39cc7fa9a8398149202cb20d038b0082`.

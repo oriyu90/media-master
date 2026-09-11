@@ -92,11 +92,19 @@ fun MainNavigation(
     }
 
     if (isGranted) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            val desktop = isDesktopLayout()
+        // DeX (desk uiMode) gets the desktop shell only when the window is wide
+        // enough: small DeX / pop-up windows keep the normal touch UI readable.
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val desktop = isDesktopLayout() && maxWidth >= 600.dp
             if (desktop) {
-                DesktopNavigation(navController, settingsViewModel) { onPinFolder, onOpenFolderInNewTab ->
-                    MediaNavHost(navController, fileViewModel, settingsViewModel, true, onPinFolder, onOpenFolderInNewTab)
+                Box(modifier = Modifier.fillMaxSize()) {
+                    DesktopNavigation(navController, fileViewModel, settingsViewModel) { onPinFolder, onOpenFolderInNewTab ->
+                        MediaNavHost(navController, fileViewModel, settingsViewModel, true, onPinFolder, onOpenFolderInNewTab)
+                    }
+                    com.example.playback.MiniPlayer(
+                        onNavigateToAudio = { navController.navigate("audio") { launchSingleTop = true } },
+                        modifier = Modifier.align(Alignment.BottomCenter),
+                    )
                 }
             } else {
                 Box(modifier = Modifier.fillMaxSize()) {
@@ -137,7 +145,7 @@ private fun MediaNavHost(
         composable("library") { LibraryScreen(fileViewModel, navController) }
         composable("audio") { AudioScreen(fileViewModel, navController) }
         composable("documents") { DocumentsScreen(fileViewModel, navController) }
-        composable("manage") { ManageDashboardScreen(navController) }
+        composable("manage") { ManageDashboardScreen(navController, fileViewModel) }
         composable(
             route = "file_browser?path={path}",
             arguments = listOf(androidx.navigation.navArgument("path") {

@@ -86,4 +86,8 @@
 <string name="files">文件</string><string name="folders">文件夹</string><string name="grant_all_files_access">授予所有文件访问权限</string>    <string name="home_desc_apps">已安装的应用与 APK</string>
     <string name="retry">重试</string>
     <string name="parent_folder">父文件夹</string>
+    <string name="hour_abbrev">时</string>
+    <string name="minute_abbrev">分</string>
+    <string name="trim_start_position">剪辑起点 %1$s</string>
+    <string name="trim_end_position">剪辑终点 %1$s</string>
 </resources>

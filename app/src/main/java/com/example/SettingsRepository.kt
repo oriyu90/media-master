@@ -16,6 +16,7 @@ class SettingsRepository(private val context: Context) {
         val SERVER_URL = stringPreferencesKey("server_url")
         val MEDIA_FOLDERS = stringSetPreferencesKey("media_folders")
         val PINNED_FOLDERS = stringSetPreferencesKey("pinned_folders")
+        val EXCLUDED_FOLDERS = stringSetPreferencesKey("excluded_folders")
         
         val BACKUP_ENABLED = booleanPreferencesKey("backup_enabled")
         val BACKUP_START_TIME = intPreferencesKey("backup_start_time")
@@ -44,6 +45,9 @@ class SettingsRepository(private val context: Context) {
     }
     val pinnedFoldersFlow: Flow<Set<String>> = context.dataStore.data.map { preferences ->
         preferences[PINNED_FOLDERS] ?: emptySet()
+    }
+    val excludedFoldersFlow: Flow<Set<String>> = context.dataStore.data.map { preferences ->
+        preferences[EXCLUDED_FOLDERS] ?: emptySet()
     }
     val backupEnabledFlow: Flow<Boolean> = context.dataStore.data.map { it[BACKUP_ENABLED] ?: false }
     val backupStartTimeFlow: Flow<Int> = context.dataStore.data.map { it[BACKUP_START_TIME] ?: 0 }
@@ -93,6 +97,21 @@ class SettingsRepository(private val context: Context) {
         context.dataStore.edit { preferences ->
             val current = preferences[PINNED_FOLDERS] ?: emptySet()
             preferences[PINNED_FOLDERS] = current.let { s -> (if (add != null) s + add else s).let { if (remove != null) it - remove else it } }
+        }
+    }
+
+    suspend fun updateExcludedFolders(add: String? = null, remove: String? = null) {
+        context.dataStore.edit { preferences ->
+            val current = preferences[EXCLUDED_FOLDERS] ?: emptySet()
+            preferences[EXCLUDED_FOLDERS] = current.let { s -> (if (add != null) s + add else s).let { if (remove != null) it - remove else it } }
+        }
+    }
+
+    /** One-time legacy migration: union old SharedPreferences values into DataStore (edits serialize, never lose). */
+    suspend fun mergeExcludedFolders(paths: Set<String>) {
+        if (paths.isEmpty()) return
+        context.dataStore.edit { preferences ->
+            preferences[EXCLUDED_FOLDERS] = (preferences[EXCLUDED_FOLDERS] ?: emptySet()) + paths
         }
     }
     suspend fun setBackupEnabled(value: Boolean) { context.dataStore.edit { it[BACKUP_ENABLED] = value } }

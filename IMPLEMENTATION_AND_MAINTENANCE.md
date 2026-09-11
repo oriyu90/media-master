@@ -1,4 +1,4 @@
-# Media Master v1.0.0 実装・保守メモ
+# Media Master v1.1.0 実装・保守メモ
 
 最終更新: 2026-09-11
 
@@ -6,19 +6,75 @@
 
 | 項目 | 内容 |
 | --- | --- |
-| バージョン | `1.0.0` (`versionCode 4`) |
+| バージョン | `1.1.0` (`versionCode 5`) |
 | アプリケーションID | `com.yukiorita.mediamaster` |
 | 最小 SDK / target SDK | 24 / 36 |
 | ライセンス | MIT |
 | 著作者 | Yuki_Orita |
 | release APK | `app/build/outputs/apk/release/app-release-signed.apk`（R8 + resource shrink 有効） |
-| APK SHA-256 | `255d8ed2b60e1f7a3dd51d1f933b08ae39cc7fa9a8398149202cb20d038b0082` |
-| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0/v0.2.0/v0.3.0 と同一鍵） |
-| GitHub Release | `v1.0.0` (GitHub Releases) |
+| APK SHA-256 | `fe75d958b3c811a48582058903d95947b1f97ad108b8c23fd5338ec6ae8eb9a3` |
+| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0/v0.2.0/v0.3.0/v1.0.0 と同一鍵） |
+| GitHub Release | `v1.1.0` (GitHub Releases) |
 
 release APK は RSA 4096 ビット鍵・APK Signature Scheme v2+v3 署名（`apksigner verify` で確認済み）。署名鍵は `common-rules-document/keystores/media-master-upload-key.jks`（alias `upload`）。公開前には毎回 `apksigner verify --verbose` で署名を確認してください。
 
-v1.0.0 は R8 有効ビルドで `:app:assembleDebug` / `:app:assembleRelease` が成功し、署名 APK の `apksigner verify`（v2+v3）を通しています。実機・エミュレータのスモークテストは未実施のため、配布前に主要画面・削除確認・共有・バックアップ/復元の実機確認を推奨。DeX・RTL(ar)・TalkBack・分割画面・実 SMB/WebDAV サーバー疎通は引き続き未検証。旧 v0.3.0 の APK SHA-256 は `5f896b1bd15a65b4a947c428490ca63cc0ea0cac81332d89477029b5fe3d4bab`。
+v1.1.0 は R8 有効ビルドで `:app:assembleDebug` / `:app:assembleRelease` が成功。単体テストは非 Robolectric（`BackupPathsTest`・`ExampleUnitTest`）が通過、`DeepLinksTest` のみ実行環境制約（Robolectric が SDK 36 に Java 21 を要求、手元は JDK 17）で失敗＝コード由来の失敗ではない。実機・エミュレータのスモークテストは未実施のため、配布前に主要画面・削除確認・共有・バックアップ/復元の実機確認を推奨。DeX 実機・RTL(ar)・TalkBack・分割画面・実 SMB/WebDAV サーバー疎通は引き続き未検証。旧リリースの APK SHA-256: v1.0.0 `255d8ed2b60e1f7a3dd51d1f933b08ae39cc7fa9a8398149202cb20d038b0082`、v0.3.0 `5f896b1bd15a65b4a947c428490ca63cc0ea0cac81332d89477029b5fe3d4bab`。
+
+## v1.1.0 の実装内容（残課題の解消 + DeX/通常モード堅牢化）
+
+### DeX / 通常モード
+
+- デスクトップ判定を `UI_MODE_TYPE_DESK && windowWidth >= 600dp` に変更（`MainNavigation` の `BoxWithConstraints`）。小さな DeX ウィンドウでは通常タッチ UI を維持し、誤ったデスクトップ表示を防止。
+- Manifest の `configChanges` に `density|layoutDirection|uiMode` を追加。DeX ドック/解除・密度変更で Activity が再生成されず、ナビゲーション状態を保持。
+- DeX シェルにも `MiniPlayer` をオーバーレイ（従来は通常モードのみで、DeX では再生操作が不可だった）。
+- `DesktopNavigation` の独自 root 解決（非推奨 `getExternalStorageDirectory`）を撤去し、`FileViewModel.storageRoots()` に一元化。Manage ダッシュボード・除外フォルダピッカーも同一実装に統一（DeX/通常で同一ボリューム集合を表示）。
+
+### ファイル認識
+
+- `storageRoots()` を `MediaRepository` へ移動し公開化。`getExternalFilesDirs()` + `SECONDARY_STORAGE`（SD/USB-OTG のベンダー差分吸収）+ レガシーフォールバックの順で解決し、存在確認で絞る。`isStorageRoot()` も同候補集合に統一。
+- Manage/除外ピッカーの root 解決は `Dispatchers.IO` 経由（合成中のディスク I/O を排除）。
+
+### MVI 分離（`FileViewModel` 632行 → オーケストレーター化）
+
+- 新設 `com.example.MediaFile.kt`（`MediaFile`/`SortOption`/`ViewMode`/`ViewState`、同一パッケージのため既存画面の import 変更なし）。
+- 新設 `com.example.files.MediaRepository`（storage roots/MediaStore クエリ/ドキュメント走査/MIME 判定）。
+- 新設 `com.example.files.DuplicateFinder`（head/tail サンプルハッシュ、null=読取不可で誤合流防止）。
+- `FileViewModel` は StateFlow + intent + 削除フロー（`MediaStore.createDeleteRequest` の権限委譲含む）のみ保持。外部 Intent から破壊的操作に到達できない設計は維持。
+
+### 除外フォルダの DataStore 統一
+
+- `SettingsRepository.EXCLUDED_FOLDERS`（string-set）+ `updateExcludedFolders()`（`edit{}` 内 read-modify-write で単一トランザクション）+ `mergeExcludedFolders()`（移行用 union）。
+- `FileViewModel` 起動時に旧 `media_master_prefs` の値を union 移行してキーを削除。以降の読み書きは DataStore のみ。
+
+### 未使用依存の撤去
+
+- 撤去: `retrofit`/`converter-moshi`/`moshi`（+ksp codegen）/`firebase-bom`・`firebase-ai`・`firebase-appcheck-recaptcha`/`room-ktx`・`room-runtime`（+ksp compiler）/`logging-interceptor`、プラグイン `ksp`・`secrets`・`google-services`。catalog の対応 version/library/plugin エントリも削除。`.env.example` の死んだ `GEMINI_API_KEY` を整理。
+- 直接依存化: `kotlinx-coroutines-play-services`（ML Kit `Task.await()` 用。従来は firebase 経由の推移依存だったため、撤去後に明示化）。
+- 維持: `okhttp`（WebDAV）、`smbj`、`coil-compose`+`coil-video`（`VideoFrameDecoder` 使用）、`media3` 全種（session/transformer/effect は Playback/VideoEditor で使用）、`datastore`、`security-crypto`。
+- proguard の moshi/retrofit keep を除去（okhttp dontwarn 維持）。
+
+### Viewer 単一 Player 化
+
+- ページ毎 `ExoPlayer.Builder` を廃止し、Viewer セッションで 1 インスタンスを `remember`。`LaunchedEffect(currentFile)` で `setMediaItem`+`prepare`+再生、`DisposableEffect` で `release()`。
+- 同一 Player を複数 `PlayerView` に束縛すると映像出力が裏ページへ移動するため、settled ページのみ `AndroidView`、隣接ページはプレースホルダー表示。
+
+### MediaStore の LIMIT/OFFSET 化
+
+- `MediaRepository.queryMediaVolume()` がボリューム毎に 2000 行ページング（`_ID ASC LIMIT … OFFSET …`）で取得し、巨大ライブラリでも単一 CursorWindow を肥大化させない。`mediaState` を消費する 6 画面の API は不変（インメモリのソート/フィルタ維持）。
+- Paging3 の全画面移行は `mediaState` 共有設計と両立しないため v1.2.0 候補に据え置き（本改修が Repository 側の土台）。
+
+### 日英完全対応
+
+- バックアップ時間ダイアログの `Text("h")`/`Text("m")` → `hour_abbrev`/`minute_abbrev`（en h/m、ja 時/分、+zh/ar/nl）。
+- トリムスライダーのサム読み上げ → `trim_start_position`/`trim_end_position`（`%1$s` 付き 5 言語）。
+- 日付/サイズは locale 対応済み（`DateFormat.MEDIUM`、`Formatter`/`String.format(Locale)`）、件数は plurals。コード内の UI 直書きテキストはゼロ。
+
+### 残課題（v1.2.0 以降の候補）
+
+- Paging3 の全画面移行（`mediaState` を `Flow<PagingData>` 化し、Library/Audio/Category/Album/Playlist/Viewer を `collectAsLazyPagingItems` 化）。
+- `ViewerScreen` の OCR 座標計算・`DocumentsScreen.ScanView` の合成中 `?: return` の本格再設計。
+- ネットワークストレージの実機（SMB/WebDAV サーバー）疎通テスト。
+- 実機スモーク（削除確認・共有・SAF永続・バックアップ/復元）、DeX・RTL・TalkBack・分割画面。
 
 ## v1.0.0 の実装内容（正式リリース改修）
 
@@ -49,14 +105,14 @@ v1.0.0 は R8 有効ビルドで `:app:assembleDebug` / `:app:assembleRelease` �
 - `FileItemRow/Grid` に `modifier` 引数＋`selected` セマンティクス＋`Role.Checkbox` を追加。`VideoEditor` の RangeSlider サムに読み上げラベル、`DocumentsScreen` の日付区切りは既存の locale 対応を維持。
 - 新規文字列 `retry`・`parent_folder` を en/ja/zh/ar/nl に追加（`".."` 直書きを除去）。
 
-### 残課題（v1.1.0 以降の候補）
+### 残課題（v1.1.0 で解消済み → 上記参照）
 
-- `FileViewModel`（約590行）の完全 MVI 分割（FilesBrowser / MediaLibrary / Duplicates / DeleteUseCase + Repository）。
-- 数万件規模の `Paging3` 導入、`MediaStore` クエリの `LIMIT` 化。
-- 除外フォルダの生 `SharedPreferences` → DataStore 統一（現在は atomic 化のみ）。
-- Firebase AI / AppCheck・Room の未使用依存の撤去。
-- `ViewerScreen` のページ毎 ExoPlayer 生成 → 単一 Player＋`setMediaItem` 化。
-- 実機スモーク（削除確認・共有・SAF永続・バックアップ/復元）、DeX・RTL・TalkBack・分割画面・実SMB/WebDAV疎通。
+- ~~`FileViewModel` の MVI 分割~~ → 解消（`MediaFile.kt` + `files/MediaRepository` + `files/DuplicateFinder`）。
+- ~~`MediaStore` クエリの `LIMIT` 化~~ → 解消（2000行ページング）。Paging3 全画面移行は v1.2.0 候補。
+- ~~除外フォルダの DataStore 統一~~ → 解消（union 移行付き）。
+- ~~Firebase AI / AppCheck・Room 等の未使用依存撤去~~ → 解消。
+- ~~`ViewerScreen` の単一 Player 化~~ → 解消。
+- 実機スモーク（削除確認・共有・SAF永続・バックアップ/復元）、DeX・RTL・TalkBack・分割画面・実SMB/WebDAV疎通 → 未実施（v1.2.0 以降）。
 
 ## v0.2.0 の実装内容
 
@@ -301,12 +357,12 @@ v1.0.0 は R8 有効ビルドで `:app:assembleDebug` / `:app:assembleRelease` �
 
 ### 残課題（フォローアップ）
 
-- `FileViewModel`（532行）の完全 MVI 分割は未実施（`ViewState` は安全消費へ移行済み。回帰リスク管理のため据え置き）。
+- ~~`FileViewModel` の完全 MVI 分割~~ → v1.1.0 で解消（`MediaFile.kt` + `files/MediaRepository` + `files/DuplicateFinder`）。
 - `ViewerScreen` の OCR 座標計算・合成中 `?: return` の本格再設計。
 - `DocumentsScreen.ScanView` の `?: return`（合成中）。
-- 除外フォルダの生 `SharedPreferences("media_master_prefs")` を DataStore へ統一。
+- ~~除外フォルダの生 `SharedPreferences("media_master_prefs")` を DataStore へ統一~~ → v1.1.0 で解消。
 - ネットワークストレージの実機（SMB/WebDAV サーバー）疎通テスト。
-- Firebase AI/AppCheck・Room の未使用依存の撤去（本改修では非対象）。
+- ~~Firebase AI/AppCheck・Room の未使用依存の撤去~~ → v1.1.0 で解消（retrofit/moshi/logging-interceptor 同時撤去）。
 
 ### 検証手順（リリース前・要実施）
 

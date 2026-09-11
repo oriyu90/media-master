@@ -21,7 +21,6 @@ import com.example.FileViewModel
 import com.example.R
 import java.io.File
 import kotlinx.coroutines.withContext
-import androidx.core.content.ContextCompat
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,37 +77,32 @@ fun ExcludeFoldersScreen(viewModel: FileViewModel, navController: NavHostControl
     }
     
     if (showFolderPicker) {
+        // Single canonical volume set (internal/SD/USB), resolved off the main thread.
+        var pickerRoots by remember { mutableStateOf<List<String>>(emptyList()) }
+        LaunchedEffect(Unit) {
+            pickerRoots = withContext(kotlinx.coroutines.Dispatchers.IO) { viewModel.storageRoots() }
+        }
         FolderPickerDialog(
             onDismiss = { showFolderPicker = false },
             onFolderSelected = { path ->
                 viewModel.addExcludedFolder(path)
                 showFolderPicker = false
-            }
+            },
+            storageRoots = pickerRoots,
+            initialRoot = pickerRoots.firstOrNull()
         )
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FolderPickerDialog(onDismiss: () -> Unit, onFolderSelected: (String) -> Unit) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    var currentPath by remember { 
-        mutableStateOf(android.os.Environment.getExternalStorageDirectory().absolutePath) 
-    }
-    
-    // Get external storage roots
-    val externalDirs = ContextCompat.getExternalFilesDirs(context, null)
-    val storageRoots = externalDirs.mapNotNull { dir ->
-        if (dir != null) {
-            val path = dir.absolutePath
-            val androidIndex = path.indexOf("/Android/data/")
-            if (androidIndex != -1) {
-                path.substring(0, androidIndex)
-            } else {
-                null
-            }
-        } else null
-    }.distinct()
+fun FolderPickerDialog(
+    onDismiss: () -> Unit,
+    onFolderSelected: (String) -> Unit,
+    storageRoots: List<String>,
+    initialRoot: String?
+) {
+    var currentPath by remember(initialRoot) { mutableStateOf(initialRoot.orEmpty()) }
 
     // Disk I/O off the composition: recompute only when the browsed path changes.
     var files by remember { mutableStateOf<List<File>>(emptyList()) }

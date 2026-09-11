@@ -157,14 +157,14 @@ fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostControlle
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         OutlinedTextField(
                                             value = startH, onValueChange = { startH = it.filter(Char::isDigit).take(2) },
-                                            label = { Text("h") }, singleLine = true,
+                                            label = { Text(stringResource(R.string.hour_abbrev)) }, singleLine = true,
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                             modifier = Modifier.weight(1f),
                                         )
                                         Text(":", modifier = Modifier.padding(horizontal = 8.dp))
                                         OutlinedTextField(
                                             value = startM, onValueChange = { startM = it.filter(Char::isDigit).take(2) },
-                                            label = { Text("m") }, singleLine = true,
+                                            label = { Text(stringResource(R.string.minute_abbrev)) }, singleLine = true,
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                             modifier = Modifier.weight(1f),
                                         )
@@ -174,14 +174,14 @@ fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostControlle
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         OutlinedTextField(
                                             value = endH, onValueChange = { endH = it.filter(Char::isDigit).take(2) },
-                                            label = { Text("h") }, singleLine = true,
+                                            label = { Text(stringResource(R.string.hour_abbrev)) }, singleLine = true,
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                             modifier = Modifier.weight(1f),
                                         )
                                         Text(":", modifier = Modifier.padding(horizontal = 8.dp))
                                         OutlinedTextField(
                                             value = endM, onValueChange = { endM = it.filter(Char::isDigit).take(2) },
-                                            label = { Text("m") }, singleLine = true,
+                                            label = { Text(stringResource(R.string.minute_abbrev)) }, singleLine = true,
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                             modifier = Modifier.weight(1f),
                                         )

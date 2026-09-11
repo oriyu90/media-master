@@ -48,4 +48,8 @@
   <string name="home_desc_apps">Geïnstalleerde apps en APK\'s</string>
     <string name="retry">Opnieuw proberen</string>
     <string name="parent_folder">Bovenliggende map</string>
+    <string name="hour_abbrev">u</string>
+    <string name="minute_abbrev">m</string>
+    <string name="trim_start_position">Trimstart %1$s</string>
+    <string name="trim_end_position">Trimeinde %1$s</string>
 </resources>

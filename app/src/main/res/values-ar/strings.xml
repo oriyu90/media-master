@@ -86,4 +86,8 @@
 <string name="files">ملفات</string><string name="folders">مجلدات</string><string name="grant_all_files_access">السماح بالوصول إلى كل الملفات</string>    <string name="home_desc_apps">التطبيقات المثبّتة وملفات APK</string>
     <string name="retry">إعادة المحاولة</string>
     <string name="parent_folder">المجلد الأب</string>
+    <string name="hour_abbrev">س</string>
+    <string name="minute_abbrev">د</string>
+    <string name="trim_start_position">بداية القص %1$s</string>
+    <string name="trim_end_position">نهاية القص %1$s</string>
 </resources>

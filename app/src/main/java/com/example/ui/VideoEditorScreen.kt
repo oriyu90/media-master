@@ -187,14 +187,18 @@ fun VideoEditorScreen(uriString: String, navController: NavHostController) {
                                 startThumb = {
                                     androidx.compose.foundation.layout.Box(
                                         modifier = Modifier.semantics {
-                                            contentDescription = "${formatTime(startTrimMs)}"
+                                            contentDescription = context.getString(
+                                                R.string.trim_start_position, formatTime(startTrimMs)
+                                            )
                                         },
                                     )
                                 },
                                 endThumb = {
                                     androidx.compose.foundation.layout.Box(
                                         modifier = Modifier.semantics {
-                                            contentDescription = "${formatTime(endTrimMs)}"
+                                            contentDescription = context.getString(
+                                                R.string.trim_end_position, formatTime(endTrimMs)
+                                            )
                                         },
                                     )
                                 },

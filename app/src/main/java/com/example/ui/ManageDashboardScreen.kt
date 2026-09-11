@@ -1,10 +1,11 @@
 package com.example.ui
 
 import androidx.compose.ui.res.stringResource
-import androidx.core.content.ContextCompat
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import com.example.FileViewModel
 import com.example.R
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -13,7 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.semantics
@@ -22,20 +23,12 @@ import androidx.navigation.NavHostController
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ManageDashboardScreen(navController: NavHostController) {
-    val context = LocalContext.current
-    val externalDirs = ContextCompat.getExternalFilesDirs(context, null)
-    val storageRoots = externalDirs.mapNotNull { dir ->
-        if (dir != null) {
-            val path = dir.absolutePath
-            val androidIndex = path.indexOf("/Android/data/")
-            if (androidIndex != -1) {
-                path.substring(0, androidIndex)
-            } else {
-                null
-            }
-        } else null
-    }.distinct()
+fun ManageDashboardScreen(navController: NavHostController, viewModel: FileViewModel) {
+    // Same canonical roots as the browser and DeX sidebar (incl. SD/USB), resolved off the main thread.
+    var storageRoots by remember { mutableStateOf<List<String>>(emptyList()) }
+    LaunchedEffect(Unit) {
+        storageRoots = withContext(Dispatchers.IO) { viewModel.storageRoots() }
+    }
     Scaffold(
         topBar = {
             TopAppBar(

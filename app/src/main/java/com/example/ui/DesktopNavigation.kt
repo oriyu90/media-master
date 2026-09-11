@@ -3,7 +3,6 @@ package com.example.ui
 import android.content.ClipDescription
 import android.content.res.Configuration
 import android.net.Uri
-import android.os.Environment
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -36,10 +35,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
+import com.example.FileViewModel
 import com.example.R
 import com.example.SettingsViewModel
 import java.io.File
@@ -58,15 +57,29 @@ private data class DesktopTab(val id: Long, val title: String, val route: String
 @Composable
 fun DesktopNavigation(
     navController: NavHostController,
+    fileViewModel: FileViewModel,
     settingsViewModel: SettingsViewModel,
     navHost: @Composable (onPinFolder: (String) -> Unit, onOpenFolderInNewTab: (String) -> Unit) -> Unit
 ) {
     val context = LocalContext.current
     val customPins by settingsViewModel.pinnedFolders.collectAsStateWithLifecycle()
     val serverUrl by settingsViewModel.serverUrl.collectAsStateWithLifecycle()
-    val root = Environment.getExternalStorageDirectory().absolutePath
-    val standardPins = remember(root) {
-        listOf("$root/Pictures", "$root/Download", "$root/apk")
+    // Same volume resolution as the normal UI (FileViewModel.storageRoots):
+    // DeX and phone shells always see identical internal/SD/USB roots.
+    val roots = remember { fileViewModel.storageRoots() }
+    val standardPins = remember(roots) {
+        val primary = roots.firstOrNull()
+        buildList {
+            roots.drop(1).forEach { root ->
+                add("$root/Pictures")
+                add("$root/Download")
+            }
+            if (primary != null) {
+                add(0, "$primary/apk")
+                add(0, "$primary/Download")
+                add(0, "$primary/Pictures")
+            }
+        }.distinct()
     }
     val tabs = remember { mutableStateListOf(DesktopTab(0, context.getString(R.string.home), "home")) }
     var selectedTabId by remember { mutableLongStateOf(0L) }
@@ -132,6 +145,7 @@ fun DesktopNavigation(
                     target = dropTarget
                 ),
             currentRoute = currentRoute,
+            storageRoots = roots,
             standardPins = standardPins,
             customPins = customPins.toList().sorted(),
             serverUrl = serverUrl,
@@ -206,6 +220,7 @@ private fun DesktopTabStrip(
 private fun DesktopSidebar(
     modifier: Modifier,
     currentRoute: String,
+    storageRoots: List<String>,
     standardPins: List<String>,
     customPins: List<String>,
     serverUrl: String,
@@ -214,11 +229,8 @@ private fun DesktopSidebar(
     onRemovePin: (String) -> Unit
 ) {
     val context = LocalContext.current
-    val externalRoots = remember(context) {
-        ContextCompat.getExternalFilesDirs(context, null).mapNotNull { dir ->
-            dir?.absolutePath?.substringBefore("/Android/data/")
-        }.distinct()
-    }
+    // Reuses the caller-resolved roots: identical volume set to the normal UI.
+    val externalRoots = storageRoots
     LazyColumn(
         modifier = modifier.background(MaterialTheme.colorScheme.surfaceContainerLow),
         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 12.dp),

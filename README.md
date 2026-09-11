@@ -4,6 +4,16 @@ Media Master is an open-source Android media and file manager built with Kotlin 
 
 Media Master は、Kotlin と Jetpack Compose で開発されたオープンソースのAndroid向けメディア・ファイル管理アプリです。写真・動画、音楽、書類、ストレージ、アプリ／APK、編集、バックアップを1つのアプリで扱えます。
 
+## v1.4.0
+
+- **DeX / desktop-windowing detection fixed:** the desktop shell used to key off `Configuration.UI_MODE_TYPE_DESK` alone, which Samsung's One UI 8 (Android 16-based) no longer sets reliably now that classic DeX has been replaced by Android's own desktop windowing. Detection now also checks for a system caption bar (present on any freeform/desktop-windowed session, old or new DeX included), so the desktop UI activates correctly on current devices while the existing width gate still keeps small popup/split-screen windows in the touch UI.
+- **Pinch-to-zoom everywhere:** previously only the plain image viewer supported zoom. A new shared `ZoomableBox` component extends pinch-zoom-and-pan to video playback in the viewer, PDF pages, and embedded images in `.docx`/`.pptx` documents, without touching the existing (and more delicate) OCR-mode image zoom.
+- **Library viewer gains file management:** rename and a "File Info" detail sheet (name, path, size, date modified, image resolution / video duration) are now available directly from the photo/video viewer, alongside the existing delete and share actions.
+- **Real music player:** background playback and the system notification already worked, but the app now has a proper Now Playing screen (album art, seek bar, shuffle/repeat, skip) and a 5-band system equalizer with presets, reachable from the mini-player. Track titles also now show the actual filename/tags instead of a raw content URI.
+- **Manage screen redesigned closer to Files by Google / Samsung My Files:** a storage-usage bar broken down by category plus a recent-files strip, breadcrumb navigation and an in-folder search bar in the file browser, and rename/move/copy added next to the existing delete/share multi-select actions (move/copy use a lightweight in-app folder picker).
+- On-device stability pass (Android 14 emulator) found and fixed one real bug that static checks couldn't: the synthetic ".." "go up" folder entry could be long-press-selected and then renamed/moved/deleted through the new multi-select actions, which would have targeted the parent directory. Fixed so ".." is never selectable.
+- Version `1.4.0` (`versionCode 8`), signed with the same upload key as v0.1.0–v1.3.0 (APK Signature Scheme v2+v3 verified). **APK SHA-256: `2051ca8e092dd68a1bcdf0b2b65f40e8953ad80d66fa763cd5d1395e8cd4ad93`.**
+
 ## v1.3.0
 
 - **LaTeX math in Markdown:** `$...$` inline and `$$...$$` display math now render as proper typeset formulas via a bundled, fully offline copy of [KaTeX](https://katex.org/) (MIT license, no network access — assets ship under `app/src/main/assets/katex/`). Math is extracted from the Markdown source before CommonMark parsing, so it composes correctly with bold/italic/links around an inline formula.

@@ -3,6 +3,7 @@ package com.example.playback
 
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -21,7 +22,18 @@ class PlaybackService : MediaSessionService() {
                 true
             )
             .build()
-        
+
+        // ExoPlayer.Builder already allocates an audio session id during build(), so
+        // onAudioSessionIdChanged (fires only on a *change*) never fires for a normal
+        // single-session playback lifetime -- read the id immediately too, and keep
+        // the listener only to cover the rare case where it's regenerated later.
+        EqualizerController.attach(player.audioSessionId)
+        player.addListener(object : Player.Listener {
+            override fun onAudioSessionIdChanged(audioSessionId: Int) {
+                EqualizerController.attach(audioSessionId)
+            }
+        })
+
         mediaSession = MediaSession.Builder(this, player).build()
     }
 
@@ -30,6 +42,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        EqualizerController.release()
         mediaSession?.run {
             player.release()
             release()

@@ -1,24 +1,35 @@
-# Media Master v1.3.0 実装・保守メモ
+# Media Master v1.4.0 実装・保守メモ
 
-最終更新: 2026-09-11
+最終更新: 2026-09-12
 
 ## リリース情報
 
 | 項目 | 内容 |
 | --- | --- |
-| バージョン | `1.3.0` (`versionCode 7`) |
+| バージョン | `1.4.0` (`versionCode 8`) |
 | アプリケーションID | `com.yukiorita.mediamaster` |
 | 最小 SDK / target SDK | 24 / 36 |
 | ライセンス | MIT |
 | 著作者 | Yuki_Orita |
 | release APK | `app/build/outputs/apk/release/app-release-signed.apk`（R8 + resource shrink 有効） |
-| APK SHA-256 | `500ec32227858828e81370fc6b5d90f39495fc8b081a398a860610953ad06058`（実機デバッグ後の最終版。初回署名版 `09fd2522…ac0db` は4件のバグを含み**配布前に破棄・差し替え済み**、下記「v1.3.0 実機デバッグ」参照） |
-| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.2.0 と同一鍵） |
-| GitHub Release | `v1.3.0` (GitHub Releases) |
+| APK SHA-256 | `2051ca8e092dd68a1bcdf0b2b65f40e8953ad80d66fa763cd5d1395e8cd4ad93` |
+| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.3.0 と同一鍵） |
+| GitHub Release | `v1.4.0` (GitHub Releases) |
 
 release APK は RSA 4096 ビット鍵・APK Signature Scheme v2+v3 署名（`apksigner verify` で確認済み）。署名鍵は `common-rules-document/keystores/media-master-upload-key.jks`（alias `upload`）。公開前には毎回 `apksigner verify --verbose` で署名を確認してください。
 
-v1.3.0 は JDK 21 + R8 有効ビルドで `:app:assembleDebug` / `:app:assembleRelease` が成功。単体テスト68件全て通過（`DeepLinksTest`含む）。`lintDebug` はエラー0件。**実機デバッグ実施済み**（下記「v1.3.0 実機デバッグ」節参照、Android 14 arm64エミュレータ）。旧リリースの APK SHA-256: v1.2.0 `a9be2530fc51397582a820b9e9c7404dad3d1374d685838e0170de495e591c33`、v1.1.0 `fe75d958b3c811a48582058903d95947b1f97ad108b8c23fd5338ec6ae8eb9a3`、v1.0.0 `255d8ed2b60e1f7a3dd51d1f933b08ae39cc7fa9a8398149202cb20d038b0082`、v0.3.0 `5f896b1bd15a65b4a947c428490ca63cc0ea0cac81332d89477029b5fe3d4bab`。
+v1.4.0 はJDK21+R8有効ビルドで`:app:assembleDebug`/`:app:assembleRelease`/`:app:testDebugUnitTest`(68件)/`:app:lintDebug`(0エラー)を確認。**実機（エミュレータ）デバッグ実施済み**——本番署名済みAPKをクリーンインストールしてクラッシュがないことを確認する手順を、v1.3.0の教訓どおり今回も実施した（下記「v1.4.0 実機デバッグ」参照）。
+
+v1.3.0 は JDK 21 + R8 有効ビルドで `:app:assembleDebug` / `:app:assembleRelease` が成功。単体テスト68件全て通過（`DeepLinksTest`含む）。`lintDebug` はエラー0件。**実機デバッグ実施済み**（下記「v1.3.0 実機デバッグ」節参照、Android 14 arm64エミュレータ）。旧リリースの APK SHA-256: v1.3.0（実機デバッグ後の最終版）`500ec32227858828e81370fc6b5d90f39495fc8b081a398a860610953ad06058`、v1.2.0 `a9be2530fc51397582a820b9e9c7404dad3d1374d685838e0170de495e591c33`、v1.1.0 `fe75d958b3c811a48582058903d95947b1f97ad108b8c23fd5338ec6ae8eb9a3`、v1.0.0 `255d8ed2b60e1f7a3dd51d1f933b08ae39cc7fa9a8398149202cb20d038b0082`、v0.3.0 `5f896b1bd15a65b4a947c428490ca63cc0ea0cac81332d89477029b5fe3d4bab`。
+
+## v1.4.0 実機デバッグ（2026-09、ユーザー依頼によるリリース前スモーク）
+
+v1.3.0の教訓（「`assembleRelease`成功だけで配布しない」）に従い、本リリースでは**実装直後・リリース前の両方**でAndroidエミュレータ（API 34, arm64, Google APIs）へ実インストールして確認した。
+
+- デバッグビルドで全新機能（DeXキャプションバー検出、ズーム拡大、ビューアーのリネーム/詳細情報、Now Playing/イコライザー、Manage画面刷新一式）を実際に操作して検証：ストレージ使用量バー・最近のファイル・パンくず・検索・リネーム・移動（実ファイルI/O経由でPictures→Moviesへの移動を確認）・イコライザーのプリセット適用（Jazzプリセット選択でバンド値が実際に変化）まで実機上で動作確認済み。
+- **実機デバッグで発見・修正したバグ1件**: `FilesScreen`の一覧で表示される`..`（親フォルダへ戻る合成エントリ）が、長押しで複数選択モードに入れてしまい、新設したリネーム/移動/コピー操作の対象になり得た。選択すると「親フォルダそのもの」をリネーム・移動しようとする、意図しない破壊的操作になり得るバグ。`FileItemRow`/`FileItemGrid`の`onLongClick`条件を修正し、`..`は常に選択不可にした。
+- バックグラウンド再生・システム通知（メディア通知シェードでの再生/一時停止/スキップ）、画面回転、ホームボタンでのバックグラウンド化→復帰、5回連続の戻るボタンでのアプリ終了、いずれもクラッシュなし。`adb logcat`全体を通してFATAL EXCEPTION・ANRは0件。
+- **本番署名済みAPK（`apksigner`でv2+v3署名・検証済み、証明書はv0.1.0〜v1.3.0と同一）をアンインストール→クリーンインストールし、初回コールド起動からホーム画面・Manage画面まで実際に操作してクラッシュがないことを確認**（v1.3.0で「署名済みAPKを一度も実機導入していなかったために起動不能バグが5リリース連続で見逃されていた」教訓を踏まえた必須手順）。
 
 ## v1.3.0 実機デバッグ（2026-09、リリース後・配布前に発見）
 
@@ -92,6 +103,85 @@ Android SDK cmdline-tools経由でAPI 34 arm64（Google APIs）システムイ�
 Shift_JIS/バイナリの全形式を実際にタップで開き、削除・共有・既定アプリ設定導線を含めて
 スクリーンショットとlogcat（`-b crash`）で確認。上記4件を検出・修正後、同じ手順で再検証し
 問題なしを確認してから、本番署名鍵で最終APKを作成しGitHub Releaseを差し替えた。
+
+## v1.4.0 の実装内容（安定性・UX改善6件）
+
+ユーザー要望に基づく6件の改善。詳細設計は実装前にプラン化・承認を得たうえで着手した。
+
+### 1. DeX / デスクトップウィンドウイング判定の修正
+
+- `ui/DesktopNavigation.kt`の`isDesktopLayout()`が`Configuration.UI_MODE_TYPE_DESK`のみに依存
+  していたため、One UI 8（Android 16ベース）以降で旧来のDeXがAndroid標準の「デスクトップ
+  ウィンドウイング」に置き換わり、このフラグが立たない端末でPCモードに切り替わらなくなって
+  いた。Android公式ドキュメントも`UI_MODE_TYPE_DESK`を推奨しておらず、ウィンドウサイズ主体の
+  判定を推奨している。
+- 修正: `UI_MODE_TYPE_DESK`（旧来DeX向け、後方互換のため維持）に加え、`WindowInsets.captionBar`
+  （Compose）とその`ViewCompat`フォールバックでシステムキャプションバーの表示有無を検出し、
+  いずれかが真ならデスクトップ扱いとする。`MainNavigation.kt`側の`maxWidth >= 600.dp`ゲートは
+  変更なし（小さいポップアップ/分割画面ウィンドウが誤ってデスクトップUIになるのを防ぐため）。
+  新規Gradle依存の追加なし。
+
+### 2〜3. ピンチズームの拡大
+
+- 既存の画像ビューアーのズーム処理（`ViewerScreen.kt`の`ImageWithOcrOverlay`、OCR座標計算と
+  密結合）はそのまま維持し、新規`ui/components/ZoomableBox.kt`を追加。
+- 適用先: `ViewerScreen.kt`の動画再生ページ（`PlayerView`をラップ、表示レイヤーでの拡大/パン。
+  再エンコードなし）、`ui/viewer/DocumentViewerScreen.kt`の`PdfViewerBody`（各ページ）、
+  `DocxViewerBody`/`PptxViewerBody`が使う`InlineDecodedImage`（埋め込み画像）。
+- いずれも`HorizontalPager`と共存させるため、ズーム中（`scale > 1`）は`userScrollEnabled`を
+  falseにしてページ送りジェスチャーと競合しないようにした。
+
+### 4. ビューアーへのファイル管理機能追加
+
+- `ViewerScreen.kt`のトップバーに「リネーム」「詳細情報」を追加（削除・共有は既存）。
+- `FileViewModel.kt`に`renameFile()`を新設。`deleteFile()`と同じデュアルパス処理
+  （API29+は`ContentResolver.update(MediaStore.MediaColumns.DISPLAY_NAME)`、レガシーパスは
+  `File.renameTo`）。
+- 詳細情報は`ModalBottomSheet`で名前/パス/サイズ/更新日時/画像解像度（`BitmapFactory.Options`）・
+  動画長（`ExoPlayer.duration`）を表示。
+
+### 5. 音楽プレイヤーの本格化
+
+- バックグラウンド再生・システム通知（`playback/PlaybackService.kt`が`MediaSessionService`+
+  ExoPlayer+`MediaSession`で構成）は元々機能していたが、専用のNow Playing画面
+  （`ui/NowPlayingScreen.kt`）とシステムイコライザー（`playback/EqualizerController.kt`、
+  `android.media.audiofx.Equalizer`をラップ、5-6バンド+プリセット、`ui/EqualizerScreen.kt`）を
+  新設。
+- 副次的に発見した不具合: `AudioScreen.kt`の`playAudioList()`が`MediaItem.fromUri()`のみで
+  `MediaMetadata`を設定しておらず、MiniPlayer/通知にファイルURIやmediaIdがそのまま表示される
+  ことがあった。`MediaItem.Builder`でタイトル（拡張子除去したファイル名）を設定するよう修正し、
+  `PlaybackManager.kt`に`onMediaMetadataChanged`リスナーを追加してExoPlayerが自動抽出する
+  ID3/Vorbisタグ（タイトル/アーティスト/アートワーク）も反映されるようにした。
+- **実装中に発見・修正したバグ**: `EqualizerController.attach()`を`Player.Listener
+  .onAudioSessionIdChanged`のコールバック内でのみ呼んでいたが、ExoPlayerは`Builder.build()`
+  時点で既にオーディオセッションIDを確保しているため、単一トラック再生の通常ライフサイクルでは
+  このコールバックが一度も発火せずイコライザーが常に空のまま、という不具合があった。
+  `player.audioSessionId`を`build()`直後に直接読んで`attach()`する処理を追加し解消。
+
+### 6. 管理(Manage)画面の刷新（Files by Google / マイファイル準拠）
+
+- `ui/ManageDashboardScreen.kt`にストレージ使用量バー（`StatFs`+`MediaCategory.matches()`による
+  カテゴリ別内訳、既存のカテゴリ判定ロジックを再利用）と「最近のファイル」水平リストを追加。
+- 新規`ui/components/BreadcrumbBar.kt`（パンくずナビゲーション）、`ui/components/
+  FolderPickerDialog.kt`（移動/コピー先を選ぶ、`FileViewModel`の共有状態とは独立した自己完結
+  ダイアログ）。
+- `FilesScreen.kt`に検索バー（現在フォルダ内をクライアント側でフィルタ）、リネーム（単一選択時）・
+  移動・コピーをマルチセレクトのアクションバーに追加（削除・共有は既存）。
+- `FileViewModel.kt`に`moveFile()`/`copyFile()`を新設。`copyFile()`は`ContentResolver
+  .openInputStream()`（MediaStore経由）または直接`File`読み込みでソースを読み、宛先へは常に
+  `File`書き込み（`MediaScannerConnection.scanFile()`でMediaStoreに反映）。`moveFile()`は
+  コピー成功後に既存の`deleteFile()`を呼んで元ファイルを削除する構成とし、スコープドストレージの
+  `RecoverableSecurityException`処理を新規実装せず再利用した。
+- 副次的な修正: `FilesScreen`のタイトルが「内部ストレージ」直下で`currentPath
+  .substringAfterLast("/")`により`"0"`（`/storage/emulated/0`の末尾）と表示されていたのを、
+  ストレージルート判定時は「Internal Storage」/「External Storage」ラベルを表示するよう修正。
+
+### 検証
+
+- JDK21で`assembleDebug`/`assembleRelease`/`testDebugUnitTest`(68件)/`lintDebug`(0エラー)を
+  確認。既存テストに変更なし（新規UIのロジックはユニットテストではなく実機操作で検証）。
+- 実機（エミュレータ）デバッグを実装直後とリリース前の2回実施。詳細は上記「v1.4.0 実機デバッグ」
+  節を参照。
 
 ## v1.3.0 の実装内容（Markdown/`.tex`のLaTeX数式表示、削除ボタン修正）
 
@@ -629,6 +719,10 @@ Shift_JIS/バイナリの全形式を実際にタップで開き、削除・共�
 | `app/src/main/java/com/example/ui/viewer/LatexView.kt` | KaTeX WebViewレンダラ（v1.3.0〜） |
 | `app/src/main/java/com/example/viewer/MathExtractor.kt`・`LatexSourceParser.kt` | Markdown/`.tex`の数式抽出（v1.3.0〜） |
 | `app/src/main/assets/katex/` | オフライン同梱KaTeX本体・フォント（MIT、v1.3.0〜） |
+| `app/src/main/java/com/example/ui/components/ZoomableBox.kt` | 動画/PDF/Office埋め込み画像向け共有ピンチズームコンポーネント（v1.4.0〜） |
+| `app/src/main/java/com/example/playback/EqualizerController.kt` | システムイコライザー制御（v1.4.0〜） |
+| `app/src/main/java/com/example/ui/NowPlayingScreen.kt`・`EqualizerScreen.kt` | 音楽プレイヤーのフル画面UI（v1.4.0〜） |
+| `app/src/main/java/com/example/ui/components/BreadcrumbBar.kt`・`FolderPickerDialog.kt` | 管理画面のパンくず・移動/コピー先フォルダピッカー（v1.4.0〜） |
 | `app/src/main/java/com/example/SettingsRepository.kt` | DataStore設定（ピン留めを含む） |
 | `app/src/main/java/com/example/SettingsViewModel.kt` | 設定操作のViewModel |
 | `app/src/main/res/values*/strings*.xml` | UI翻訳リソース |

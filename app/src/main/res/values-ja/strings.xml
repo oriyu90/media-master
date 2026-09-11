@@ -37,6 +37,15 @@
     <string name="back">戻る</string>
     <string name="delete">削除</string>
     <string name="share">共有</string>
+    <string name="rename">名前を変更</string>
+    <string name="file_info">ファイル情報</string>
+    <string name="file_name">名前</string>
+    <string name="file_path">パス</string>
+    <string name="file_size">サイズ</string>
+    <string name="date_modified">更新日時</string>
+    <string name="resolution">解像度</string>
+    <string name="duration">再生時間</string>
+    <string name="new_name">新しい名前</string>
     <string name="save_to_album">アルバムに保存</string>
     <string name="edit">編集</string>
     <string name="invalid_file_path">無効なファイルパス</string>

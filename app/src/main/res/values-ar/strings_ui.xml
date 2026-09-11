@@ -10,4 +10,22 @@
     <string name="all">الكل</string>
     <string name="export_as_jpg">تصدير JPG</string>
     <string name="exported_jpg_pages">تم حفظ صفحات JPG في الصور</string>
+    <string name="now_playing">قيد التشغيل</string>
+    <string name="repeat">تكرار</string>
+    <string name="repeat_off">إيقاف التكرار</string>
+    <string name="repeat_all">تكرار الكل</string>
+    <string name="repeat_one">تكرار واحد</string>
+    <string name="equalizer">موازن الصوت</string>
+    <string name="preset">إعداد مسبق</string>
+    <string name="reset">إعادة تعيين</string>
+    <string name="unknown_artist">فنان غير معروف</string>
+    <string name="recent_files">الملفات الأخيرة</string>
+    <string name="other_files">أخرى</string>
+    <string name="storage_used_of_total">تم استخدام %1$s من %2$s</string>
+    <string name="move">نقل</string>
+    <string name="copy">نسخ</string>
+    <string name="move_here">نقل إلى هنا</string>
+    <string name="copy_here">نسخ إلى هنا</string>
+    <string name="search">بحث</string>
+    <string name="search_files">البحث عن ملفات</string>
 </resources>

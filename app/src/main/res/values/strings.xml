@@ -37,6 +37,15 @@
     <string name="back">Back</string>
     <string name="delete">Delete</string>
     <string name="share">Share</string>
+    <string name="rename">Rename</string>
+    <string name="file_info">File Info</string>
+    <string name="file_name">Name</string>
+    <string name="file_path">Path</string>
+    <string name="file_size">Size</string>
+    <string name="date_modified">Date Modified</string>
+    <string name="resolution">Resolution</string>
+    <string name="duration">Duration</string>
+    <string name="new_name">New Name</string>
     <string name="save_to_album">Save to Album</string>
     <string name="edit">Edit</string>
     <string name="invalid_file_path">Invalid file path</string>

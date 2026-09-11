@@ -37,6 +37,15 @@
   <string name="back">Terug</string>
   <string name="delete">Verwijderen</string>
   <string name="share">Delen</string>
+  <string name="rename">Hernoemen</string>
+  <string name="file_info">Bestandsinformatie</string>
+  <string name="file_name">Naam</string>
+  <string name="file_path">Pad</string>
+  <string name="file_size">Grootte</string>
+  <string name="date_modified">Wijzigingsdatum</string>
+  <string name="resolution">Resolutie</string>
+  <string name="duration">Duur</string>
+  <string name="new_name">Nieuwe naam</string>
   <string name="save_to_album">Opslaan in album</string>
   <string name="edit">Bewerken</string>
   <string name="invalid_file_path">Ongeldig bestandspad</string>

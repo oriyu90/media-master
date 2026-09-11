@@ -90,4 +90,22 @@
     <string name="all">All</string>
     <string name="export_as_jpg">Export JPG</string>
     <string name="exported_jpg_pages">JPG pages saved to Pictures</string>
+    <string name="now_playing">Now Playing</string>
+    <string name="repeat">Repeat</string>
+    <string name="repeat_off">Repeat off</string>
+    <string name="repeat_all">Repeat all</string>
+    <string name="repeat_one">Repeat one</string>
+    <string name="equalizer">Equalizer</string>
+    <string name="preset">Preset</string>
+    <string name="reset">Reset</string>
+    <string name="unknown_artist">Unknown Artist</string>
+    <string name="recent_files">Recent files</string>
+    <string name="other_files">Other</string>
+    <string name="storage_used_of_total">%1$s used of %2$s</string>
+    <string name="move">Move</string>
+    <string name="copy">Copy</string>
+    <string name="move_here">Move here</string>
+    <string name="copy_here">Copy here</string>
+    <string name="search">Search</string>
+    <string name="search_files">Search files</string>
 </resources>

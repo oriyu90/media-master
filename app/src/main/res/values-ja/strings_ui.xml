@@ -14,4 +14,22 @@
     <string name="all">すべて</string>
     <string name="export_as_jpg">JPGで書き出す</string>
     <string name="exported_jpg_pages">JPGページをピクチャに保存しました</string>
+    <string name="now_playing">再生中</string>
+    <string name="repeat">リピート</string>
+    <string name="repeat_off">リピートしない</string>
+    <string name="repeat_all">全曲をリピート</string>
+    <string name="repeat_one">1曲をリピート</string>
+    <string name="equalizer">イコライザー</string>
+    <string name="preset">プリセット</string>
+    <string name="reset">リセット</string>
+    <string name="unknown_artist">不明なアーティスト</string>
+    <string name="recent_files">最近のファイル</string>
+    <string name="other_files">その他</string>
+    <string name="storage_used_of_total">%2$s 中 %1$s 使用</string>
+    <string name="move">移動</string>
+    <string name="copy">コピー</string>
+    <string name="move_here">ここに移動</string>
+    <string name="copy_here">ここにコピー</string>
+    <string name="search">検索</string>
+    <string name="search_files">ファイルを検索</string>
 </resources>

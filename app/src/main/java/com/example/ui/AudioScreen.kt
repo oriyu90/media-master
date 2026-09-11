@@ -217,7 +217,19 @@ fun AudioScreen(viewModel: FileViewModel, navController: NavHostController) {
 
 fun playAudioList(files: List<MediaFile>, startIndex: Int = 0, shuffle: Boolean = false, reverse: Boolean = false) {
     val p = PlaybackManager.player ?: return
-    val mediaItems = files.map { MediaItem.fromUri(it.contentUri ?: Uri.fromFile(File(it.path))) }
+    val mediaItems = files.map { file ->
+        MediaItem.Builder()
+            .setUri(file.contentUri ?: Uri.fromFile(File(file.path)))
+            // Title as a sane immediate fallback; ExoPlayer overlays this with
+            // ID3/Vorbis-extracted title/artist/artwork once the file is parsed
+            // (PlaybackManager.onMediaMetadataChanged picks that up).
+            .setMediaMetadata(
+                androidx.media3.common.MediaMetadata.Builder()
+                    .setTitle(file.name.substringBeforeLast('.'))
+                    .build()
+            )
+            .build()
+    }
     p.setMediaItems(if (reverse) mediaItems.reversed() else mediaItems)
     p.shuffleModeEnabled = shuffle
     val actualStartIndex = if (reverse) mediaItems.size - 1 - startIndex else startIndex

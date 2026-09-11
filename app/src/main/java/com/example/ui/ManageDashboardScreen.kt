@@ -7,9 +7,11 @@ import com.example.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.*
@@ -17,9 +19,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
+import com.example.MediaFile
+import com.example.ViewState
+import com.example.formatSizeLocalized
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,7 +38,9 @@ fun ManageDashboardScreen(navController: NavHostController, viewModel: FileViewM
     var storageRoots by remember { mutableStateOf<List<String>>(emptyList()) }
     LaunchedEffect(Unit) {
         storageRoots = withContext(Dispatchers.IO) { viewModel.storageRoots() }
+        viewModel.loadAllMedia()
     }
+    val mediaViewState by viewModel.mediaState.collectAsStateWithLifecycle()
     Scaffold(
         topBar = {
             TopAppBar(
@@ -46,6 +58,14 @@ fun ManageDashboardScreen(navController: NavHostController, viewModel: FileViewM
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            item {
+                StorageUsageCard(storageRoots.firstOrNull(), mediaViewState)
+            }
+            item {
+                RecentFilesRow(mediaViewState) { file ->
+                    navController.navigate("viewer/${android.net.Uri.encode(file.path)}")
+                }
+            }
             item {
                 Text(stringResource(R.string.categories), style = MaterialTheme.typography.titleMedium)
             }
@@ -102,6 +122,107 @@ fun ManageDashboardScreen(navController: NavHostController, viewModel: FileViewM
         }
     }
 }
+
+private val categoryColors = listOf(
+    Color(0xFF4C8DF6), // Downloads
+    Color(0xFF34A853), // Images
+    Color(0xFFEA4335), // Videos
+    Color(0xFFFBBC05), // Audio
+    Color(0xFFAB47BC), // Documents
+    Color(0xFF00ACC1), // Apps
+)
+private val otherColor = Color(0xFF9AA0A6)
+
+/**
+ * Files-by-Google/My-Files-style storage summary: a segmented bar (bytes per
+ * MediaCategory, reusing MediaCategory.matches instead of new repository
+ * queries) plus used/total space from StatFs on the primary storage root.
+ */
+@Composable
+private fun StorageUsageCard(primaryRoot: String?, mediaViewState: ViewState) {
+    val files = (mediaViewState as? ViewState.Success)?.files.orEmpty()
+    val byCategory = remember(files) {
+        MediaCategory.entries.associateWith { category -> files.filter { category.matches(it) }.sumOf { it.size } }
+    }
+    val categorizedBytes = byCategory.values.sum()
+    val otherBytes = (files.sumOf { it.size } - categorizedBytes).coerceAtLeast(0)
+
+    val statFs = remember(primaryRoot) {
+        runCatching { android.os.StatFs(primaryRoot ?: android.os.Environment.getExternalStorageDirectory().path) }.getOrNull()
+    }
+    val totalBytes = statFs?.let { it.blockCountLong * it.blockSizeLong } ?: 0L
+    val freeBytes = statFs?.let { it.availableBlocksLong * it.blockSizeLong } ?: 0L
+    val usedBytes = (totalBytes - freeBytes).coerceAtLeast(0)
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            if (totalBytes > 0) {
+                Text(
+                    stringResource(R.string.storage_used_of_total, formatSizeLocalized(usedBytes), formatSizeLocalized(totalBytes)),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShapeAll(6.dp)),
+                ) {
+                    MediaCategory.entries.forEachIndexed { i, category ->
+                        val bytes = byCategory[category] ?: 0L
+                        if (bytes > 0) {
+                            Box(modifier = Modifier.weight(bytes.toFloat()).fillMaxHeight().background(categoryColors[i % categoryColors.size]))
+                        }
+                    }
+                    if (otherBytes > 0) {
+                        Box(modifier = Modifier.weight(otherBytes.toFloat()).fillMaxHeight().background(otherColor))
+                    }
+                    val unusedBytes = (freeBytes).coerceAtLeast(1L)
+                    Box(modifier = Modifier.weight(unusedBytes.toFloat()).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceVariant))
+                }
+            } else {
+                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+            }
+        }
+    }
+}
+
+private fun RoundedCornerShapeAll(radius: androidx.compose.ui.unit.Dp) =
+    androidx.compose.foundation.shape.RoundedCornerShape(radius)
+
+@Composable
+private fun RecentFilesRow(mediaViewState: ViewState, onOpen: (MediaFile) -> Unit) {
+    val files = (mediaViewState as? ViewState.Success)?.files.orEmpty()
+    val recent = remember(files) { files.sortedByDescending { it.dateModified }.take(10) }
+    if (recent.isEmpty()) return
+    Column {
+        Text(stringResource(R.string.recent_files), style = MaterialTheme.typography.titleMedium)
+        Spacer(modifier = Modifier.height(8.dp))
+        androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(recent.size) { i ->
+                val file = recent[i]
+                Card(
+                    modifier = Modifier.width(96.dp).clickable { onOpen(file) },
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Icon(
+                            categoryIconFor(file),
+                            contentDescription = null,
+                            modifier = Modifier.size(32.dp),
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            file.name,
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun categoryIconFor(file: MediaFile): androidx.compose.ui.graphics.vector.ImageVector =
+    MediaCategory.entries.firstOrNull { it.matches(file) }?.icon ?: Icons.AutoMirrored.Filled.InsertDriveFile
 
 @Composable
 fun CategoryGrid(onCategoryClick: (MediaCategory) -> Unit) {

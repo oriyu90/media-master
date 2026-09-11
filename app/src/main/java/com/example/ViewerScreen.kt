@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -141,10 +142,12 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
         val isAudio = currentFile.mimeType.startsWith("audio/")
         val isImage = currentFile.mimeType.startsWith("image/")
 
+        var isZoomedIn by remember { mutableStateOf(false) }
         LaunchedEffect(pagerState.currentPage) {
             isOcrMode = false
             recognizedText = null
             imageSize = IntSize.Zero
+            isZoomedIn = false
         }
 
         // Single player for the whole viewer session: pages share it instead of
@@ -261,6 +264,31 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
                             }) {
                                 Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share))
                             }
+                            var showRenameDialog by remember { mutableStateOf(false) }
+                            if (showRenameDialog) {
+                                RenameDialog(
+                                    currentName = currentFile.name,
+                                    onDismiss = { showRenameDialog = false },
+                                    onConfirm = { newName ->
+                                        showRenameDialog = false
+                                        viewModel.renameFile(currentFile.path, currentFile.contentUri, newName)
+                                    },
+                                )
+                            }
+                            IconButton(onClick = { showRenameDialog = true }) {
+                                Icon(Icons.Default.DriveFileRenameOutline, contentDescription = stringResource(R.string.rename))
+                            }
+                            var showInfoSheet by remember { mutableStateOf(false) }
+                            if (showInfoSheet) {
+                                FileInfoSheet(
+                                    file = currentFile,
+                                    player = if (isVideo) viewerPlayer else null,
+                                    onDismiss = { showInfoSheet = false },
+                                )
+                            }
+                            IconButton(onClick = { showInfoSheet = true }) {
+                                Icon(Icons.Outlined.Info, contentDescription = stringResource(R.string.file_info))
+                            }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
                             containerColor = ViewerChromeContainer,
@@ -278,7 +306,7 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
                     .fillMaxSize()
                     .background(ViewerScrim)
                     .padding(if (isFullScreen) PaddingValues(0.dp) else innerPadding),
-                userScrollEnabled = !isOcrMode
+                userScrollEnabled = !isOcrMode && !isZoomedIn
             ) { page ->
                 val pageFile = mediaList[page]
                 val pageUri = pageFile.contentUri ?: Uri.fromFile(File(pageFile.path))
@@ -295,18 +323,24 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
                         // player to several PlayerViews would move the video output
                         // to an off-screen page. Neighbours show a placeholder.
                         if (page == pagerState.currentPage) {
-                            AndroidView(
-                                factory = {
-                                    PlayerView(context).apply {
-                                        player = viewerPlayer
-                                        setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { visibility ->
-                                            isFullScreen = visibility != android.view.View.VISIBLE
-                                        })
-                                    }
-                                },
-                                update = { it.player = viewerPlayer },
-                                modifier = Modifier.fillMaxSize()
-                            )
+                            com.example.ui.components.ZoomableBox(
+                                modifier = Modifier.fillMaxSize(),
+                                enabled = pageIsVideo,
+                                onZoomChanged = { isZoomedIn = it },
+                            ) {
+                                AndroidView(
+                                    factory = {
+                                        PlayerView(context).apply {
+                                            player = viewerPlayer
+                                            setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { visibility ->
+                                                isFullScreen = visibility != android.view.View.VISIBLE
+                                            })
+                                        }
+                                    },
+                                    update = { it.player = viewerPlayer },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
                         } else {
                             Box(
                                 modifier = Modifier.fillMaxSize(),
@@ -596,5 +630,77 @@ fun ImageWithOcrOverlay(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun RenameDialog(currentName: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    var text by remember { mutableStateOf(currentName) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.rename)) },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                label = { Text(stringResource(R.string.new_name)) },
+                singleLine = true,
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(text.trim()) }, enabled = text.isNotBlank()) {
+                Text(stringResource(R.string.save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        },
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FileInfoSheet(file: MediaFile, player: ExoPlayer?, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val isImage = file.mimeType.startsWith("image/")
+    var resolution by remember(file.path) { mutableStateOf<String?>(null) }
+    LaunchedEffect(file.path) {
+        if (isImage) {
+            resolution = withContext(Dispatchers.IO) {
+                runCatching {
+                    val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    val uri = file.contentUri ?: Uri.fromFile(File(file.path))
+                    context.contentResolver.openInputStream(uri)?.use {
+                        android.graphics.BitmapFactory.decodeStream(it, null, options)
+                    }
+                    if (options.outWidth > 0 && options.outHeight > 0) "${options.outWidth} × ${options.outHeight}" else null
+                }.getOrNull()
+            }
+        }
+    }
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp).padding(bottom = 24.dp)) {
+            Text(stringResource(R.string.file_info), style = MaterialTheme.typography.titleLarge)
+            Spacer(modifier = Modifier.height(16.dp))
+            InfoRow(stringResource(R.string.file_name), file.name)
+            InfoRow(stringResource(R.string.file_path), file.path)
+            InfoRow(stringResource(R.string.file_size), formatSizeLocalized(file.size))
+            InfoRow(stringResource(R.string.date_modified), formatDate(file.dateModified))
+            if (isImage) {
+                resolution?.let { InfoRow(stringResource(R.string.resolution), it) }
+            }
+            if (player != null && player.duration > 0) {
+                val totalSeconds = player.duration / 1000
+                InfoRow(stringResource(R.string.duration), "%d:%02d".format(totalSeconds / 60, totalSeconds % 60))
+            }
+        }
+    }
+}
+
+@Composable
+private fun InfoRow(label: String, value: String) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.bodyLarge)
     }
 }

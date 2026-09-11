@@ -10,4 +10,22 @@
     <string name="all">全部</string>
     <string name="export_as_jpg">导出 JPG</string>
     <string name="exported_jpg_pages">JPG 页面已保存到图片</string>
+    <string name="now_playing">正在播放</string>
+    <string name="repeat">循环播放</string>
+    <string name="repeat_off">不循环</string>
+    <string name="repeat_all">循环全部</string>
+    <string name="repeat_one">单曲循环</string>
+    <string name="equalizer">均衡器</string>
+    <string name="preset">预设</string>
+    <string name="reset">重置</string>
+    <string name="unknown_artist">未知艺术家</string>
+    <string name="recent_files">最近的文件</string>
+    <string name="other_files">其他</string>
+    <string name="storage_used_of_total">已用 %1$s，共 %2$s</string>
+    <string name="move">移动</string>
+    <string name="copy">复制</string>
+    <string name="move_here">移动到此处</string>
+    <string name="copy_here">复制到此处</string>
+    <string name="search">搜索</string>
+    <string name="search_files">搜索文件</string>
 </resources>

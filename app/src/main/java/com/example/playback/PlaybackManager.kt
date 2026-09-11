@@ -32,12 +32,45 @@ object PlaybackManager {
     
     private val _currentMediaTitle = MutableStateFlow("")
     val currentMediaTitle: StateFlow<String> = _currentMediaTitle.asStateFlow()
+
+    private val _currentArtist = MutableStateFlow("")
+    val currentArtist: StateFlow<String> = _currentArtist.asStateFlow()
+
+    private val _currentArtworkUri = MutableStateFlow<android.net.Uri?>(null)
+    val currentArtworkUri: StateFlow<android.net.Uri?> = _currentArtworkUri.asStateFlow()
     
     private val _currentPosition = MutableStateFlow(0L)
     val currentPosition: StateFlow<Long> = _currentPosition.asStateFlow()
     
     private val _duration = MutableStateFlow(0L)
     val duration: StateFlow<Long> = _duration.asStateFlow()
+
+    private val _shuffleEnabled = MutableStateFlow(false)
+    val shuffleEnabled: StateFlow<Boolean> = _shuffleEnabled.asStateFlow()
+
+    private val _repeatMode = MutableStateFlow(Player.REPEAT_MODE_OFF)
+    val repeatMode: StateFlow<Int> = _repeatMode.asStateFlow()
+
+    /** Equalizer state, forwarded as-is from EqualizerController (same process). */
+    val equalizerState: StateFlow<EqState> = EqualizerController.state
+
+    fun toggleShuffle() {
+        val p = player ?: return
+        p.shuffleModeEnabled = !p.shuffleModeEnabled
+    }
+
+    fun cycleRepeatMode() {
+        val p = player ?: return
+        p.repeatMode = when (p.repeatMode) {
+            Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+            Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+            else -> Player.REPEAT_MODE_OFF
+        }
+    }
+
+    fun setEqualizerBand(bandIndex: Int, level: Short) = EqualizerController.setBandLevel(bandIndex, level)
+
+    fun useEqualizerPreset(preset: Short) = EqualizerController.usePreset(preset)
 
     fun initialize(context: Context) {
         if (controllerFuture != null) return
@@ -58,11 +91,21 @@ object PlaybackManager {
         _isPlaying.value = p.isPlaying
         _currentMediaTitle.value = p.currentMediaItem?.mediaMetadata?.title?.toString()
             ?: p.currentMediaItem?.mediaId ?: ""
+        _currentArtist.value = p.currentMediaItem?.mediaMetadata?.artist?.toString() ?: ""
+        _currentArtworkUri.value = p.currentMediaItem?.mediaMetadata?.artworkUri
         _duration.value = p.duration.coerceAtLeast(0)
         _currentPosition.value = p.currentPosition.coerceAtLeast(0)
+        _shuffleEnabled.value = p.shuffleModeEnabled
+        _repeatMode.value = p.repeatMode
         if (p.isPlaying) startPositionUpdates()
 
         p.addListener(object : Player.Listener {
+            override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+                _shuffleEnabled.value = shuffleModeEnabled
+            }
+            override fun onRepeatModeChanged(repeatMode: Int) {
+                _repeatMode.value = repeatMode
+            }
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 _isPlaying.value = isPlaying
                 if (isPlaying) startPositionUpdates() else {
@@ -72,8 +115,17 @@ object PlaybackManager {
             }
             override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
                 _currentMediaTitle.value = mediaItem?.mediaMetadata?.title?.toString() ?: mediaItem?.mediaId ?: ""
+                _currentArtist.value = mediaItem?.mediaMetadata?.artist?.toString() ?: ""
+                _currentArtworkUri.value = mediaItem?.mediaMetadata?.artworkUri
                 _duration.value = p.duration.coerceAtLeast(0)
                 _currentPosition.value = p.currentPosition.coerceAtLeast(0)
+            }
+            // Fires once ExoPlayer parses the file's own ID3/Vorbis tags, overlaying
+            // (title/artist/artwork) on top of whatever MediaItem.Builder set statically.
+            override fun onMediaMetadataChanged(mediaMetadata: androidx.media3.common.MediaMetadata) {
+                mediaMetadata.title?.toString()?.let { _currentMediaTitle.value = it }
+                _currentArtist.value = mediaMetadata.artist?.toString() ?: mediaMetadata.albumArtist?.toString() ?: ""
+                _currentArtworkUri.value = mediaMetadata.artworkUri
             }
             override fun onPositionDiscontinuity(
                 oldPosition: Player.PositionInfo,

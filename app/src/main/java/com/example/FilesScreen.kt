@@ -37,6 +37,8 @@ import androidx.navigation.NavHostController
 import com.example.ui.components.SortViewMenu
 import com.example.ui.components.ConfirmDeleteDialog
 import com.example.ui.components.Hallmark
+import com.example.ui.components.BreadcrumbBar
+import com.example.ui.components.FolderPickerDialog
 import java.text.DateFormat
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -48,6 +50,8 @@ import java.util.Date
 import java.util.Locale
 import java.io.File
 import androidx.compose.foundation.ExperimentalFoundationApi
+
+private data class FolderPickerMode(val isMove: Boolean, val paths: List<String>)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -67,6 +71,17 @@ fun FilesScreen(
     val isSelectionMode = selectedFiles.isNotEmpty()
     var pendingDeletePaths by remember { mutableStateOf<List<String>>(emptyList()) }
     val deleteError by viewModel.deleteError.collectAsStateWithLifecycle()
+    val renameError by viewModel.renameError.collectAsStateWithLifecycle()
+
+    var storageRoots by remember { mutableStateOf<List<String>>(emptyList()) }
+    var searchActive by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var showRenameDialog by remember { mutableStateOf(false) }
+    var folderPickerMode by remember { mutableStateOf<FolderPickerMode?>(null) }
+
+    LaunchedEffect(Unit) {
+        storageRoots = withContext(kotlinx.coroutines.Dispatchers.IO) { viewModel.storageRoots() }
+    }
 
     LaunchedEffect(initialPath) {
         initialPath?.takeIf { it.startsWith("/") }?.let(viewModel::loadFiles)
@@ -114,6 +129,67 @@ fun FilesScreen(
         }
     }
 
+    renameError?.let { message ->
+        LaunchedEffect(message) {
+            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+            viewModel.clearRenameError()
+        }
+    }
+
+    if (showRenameDialog && selectedFiles.size == 1) {
+        val target = (viewState as? ViewState.Success)?.files?.find { it.path == selectedFiles.first() }
+        if (target != null) {
+            var newName by remember(target.path) { mutableStateOf(target.name) }
+            AlertDialog(
+                onDismissRequest = { showRenameDialog = false },
+                title = { Text(stringResource(R.string.rename)) },
+                text = {
+                    OutlinedTextField(
+                        value = newName,
+                        onValueChange = { newName = it },
+                        label = { Text(stringResource(R.string.new_name)) },
+                        singleLine = true,
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showRenameDialog = false
+                            viewModel.renameFile(target.path, target.contentUri, newName.trim())
+                            selectedFiles.clear()
+                        },
+                        enabled = newName.isNotBlank(),
+                    ) { Text(stringResource(R.string.save)) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showRenameDialog = false }) { Text(stringResource(R.string.cancel)) }
+                },
+            )
+        }
+    }
+
+    folderPickerMode?.let { mode ->
+        val startDir = (viewState as? ViewState.Success)?.currentPath ?: storageRoots.firstOrNull() ?: "/"
+        FolderPickerDialog(
+            startPath = startDir,
+            isMove = mode.isMove,
+            onDismiss = { folderPickerMode = null },
+            onConfirm = { destDir ->
+                val files = (viewState as? ViewState.Success)?.files.orEmpty()
+                mode.paths.forEach { path ->
+                    val file = files.find { it.path == path } ?: return@forEach
+                    if (mode.isMove) {
+                        viewModel.moveFile(file.path, file.contentUri, destDir)
+                    } else {
+                        viewModel.copyFile(file.path, file.contentUri, destDir)
+                    }
+                }
+                selectedFiles.clear()
+                folderPickerMode = null
+            },
+        )
+    }
+
     BackHandler(enabled = viewState is ViewState.Success && !(viewModel.isStorageRoot((viewState as ViewState.Success).currentPath))) {
         if (isSelectionMode) {
             selectedFiles.clear()
@@ -155,6 +231,17 @@ fun FilesScreen(
                         }) {
                             Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete))
                         }
+                        if (selectedFiles.size == 1) {
+                            IconButton(onClick = { showRenameDialog = true }) {
+                                Icon(Icons.Default.DriveFileRenameOutline, contentDescription = stringResource(R.string.rename))
+                            }
+                        }
+                        IconButton(onClick = { folderPickerMode = FolderPickerMode(isMove = false, paths = selectedFiles.toList()) }) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.copy))
+                        }
+                        IconButton(onClick = { folderPickerMode = FolderPickerMode(isMove = true, paths = selectedFiles.toList()) }) {
+                            Icon(Icons.Default.DriveFileMove, contentDescription = stringResource(R.string.move))
+                        }
                         SortViewMenu(viewModel = viewModel, onSelectAll = {
                             if (viewState is ViewState.Success) {
                                 val files = (viewState as ViewState.Success).files.filter { !it.isDirectory }
@@ -168,7 +255,12 @@ fun FilesScreen(
                 TopAppBar(
                     title = { 
                         val title = if (viewState is ViewState.Success) {
-                            (viewState as ViewState.Success).currentPath.substringAfterLast("/")
+                            val path = (viewState as ViewState.Success).currentPath
+                            if (viewModel.isStorageRoot(path)) {
+                                stringResource(if (path.contains("emulated")) R.string.internal_storage else R.string.external_storage)
+                            } else {
+                                path.substringAfterLast("/")
+                            }
                         } else stringResource(R.string.manage_files)
                         Text(text = title, maxLines = 1, overflow = TextOverflow.Ellipsis) 
                     },
@@ -184,6 +276,9 @@ fun FilesScreen(
                         }
                     },
                     actions = {
+                        IconButton(onClick = { searchActive = !searchActive; if (!searchActive) searchQuery = "" }) {
+                            Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search))
+                        }
                         IconButton(onClick = { navController.navigate("clean") }) {
                             Icon(Icons.Default.DeleteSweep, contentDescription = stringResource(R.string.clean_duplicates))
                         }
@@ -200,6 +295,29 @@ fun FilesScreen(
         }
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            if (!isSelectionMode && viewState is ViewState.Success) {
+                val currentSuccess = viewState as ViewState.Success
+                val root = storageRoots.firstOrNull { currentSuccess.currentPath.startsWith(it) } ?: storageRoots.firstOrNull()
+                if (root != null) {
+                    val isInternal = root.contains("emulated")
+                    BreadcrumbBar(
+                        rootPath = root,
+                        rootLabel = stringResource(if (isInternal) R.string.internal_storage else R.string.external_storage),
+                        currentPath = currentSuccess.currentPath,
+                        onNavigate = { viewModel.loadFiles(it) },
+                    )
+                }
+                if (searchActive) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        label = { Text(stringResource(R.string.search_files)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    )
+                }
+            }
             when (val state = viewState) {
                 is ViewState.Loading -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -212,6 +330,10 @@ fun FilesScreen(
                     }
                 }
                 is ViewState.Success -> {
+                    val displayedFiles = remember(state.files, searchQuery) {
+                        if (searchQuery.isBlank()) state.files
+                        else state.files.filter { it.name.contains(searchQuery, ignoreCase = true) }
+                    }
                     if (viewMode == ViewMode.LIST) {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
@@ -221,7 +343,7 @@ fun FilesScreen(
                             ),
                         ) {
                             itemsIndexed(
-                                state.files,
+                                displayedFiles,
                                 key = { _, file -> file.path },
                                 contentType = { _, file -> if (file.isDirectory) "dir" else "file" },
                             ) { _, file ->
@@ -252,7 +374,7 @@ fun FilesScreen(
                             verticalArrangement = Arrangement.spacedBy(Hallmark.ItemGap)
                         ) {
                             items(
-                                state.files,
+                                displayedFiles,
                                 key = { it.path },
                                 contentType = { if (it.isDirectory) "dir" else "file" },
                             ) { file ->
@@ -345,7 +467,13 @@ fun FileItemRow(
             .semantics { selected = isSelected }
             .combinedClickable(
                 onClick = onClick,
-                onLongClick = { if (file.isDirectory && file.name != "..") menuExpanded = true else onToggleSelect() },
+                onLongClick = {
+                    // ".." is the synthetic "go up" entry, not a real file: it must never enter
+                    // multi-select (rename/move/copy/delete on it would target the parent dir).
+                    if (file.name != "..") {
+                        if (file.isDirectory) menuExpanded = true else onToggleSelect()
+                    }
+                },
                 role = if (isSelectionMode) Role.Checkbox else null,
             )
     )
@@ -399,7 +527,11 @@ fun FileItemGrid(
             .padding(4.dp)
             .combinedClickable(
                 onClick = onClick,
-                onLongClick = { if (file.isDirectory && file.name != "..") menuExpanded = true else onToggleSelect() }
+                onLongClick = {
+                    if (file.name != "..") {
+                        if (file.isDirectory) menuExpanded = true else onToggleSelect()
+                    }
+                }
             ),
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer

@@ -63,6 +63,9 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
     private val _deleteError = MutableStateFlow<String?>(null)
     val deleteError: StateFlow<String?> = _deleteError.asStateFlow()
 
+    private val _renameError = MutableStateFlow<String?>(null)
+    val renameError: StateFlow<String?> = _renameError.asStateFlow()
+
     private val _pendingDeleteIntent = MutableStateFlow<android.content.IntentSender?>(null)
     val pendingDeleteIntent: StateFlow<android.content.IntentSender?> = _pendingDeleteIntent.asStateFlow()
 
@@ -325,6 +328,99 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearDeleteError() {
         _deleteError.update { null }
+    }
+
+    /**
+     * Renames a file in place (same folder). Mirrors deleteFile's dual-path
+     * handling: MediaStore-indexed content (API 29+) is renamed via
+     * ContentResolver first, falling back to a raw File rename for legacy
+     * paths not backed by a content:// URI. Unlike deleteFile this doesn't
+     * offer a RecoverableSecurityException retry flow — that only matters for
+     * files this app doesn't own (e.g. saved by another app), which is rare
+     * for a personal file manager; surfacing the error is enough for now.
+     */
+    fun renameFile(path: String, contentUri: Uri?, newName: String) {
+        if (newName.isBlank()) return
+        viewModelScope.launch {
+            var renamed = false
+            withContext(Dispatchers.IO) {
+                try {
+                    if (contentUri != null && contentUri != Uri.EMPTY) {
+                        val values = android.content.ContentValues().apply {
+                            put(MediaStore.MediaColumns.DISPLAY_NAME, newName)
+                        }
+                        val updatedRows = getApplication<Application>().contentResolver.update(contentUri, values, null, null)
+                        if (updatedRows > 0) renamed = true
+                    }
+                    if (!renamed) {
+                        val file = File(path)
+                        val target = File(file.parentFile, newName)
+                        if (file.exists() && !target.exists() && file.renameTo(target)) {
+                            renamed = true
+                            android.media.MediaScannerConnection.scanFile(
+                                getApplication(), arrayOf(path, target.path), null, null,
+                            )
+                        }
+                    }
+                } catch (e: Exception) {
+                    _renameError.update { e.message }
+                }
+            }
+            if (renamed) {
+                onFileRenamed(path)
+            }
+        }
+    }
+
+    fun clearRenameError() {
+        _renameError.update { null }
+    }
+
+    /**
+     * Copies a file into [destDir]. Reads through ContentResolver when a
+     * contentUri is available (works uniformly for MediaStore-indexed and
+     * legacy files, unlike renameFile/deleteFile's MediaStore-update path,
+     * which only applies to same-location renames), otherwise reads the raw
+     * File. Always writes the destination via plain File I/O since the
+     * destination folder is a location the user picked in-app, not a
+     * MediaStore-restricted one.
+     */
+    fun copyFile(path: String, contentUri: Uri?, destDir: String, onDone: (String?) -> Unit = {}) {
+        viewModelScope.launch {
+            val destPath = withContext(Dispatchers.IO) {
+                runCatching {
+                    val sourceName = File(path).name
+                    val dest = File(destDir, sourceName)
+                    dest.parentFile?.mkdirs()
+                    val input = if (contentUri != null && contentUri != Uri.EMPTY) {
+                        getApplication<Application>().contentResolver.openInputStream(contentUri)
+                    } else {
+                        File(path).inputStream()
+                    }
+                    input?.use { inStream -> dest.outputStream().use { out -> inStream.copyTo(out) } }
+                    android.media.MediaScannerConnection.scanFile(getApplication(), arrayOf(dest.path), null, null)
+                    dest.path
+                }.onFailure { error -> _renameError.update { error.message } }.getOrNull()
+            }
+            if (destPath != null) loadAllMedia()
+            onDone(destPath)
+        }
+    }
+
+    /** Copies then deletes the source, reusing deleteFile's scoped-storage handling for the removal. */
+    fun moveFile(path: String, contentUri: Uri?, destDir: String) {
+        copyFile(path, contentUri, destDir) { destPath ->
+            if (destPath != null) deleteFile(path, contentUri)
+        }
+    }
+
+    private fun onFileRenamed(oldPath: String) {
+        val parentPath = File(oldPath).parent
+        val current = currentPath
+        if (current == parentPath && _fileTreeState.value is ViewState.Success && current != null) {
+            loadFiles(current)
+        }
+        loadAllMedia()
     }
 
     fun onPendingDeleteResult(success: Boolean) {

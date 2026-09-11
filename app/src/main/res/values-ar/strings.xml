@@ -37,6 +37,15 @@
     <string name="back">رجوع</string>
     <string name="delete">حذف</string>
     <string name="share">مشاركة</string>
+    <string name="rename">إعادة تسمية</string>
+    <string name="file_info">معلومات الملف</string>
+    <string name="file_name">الاسم</string>
+    <string name="file_path">المسار</string>
+    <string name="file_size">الحجم</string>
+    <string name="date_modified">تاريخ التعديل</string>
+    <string name="resolution">الدقة</string>
+    <string name="duration">المدة</string>
+    <string name="new_name">الاسم الجديد</string>
     <string name="save_to_album">حفظ في الألبوم</string>
     <string name="edit">تعديل</string>
     <string name="invalid_file_path">مسار الملف غير صالح</string>

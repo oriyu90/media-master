@@ -1,7 +1,19 @@
 # 設計書兼仕様書 (Media Master)
 
 ## バージョン情報
-- **Version:** 1.3.0
+- **Version:** 1.4.0
+
+## v1.4.0 の設計変更（要約）
+- **DeX判定をウィンドウサイズ+キャプションバー検出の二段構えに変更**: `UI_MODE_TYPE_DESK`
+  単独判定は One UI 8 以降の新デスクトップウィンドウイングで機能しないため、システム
+  キャプションバーの表示有無を補助信号として追加。
+- **ピンチズームを`ZoomableBox`として共通化**し、動画/PDF/Office埋め込み画像へ適用。
+  既存のOCR画像ズーム（座標計算と密結合）はリファクタ対象から除外。
+- **音楽プレイヤーをフル画面UI+システムイコライザーへ拡張**: `EqualizerController`が
+  `android.media.audiofx.Equalizer`をExoPlayerの`audioSessionId`にアタッチ。
+- **管理画面をFiles by Google/マイファイル型のカテゴリ+ストレージバー+パンくず+検索
+  構成へ刷新**。ファイル操作（リネーム/移動/コピー）は`FileViewModel`の既存の
+  スコープドストレージ処理（`RecoverableSecurityException`ハンドリング）を再利用。
 
 ## v1.3.0 の設計変更（要約）
 - **Markdown数式(LaTeX)対応**: `$...$`/`$$...$$` をCommonMark解析前に抽出する

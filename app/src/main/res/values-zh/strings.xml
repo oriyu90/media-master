@@ -37,6 +37,15 @@
     <string name="back">返回</string>
     <string name="delete">删除</string>
     <string name="share">分享</string>
+    <string name="rename">重命名</string>
+    <string name="file_info">文件信息</string>
+    <string name="file_name">名称</string>
+    <string name="file_path">路径</string>
+    <string name="file_size">大小</string>
+    <string name="date_modified">修改日期</string>
+    <string name="resolution">分辨率</string>
+    <string name="duration">时长</string>
+    <string name="new_name">新名称</string>
     <string name="save_to_album">保存到相册</string>
     <string name="edit">编辑</string>
     <string name="invalid_file_path">无效的文件路径</string>

@@ -674,10 +674,16 @@ private fun PdfViewerBody(context: Context, uri: Uri) {
             } else {
                 val pagerState = rememberPagerState(pageCount = { renderer.pageCount })
                 val density = LocalDensity.current
+                var isZoomedIn by remember { mutableStateOf(false) }
+                LaunchedEffect(pagerState.currentPage) { isZoomedIn = false }
                 Column(Modifier.fillMaxSize()) {
                     BoxWithConstraints(Modifier.fillMaxSize().weight(1f)) {
                         val widthPx = with(density) { maxWidth.toPx().toInt() }
-                        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+                        HorizontalPager(
+                            state = pagerState,
+                            modifier = Modifier.fillMaxSize(),
+                            userScrollEnabled = !isZoomedIn,
+                        ) { page ->
                             var bitmap by remember(page, widthPx) { mutableStateOf<Bitmap?>(null) }
                             LaunchedEffect(page, widthPx) {
                                 bitmap = withContext(Dispatchers.Default) { renderer.renderPage(page, widthPx) }
@@ -685,16 +691,21 @@ private fun PdfViewerBody(context: Context, uri: Uri) {
                             DisposableEffect(page, widthPx) {
                                 onDispose { bitmap?.takeIf { !it.isRecycled }?.recycle() }
                             }
-                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                val current = bitmap
-                                if (current != null) {
-                                    androidx.compose.foundation.Image(
-                                        bitmap = current.asImageBitmap(),
-                                        contentDescription = null,
-                                        modifier = Modifier.fillMaxWidth(),
-                                    )
-                                } else {
-                                    CircularProgressIndicator()
+                            com.example.ui.components.ZoomableBox(
+                                modifier = Modifier.fillMaxSize(),
+                                onZoomChanged = { if (page == pagerState.currentPage) isZoomedIn = it },
+                            ) {
+                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    val current = bitmap
+                                    if (current != null) {
+                                        androidx.compose.foundation.Image(
+                                            bitmap = current.asImageBitmap(),
+                                            contentDescription = null,
+                                            modifier = Modifier.fillMaxWidth(),
+                                        )
+                                    } else {
+                                        CircularProgressIndicator()
+                                    }
                                 }
                             }
                         }
@@ -760,11 +771,15 @@ private fun InlineDecodedImage(bytes: ByteArray?) {
     if (bytes == null) return
     val bitmap = remember(bytes) { runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }.getOrNull() }
     bitmap?.let {
-        androidx.compose.foundation.Image(
-            bitmap = it.asImageBitmap(),
-            contentDescription = null,
+        com.example.ui.components.ZoomableBox(
             modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        )
+        ) {
+            androidx.compose.foundation.Image(
+                bitmap = it.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 }
 

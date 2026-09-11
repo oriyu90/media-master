@@ -26,6 +26,8 @@ import androidx.compose.ui.draganddrop.toAndroidDragEvent
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.isSecondaryPressed
@@ -43,12 +45,44 @@ import com.example.R
 import com.example.SettingsViewModel
 import java.io.File
 
-/** A large tablet or foldable is not DeX: use Android's desk-mode signal only. */
+/**
+ * A large tablet or foldable is not desktop mode by itself: the width gate in
+ * MainNavigation (maxWidth >= 600.dp) handles that. This function only decides
+ * whether the *window itself* is being presented in a desktop/DeX-like way.
+ *
+ * UI_MODE_TYPE_DESK is the legacy classic-Samsung-DeX signal, but One UI 8
+ * (Android 16-based) replaced classic DeX with Android's own desktop windowing
+ * and no longer reliably sets this flag while genuinely running in a desktop
+ * window — which is the root cause of "DeX mode but the app stays in phone
+ * mode". Android's own desktop-windowing guidance doesn't rely on uiMode either;
+ * a freeform/desktop-windowed session (old or new DeX, or generic Android
+ * desktop windowing) is instead identifiable by the presence of a system
+ * caption/title bar, which phone and normal fullscreen tablet layouts never
+ * have. Check both signals so older devices that do still report
+ * UI_MODE_TYPE_DESK keep working.
+ */
 @Composable
 fun isDesktopLayout(): Boolean {
     val configuration = LocalConfiguration.current
     val uiType = configuration.uiMode and Configuration.UI_MODE_TYPE_MASK
-    return uiType == Configuration.UI_MODE_TYPE_DESK
+    val legacyDex = uiType == Configuration.UI_MODE_TYPE_DESK
+    val captionBarVisible = isCaptionBarVisible()
+    return legacyDex || captionBarVisible
+}
+
+@Composable
+private fun isCaptionBarVisible(): Boolean {
+    // WindowInsets.captionBar recomposes automatically as insets change (e.g. the
+    // window gains/loses its title bar while docking to or undocking from a
+    // desktop session), unlike a one-shot ViewCompat lookup. Fall back to a
+    // direct root-insets check if the compose accessor ever returns a stale
+    // zero (e.g. before the first inset pass has run).
+    val density = LocalDensity.current
+    val composeInsetHeight = WindowInsets.captionBar.getBottom(density)
+    if (composeInsetHeight > 0) return true
+    val view = LocalView.current
+    return androidx.core.view.ViewCompat.getRootWindowInsets(view)
+        ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.captionBar()) == true
 }
 
 private data class DesktopTab(val id: Long, val title: String, val route: String)

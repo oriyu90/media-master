@@ -103,7 +103,7 @@ fun MainNavigation(
                         MediaNavHost(navController, fileViewModel, settingsViewModel, true, onPinFolder, onOpenFolderInNewTab)
                     }
                     com.example.playback.MiniPlayer(
-                        onNavigateToAudio = { navController.navigate("audio") { launchSingleTop = true } },
+                        onNavigateToAudio = { navController.navigate("nowPlaying") { launchSingleTop = true } },
                         modifier = Modifier.align(Alignment.BottomCenter),
                     )
                 }
@@ -111,7 +111,7 @@ fun MainNavigation(
                 Box(modifier = Modifier.fillMaxSize()) {
                     MediaNavHost(navController, fileViewModel, settingsViewModel, false)
                     com.example.playback.MiniPlayer(
-                        onNavigateToAudio = { navController.navigate("audio") { launchSingleTop = true } },
+                        onNavigateToAudio = { navController.navigate("nowPlaying") { launchSingleTop = true } },
                         modifier = Modifier.align(Alignment.BottomCenter),
                     )
                 }
@@ -145,6 +145,8 @@ private fun MediaNavHost(
         composable("home") { if (desktop) DesktopHomeScreen(navController) else HomeScreen(navController) }
         composable("library") { LibraryScreen(fileViewModel, navController) }
         composable("audio") { AudioScreen(fileViewModel, navController) }
+        composable("nowPlaying") { NowPlayingScreen(navController) }
+        composable("equalizer") { EqualizerScreen(navController) }
         composable("documents") { DocumentsScreen(fileViewModel, navController) }
         composable("manage") { ManageDashboardScreen(navController, fileViewModel) }
         composable(

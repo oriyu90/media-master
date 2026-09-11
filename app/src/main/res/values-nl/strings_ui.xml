@@ -10,4 +10,22 @@
     <string name="all">Alles</string>
     <string name="export_as_jpg">JPG exporteren</string>
     <string name="exported_jpg_pages">JPG-pagina\'s opgeslagen in Afbeeldingen</string>
+    <string name="now_playing">Nu aan het afspelen</string>
+    <string name="repeat">Herhalen</string>
+    <string name="repeat_off">Herhalen uit</string>
+    <string name="repeat_all">Alles herhalen</string>
+    <string name="repeat_one">Één herhalen</string>
+    <string name="equalizer">Equalizer</string>
+    <string name="preset">Voorinstelling</string>
+    <string name="reset">Resetten</string>
+    <string name="unknown_artist">Onbekende artiest</string>
+    <string name="recent_files">Recente bestanden</string>
+    <string name="other_files">Overig</string>
+    <string name="storage_used_of_total">%1$s gebruikt van %2$s</string>
+    <string name="move">Verplaatsen</string>
+    <string name="copy">Kopiëren</string>
+    <string name="move_here">Hierheen verplaatsen</string>
+    <string name="copy_here">Hierheen kopiëren</string>
+    <string name="search">Zoeken</string>
+    <string name="search_files">Bestanden zoeken</string>
 </resources>

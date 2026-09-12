@@ -4,6 +4,15 @@ Media Master is an open-source Android media and file manager built with Kotlin 
 
 Media Master は、Kotlin と Jetpack Compose で開発されたオープンソースのAndroid向けメディア・ファイル管理アプリです。写真・動画、音楽、書類、ストレージ、アプリ／APK、編集、バックアップを1つのアプリで扱えます。
 
+## v1.5.0
+
+- **Manage → Images/Videos now open in grid view by default** (previously list view for every category, including photos/videos where a tile grid reads much faster).
+- **Real thumbnails and correct icons across every Manage-related screen:** the file browser (`FilesScreen`), Audio track list, and the Manage dashboard's "Recent files" strip previously showed the same generic document icon for every non-directory file, with no distinction between images, videos, music, or documents. A new shared `MediaThumbnail` component (matching the pattern already used by the Library grid) now renders real image/video thumbnails, extracts embedded album art for audio (falling back to a music-note icon when a track has none), and shows the correct type icon otherwise.
+- **DeX / OEM desktop-mode detection extended:** in addition to the existing `UI_MODE_TYPE_DESK` and system-caption-bar signals, the app now also checks `Activity.isInMultiWindowMode()`. OEM desktop shells such as Lenovo's PC Mode/Productivity Mode on ZUI don't expose a public detection API and may not set either of the existing signals, but still run the app as an Android freeform/multi-window session under the hood — this is the most portable additional signal available without an OEM-specific SDK. As before, the existing window-width gate (≥600dp) still keeps narrow split-screen windows in the touch UI.
+- **Library redesigned closer to Google Photos:** photos/videos are now grouped into day sections with date headers (instead of one flat grid), and the view opens scrolled to the newest item at the bottom rather than the oldest at the top. A pinch gesture switches to a denser, ungrouped "all photos" grid with name/date/size/type sorting; pinching back out returns to the date-grouped view.
+- **Library multi-select gains full file management:** select-all, delete, and a folder/album menu (move to folder, copy, with the ability to create a new folder from the destination picker) are now available alongside the existing share action — matching what the Manage → Images/Videos category screen already had.
+- Version `1.5.0` (`versionCode 9`), signed with the same upload key as v0.1.0–v1.4.0 (APK Signature Scheme v2 verified). **APK SHA-256: `94647242f431bfec7919fbbe24700ef6e3d0f04aa871127056a7b59ef3a6dc01`.**
+
 ## v1.4.0
 
 - **DeX / desktop-windowing detection fixed:** the desktop shell used to key off `Configuration.UI_MODE_TYPE_DESK` alone, which Samsung's One UI 8 (Android 16-based) no longer sets reliably now that classic DeX has been replaced by Android's own desktop windowing. Detection now also checks for a system caption bar (present on any freeform/desktop-windowed session, old or new DeX included), so the desktop UI activates correctly on current devices while the existing width gate still keeps small popup/split-screen windows in the touch UI.

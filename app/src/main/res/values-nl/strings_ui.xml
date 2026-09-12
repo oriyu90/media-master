@@ -28,4 +28,7 @@
     <string name="copy_here">Hierheen kopiëren</string>
     <string name="search">Zoeken</string>
     <string name="search_files">Bestanden zoeken</string>
+    <string name="new_folder">Nieuwe map</string>
+    <string name="folder_name">Mapnaam</string>
+    <string name="create">Maken</string>
 </resources>

@@ -3,9 +3,11 @@ package com.example.ui
 
 import android.net.Uri
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
@@ -281,7 +283,17 @@ fun TracksView(viewState: ViewState, navController: NavHostController, selectedF
                         ListItem(
                             headlineContent = { Text(file.name) },
                             supportingContent = { Text(File(file.path).parentFile?.name ?: stringResource(R.string.unknown)) },
-                            leadingContent = { Icon(Icons.Default.Audiotrack, contentDescription = null) },
+                            leadingContent = {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    com.example.ui.components.MediaThumbnail(file = file, modifier = Modifier.fillMaxSize())
+                                }
+                            },
                             trailingContent = {
                                 if (isSelected) {
                                     Icon(Icons.Default.CheckCircle, contentDescription = stringResource(R.string.selected), tint = MaterialTheme.colorScheme.primary)

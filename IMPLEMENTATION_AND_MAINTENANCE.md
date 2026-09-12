@@ -1,4 +1,4 @@
-# Media Master v1.4.0 実装・保守メモ
+# Media Master v1.5.0 実装・保守メモ
 
 最終更新: 2026-09-12
 
@@ -6,21 +6,32 @@
 
 | 項目 | 内容 |
 | --- | --- |
-| バージョン | `1.4.0` (`versionCode 8`) |
+| バージョン | `1.5.0` (`versionCode 9`) |
 | アプリケーションID | `com.yukiorita.mediamaster` |
 | 最小 SDK / target SDK | 24 / 36 |
 | ライセンス | MIT |
 | 著作者 | Yuki_Orita |
-| release APK | `app/build/outputs/apk/release/app-release-signed.apk`（R8 + resource shrink 有効） |
-| APK SHA-256 | `2051ca8e092dd68a1bcdf0b2b65f40e8953ad80d66fa763cd5d1395e8cd4ad93` |
-| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.3.0 と同一鍵） |
-| GitHub Release | `v1.4.0` (GitHub Releases) |
+| release APK | `app/build/outputs/apk/release/app-release.apk`（R8 + resource shrink 有効） |
+| APK SHA-256 | `94647242f431bfec7919fbbe24700ef6e3d0f04aa871127056a7b59ef3a6dc01` |
+| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.4.0 と同一鍵） |
+| GitHub Release | `v1.5.0` (GitHub Releases) |
 
-release APK は RSA 4096 ビット鍵・APK Signature Scheme v2+v3 署名（`apksigner verify` で確認済み）。署名鍵は `common-rules-document/keystores/media-master-upload-key.jks`（alias `upload`）。公開前には毎回 `apksigner verify --verbose` で署名を確認してください。
+release APK は RSA 4096 ビット鍵・APK Signature Scheme v2 署名（`apksigner verify` で確認済み。v1無効、v3/v4はminSdk/AGP設定上有効化されていない——これまでの全リリースと同一の挙動）。署名鍵は `common-rules-document/keystores/media-master-upload-key.jks`（alias `upload`）。公開前には毎回 `apksigner verify --verbose` で署名を確認してください。
 
-v1.4.0 はJDK21+R8有効ビルドで`:app:assembleDebug`/`:app:assembleRelease`/`:app:testDebugUnitTest`(68件)/`:app:lintDebug`(0エラー)を確認。**実機（エミュレータ）デバッグ実施済み**——本番署名済みAPKをクリーンインストールしてクラッシュがないことを確認する手順を、v1.3.0の教訓どおり今回も実施した（下記「v1.4.0 実機デバッグ」参照）。
+v1.5.0 はJDK21+R8有効ビルドで`:app:assembleDebug`/`:app:assembleRelease`/`:app:testDebugUnitTest`(68件)/`:app:lintDebug`(0エラー)を確認。**実機（エミュレータ）デバッグ実施済み**——本番署名済みAPKをクリーンインストールしてクラッシュがないことを確認する手順を、v1.3.0/v1.4.0の教訓どおり今回も実施した（下記「v1.5.0 実機デバッグ」参照）。
 
-v1.3.0 は JDK 21 + R8 有効ビルドで `:app:assembleDebug` / `:app:assembleRelease` が成功。単体テスト68件全て通過（`DeepLinksTest`含む）。`lintDebug` はエラー0件。**実機デバッグ実施済み**（下記「v1.3.0 実機デバッグ」節参照、Android 14 arm64エミュレータ）。旧リリースの APK SHA-256: v1.3.0（実機デバッグ後の最終版）`500ec32227858828e81370fc6b5d90f39495fc8b081a398a860610953ad06058`、v1.2.0 `a9be2530fc51397582a820b9e9c7404dad3d1374d685838e0170de495e591c33`、v1.1.0 `fe75d958b3c811a48582058903d95947b1f97ad108b8c23fd5338ec6ae8eb9a3`、v1.0.0 `255d8ed2b60e1f7a3dd51d1f933b08ae39cc7fa9a8398149202cb20d038b0082`、v0.3.0 `5f896b1bd15a65b4a947c428490ca63cc0ea0cac81332d89477029b5fe3d4bab`。
+v1.4.0 は JDK21+R8有効ビルドで`:app:assembleDebug`/`:app:assembleRelease`/`:app:testDebugUnitTest`(68件)/`:app:lintDebug`(0エラー)を確認。実機（エミュレータ）デバッグ実施済み。旧リリースの APK SHA-256: v1.4.0 `2051ca8e092dd68a1bcdf0b2b65f40e8953ad80d66fa763cd5d1395e8cd4ad93`、v1.3.0（実機デバッグ後の最終版）`500ec32227858828e81370fc6b5d90f39495fc8b081a398a860610953ad06058`、v1.2.0 `a9be2530fc51397582a820b9e9c7404dad3d1374d685838e0170de495e591c33`、v1.1.0 `fe75d958b3c811a48582058903d95947b1f97ad108b8c23fd5338ec6ae8eb9a3`、v1.0.0 `255d8ed2b60e1f7a3dd51d1f933b08ae39cc7fa9a8398149202cb20d038b0082`、v0.3.0 `5f896b1bd15a65b4a947c428490ca63cc0ea0cac81332d89477029b5fe3d4bab`。
+
+## v1.5.0 実機デバッグ（2026-09、ユーザー依頼によるリリース前スモーク）
+
+エミュレータ（API 34, arm64, Google APIs, `mm_test` AVD）へテスト用の画像（日付をずらした8枚のJPEG）・音声ファイルを配置し、デバッグビルドで新機能を実際に操作して確認した：
+
+- Manage → Images/Videos がデフォルトでタイル(グリッド)表示になることを確認。
+- Manage の「最近のファイル」で画像の実サムネイルが表示されることを確認（従来は汎用アイコン固定）。Audioのトラック一覧でアルバムアートが無い曲は音符アイコンに正しくフォールバックすることを確認。
+- Library（写真&動画）が日付ごとにグルーピングされ（"Sep 10, 2026" 等の見出し）、初期表示が自動的に最下部（最新の写真）までスクロールされていることを確認。
+- Library の複数選択で「1 selected」ツールバーに全選択・共有・フォルダメニュー（移動/コピー）・削除の4アクションが表示されることを確認。フォルダメニュー→移動→新規フォルダ作成（"TestAlbum"）→作成したフォルダへの移動、を最後まで実行し、実ファイルシステム上でファイルが正しく移動され（移動元から削除・移動先に出現）、Library側の表示にも反映されることを確認。
+- `Activity.isInMultiWindowMode()` の追加は、`adb shell am start --windowingMode 5`（freeform）でアプリを起動した際に、OSの`dumpsys activity`上で`mWindowingMode=freeform`として認識されることを確認した（この小型エミュレータでは幅ゲート`600dp`を満たす広いフリーフォームウィンドウを作れなかったため、デスクトップUIへの実際の切替までは検証できていない。**Lenovo Tab 11インチ実機のPCモードでの最終確認を推奨**）。
+- 本番署名済みAPK（`apksigner`でv2署名・検証済み、証明書はv0.1.0〜v1.4.0と同一）をアンインストール→クリーンインストールし、起動・Library・Audio画面まで操作してクラッシュがないことを確認。`adb logcat`にFATAL EXCEPTION・AndroidRuntimeエラーは0件。
 
 ## v1.4.0 実機デバッグ（2026-09、ユーザー依頼によるリリース前スモーク）
 
@@ -103,6 +114,46 @@ Android SDK cmdline-tools経由でAPI 34 arm64（Google APIs）システムイ�
 Shift_JIS/バイナリの全形式を実際にタップで開き、削除・共有・既定アプリ設定導線を含めて
 スクリーンショットとlogcat（`-b crash`）で確認。上記4件を検出・修正後、同じ手順で再検証し
 問題なしを確認してから、本番署名鍵で最終APKを作成しGitHub Releaseを差し替えた。
+
+## v1.5.0 の実装内容（Manage/ライブラリ追加改善5件）
+
+実機（Lenovo Tab 11インチ）での使用を通じて出た5件の指摘への対応。
+
+### 1. Manage → 画像/動画のデフォルト表示
+`FileViewModel`の`_categoryViewMode`はカテゴリ非依存の単一StateFlowのため、`CategoryScreen`側で
+`LaunchedEffect(categoryName)`により入場時にカテゴリ種別に応じた初期値（IMAGES/VIDEOSはGRID、
+それ以外はLIST）を設定するようにした。
+
+### 2. サムネイル/アイコン表示の統一
+新規共有コンポーネント`ui/components/MediaThumbnail.kt`が、`CategoryScreen`/`LibraryScreen`で
+確立済みの「画像/動画は`AsyncImage(model = file.contentUri ?: File(file.path))`」パターンを一般化。
+音声は`MediaMetadataRetriever.embeddedPicture`を`produceState`+`Dispatchers.IO`で非同期抽出し、
+無ければ`Icons.Default.MusicNote`にフォールバック。`FilesScreen`/`AudioScreen`/
+`ManageDashboardScreen`の3箇所（従来はいずれも常に汎用アイコン固定だった）に適用。
+
+### 3. DeX / Lenovo PCモード判定の拡張
+`Activity.isInMultiWindowMode()`を`DesktopNavigation.kt`の`isDesktopLayout()`にOR条件で追加。
+LenovoのPCモード/Productivity Modeのような、第三者向け検出APIを公開していないOEM独自の
+デスクトップシェルは、内部的にはAndroid標準のフリーフォーム/マルチウィンドウとしてアプリを
+ホストしていることが多く、これが現状取得できる最も汎用的な追加シグナル。ただし100%の保証は
+できないため、実機での最終確認が必要（上記「v1.5.0 実機デバッグ」参照）。
+
+### 4. ライブラリのGoogleフォト風グルーピング・ピンチ密度切替
+`LibraryScreen`にローカルな`LibraryDensityMode`(`BY_DATE`/`COMPACT_ALL`)を導入。
+- `BY_DATE`（デフォルト）: `dayKey()`で日付ごとにグルーピングし、`LazyVerticalGrid`の
+  `item(span = { GridItemSpan(maxLineSpan) })`で日付見出し行を挿入。データロード後に
+  一度だけ`LazyGridState.scrollToItem()`で最下部（最新）へ自動スクロール。
+- `COMPACT_ALL`: `Modifier.pointerInput`+`awaitEachGesture`+`calculateZoom`で2本指ピンチのみを
+  検知（1本指ドラッグは`event.changes.size < 2`のため一切consumeせず、グリッドの通常スクロールと
+  非干渉）し、フラットな小さめグリッド＋`sortMediaFiles()`（`FileViewModel`から共有関数として
+  抽出、`MediaFile.kt`に配置）による並び替えメニューへ切替。
+
+### 5. ライブラリ複数選択アクションの拡張
+`LibraryScreen`の選択モードツールバーに全選択・削除（`ConfirmDeleteDialog`再利用）・
+フォルダ/アルバムメニュー（移動/コピー、`components/FolderPickerDialog`+
+`FileViewModel.moveFile`/`copyFile`を再利用）を追加。`FolderPickerDialog`自体にも
+新規フォルダ作成ボタン（`AlertDialog`+`File.mkdir()`）を追加し、`FilesScreen`側の
+移動/コピーにも自動的に反映される。
 
 ## v1.4.0 の実装内容（安定性・UX改善6件）
 
@@ -722,7 +773,9 @@ Shift_JIS/バイナリの全形式を実際にタップで開き、削除・共�
 | `app/src/main/java/com/example/ui/components/ZoomableBox.kt` | 動画/PDF/Office埋め込み画像向け共有ピンチズームコンポーネント（v1.4.0〜） |
 | `app/src/main/java/com/example/playback/EqualizerController.kt` | システムイコライザー制御（v1.4.0〜） |
 | `app/src/main/java/com/example/ui/NowPlayingScreen.kt`・`EqualizerScreen.kt` | 音楽プレイヤーのフル画面UI（v1.4.0〜） |
-| `app/src/main/java/com/example/ui/components/BreadcrumbBar.kt`・`FolderPickerDialog.kt` | 管理画面のパンくず・移動/コピー先フォルダピッカー（v1.4.0〜） |
+| `app/src/main/java/com/example/ui/components/BreadcrumbBar.kt`・`FolderPickerDialog.kt` | 管理画面のパンくず・移動/コピー先フォルダピッカー（新規フォルダ作成はv1.5.0〜）（v1.4.0〜） |
+| `app/src/main/java/com/example/ui/components/MediaThumbnail.kt` | 画像/動画/音声/フォルダの共有サムネイル・アイコン表示（v1.5.0〜） |
+| `app/src/main/java/com/example/ui/LibraryScreen.kt` | ライブラリ（日付グルーピング・ピンチ密度切替・複数選択アクション、v1.5.0で全面改修） |
 | `app/src/main/java/com/example/SettingsRepository.kt` | DataStore設定（ピン留めを含む） |
 | `app/src/main/java/com/example/SettingsViewModel.kt` | 設定操作のViewModel |
 | `app/src/main/res/values*/strings*.xml` | UI翻訳リソース |

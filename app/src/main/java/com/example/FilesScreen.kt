@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.draganddrop.dragAndDropSource
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.*
@@ -24,6 +25,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draganddrop.DragAndDropTransferData
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -439,20 +441,32 @@ fun FileItemRow(
             { Text("${formatSize(file.size)} • ${formatDate(file.dateModified)}") }
         } else null,
         leadingContent = {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(
-                        if (file.isDirectory) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant, 
-                        shape = androidx.compose.foundation.shape.CircleShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (file.isDirectory) Icons.Default.Folder else Icons.AutoMirrored.Filled.InsertDriveFile,
-                    contentDescription = null,
-                    tint = if (file.isDirectory) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            if (file.isDirectory) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(MaterialTheme.colorScheme.primaryContainer, shape = androidx.compose.foundation.shape.CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Folder,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentAlignment = Alignment.Center
+                ) {
+                    com.example.ui.components.MediaThumbnail(
+                        file = file,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
         },
         trailingContent = if (isSelected) {
@@ -540,26 +554,43 @@ fun FileItemGrid(
         elevation = CardDefaults.cardElevation(if (isSelected) 4.dp else 0.dp)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Icon(
-                    imageVector = if (file.isDirectory) Icons.Default.Folder else Icons.AutoMirrored.Filled.InsertDriveFile,
-                    contentDescription = null,
-                    tint = if (file.isDirectory) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(48.dp)
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = file.name,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    fontWeight = if (file.isDirectory) androidx.compose.ui.text.font.FontWeight.Medium else androidx.compose.ui.text.font.FontWeight.Normal
-                )
+            if (file.isDirectory) {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Folder,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = file.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
+                    )
+                }
+            } else {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    com.example.ui.components.MediaThumbnail(
+                        file = file,
+                        modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                    )
+                    Text(
+                        text = file.name,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(4.dp)
+                    )
+                }
             }
             if (isSelected) {
                 Icon(

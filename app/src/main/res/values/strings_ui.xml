@@ -108,4 +108,7 @@
     <string name="copy_here">Copy here</string>
     <string name="search">Search</string>
     <string name="search_files">Search files</string>
+    <string name="new_folder">New folder</string>
+    <string name="folder_name">Folder name</string>
+    <string name="create">Create</string>
 </resources>

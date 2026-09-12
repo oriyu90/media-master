@@ -1,7 +1,29 @@
 # 設計書兼仕様書 (Media Master)
 
 ## バージョン情報
-- **Version:** 1.4.0
+- **Version:** 1.5.0
+
+## v1.5.0 の設計変更（要約）
+- **管理カテゴリのデフォルト表示をカテゴリ種別で出し分け**: `CategoryScreen`が
+  `MediaCategory.IMAGES`/`VIDEOS`のときだけ`ViewMode.GRID`をデフォルトにする
+  （`LaunchedEffect(categoryName)`で入場時に設定、ユーザーの手動切替はセッション中は尊重）。
+- **サムネイル表示を`MediaThumbnail`として共通化**: `FilesScreen`/`AudioScreen`/
+  `ManageDashboardScreen`が個別に持っていた「常に汎用アイコン」実装を、
+  `CategoryScreen`/`LibraryScreen`で確立済みの実サムネイルパターンに統一。
+  音声は`MediaMetadataRetriever`で埋め込みアートワークを抽出（`produceState`+IOディスパッチャ）。
+- **DeX判定に`Activity.isInMultiWindowMode()`を追加**: LenovoのPCモード等、
+  公開検出APIを持たないOEM独自デスクトップシェルはOSのフリーフォーム/
+  マルチウィンドウとしてアプリを起動するため、既存の`UI_MODE_TYPE_DESK`/
+  キャプションバー検出に次ぐ3つ目の信号として追加（幅ゲートは維持）。
+- **ライブラリをGoogleフォト型（日付グルーピング+ピンチ密度切替）に再設計**:
+  `LibraryScreen`内でローカルな`LibraryDensityMode`（`BY_DATE`/`COMPACT_ALL`）を保持し、
+  2本指ズームジェスチャー（`awaitEachGesture`+`calculateZoom`、1本指スクロールとは
+  非干渉）で切替。`BY_DATE`は日付キーでグルーピングした`LazyVerticalGrid`+
+  初回のみ最下部へ自動スクロール、`COMPACT_ALL`は共通化した`sortMediaFiles`
+  （`FileViewModel`から抽出）で並び替え可能なフラットグリッド。
+- **ライブラリの複数選択アクションを`CategoryScreen`/`FilesScreen`水準に拡張**:
+  全選択・削除・移動/コピー（既存の`FolderPickerDialog`+`moveFile`/`copyFile`を再利用）。
+  `FolderPickerDialog`自体に新規フォルダ作成機能を追加。
 
 ## v1.4.0 の設計変更（要約）
 - **DeX判定をウィンドウサイズ+キャプションバー検出の二段構えに変更**: `UI_MODE_TYPE_DESK`

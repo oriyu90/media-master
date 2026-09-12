@@ -79,6 +79,16 @@ fun CategoryScreen(categoryName: String, viewModel: FileViewModel, navController
         viewModel.loadAllMedia()
     }
 
+    LaunchedEffect(categoryName) {
+        val category = MediaCategory.fromKey(categoryName)
+        val defaultMode = if (category == MediaCategory.IMAGES || category == MediaCategory.VIDEOS) {
+            ViewMode.GRID
+        } else {
+            ViewMode.LIST
+        }
+        viewModel.setCategoryViewMode(defaultMode)
+    }
+
     Scaffold(
         topBar = {
             if (isSelectionMode) {

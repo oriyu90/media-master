@@ -28,4 +28,7 @@
     <string name="copy_here">نسخ إلى هنا</string>
     <string name="search">بحث</string>
     <string name="search_files">البحث عن ملفات</string>
+    <string name="new_folder">مجلد جديد</string>
+    <string name="folder_name">اسم المجلد</string>
+    <string name="create">إنشاء</string>
 </resources>

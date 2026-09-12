@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,8 +33,41 @@ fun FolderPickerDialog(
     onConfirm: (String) -> Unit,
 ) {
     var currentDir by remember { mutableStateOf(File(startPath).takeIf { it.isDirectory } ?: File(startPath).parentFile ?: File(startPath)) }
-    val subDirs = remember(currentDir) {
+    var refreshTrigger by remember { mutableIntStateOf(0) }
+    var showNewFolderDialog by remember { mutableStateOf(false) }
+    val subDirs = remember(currentDir, refreshTrigger) {
         currentDir.listFiles { f -> f.isDirectory }?.sortedBy { it.name.lowercase() } ?: emptyList()
+    }
+
+    if (showNewFolderDialog) {
+        var newFolderName by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showNewFolderDialog = false },
+            title = { Text(stringResource(R.string.new_folder)) },
+            text = {
+                OutlinedTextField(
+                    value = newFolderName,
+                    onValueChange = { newFolderName = it },
+                    label = { Text(stringResource(R.string.folder_name)) },
+                    singleLine = true,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val name = newFolderName.trim()
+                        if (name.isNotEmpty()) {
+                            File(currentDir, name).mkdir()
+                            refreshTrigger++
+                        }
+                        showNewFolderDialog = false
+                    }
+                ) { Text(stringResource(R.string.create)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNewFolderDialog = false }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
     }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
@@ -46,6 +80,11 @@ fun FolderPickerDialog(
                             IconButton(onClick = { currentDir = parent }) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                             }
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { showNewFolderDialog = true }) {
+                            Icon(Icons.Default.CreateNewFolder, contentDescription = stringResource(R.string.new_folder))
                         }
                     },
                 )

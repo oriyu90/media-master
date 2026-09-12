@@ -28,4 +28,7 @@
     <string name="copy_here">复制到此处</string>
     <string name="search">搜索</string>
     <string name="search_files">搜索文件</string>
+    <string name="new_folder">新建文件夹</string>
+    <string name="folder_name">文件夹名称</string>
+    <string name="create">创建</string>
 </resources>

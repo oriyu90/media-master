@@ -202,11 +202,19 @@ private fun RecentFilesRow(mediaViewState: ViewState, onOpen: (MediaFile) -> Uni
                     modifier = Modifier.width(96.dp).clickable { onOpen(file) },
                 ) {
                     Column(modifier = Modifier.padding(8.dp)) {
-                        Icon(
-                            categoryIconFor(file),
-                            contentDescription = null,
-                            modifier = Modifier.size(32.dp),
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (file.isDirectory) {
+                                Icon(categoryIconFor(file), contentDescription = null, modifier = Modifier.size(32.dp))
+                            } else {
+                                com.example.ui.components.MediaThumbnail(file = file, modifier = Modifier.fillMaxSize())
+                            }
+                        }
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             file.name,

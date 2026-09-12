@@ -32,4 +32,7 @@
     <string name="copy_here">ここにコピー</string>
     <string name="search">検索</string>
     <string name="search_files">ファイルを検索</string>
+    <string name="new_folder">新規フォルダ</string>
+    <string name="folder_name">フォルダ名</string>
+    <string name="create">作成</string>
 </resources>

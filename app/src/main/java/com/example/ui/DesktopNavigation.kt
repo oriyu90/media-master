@@ -67,7 +67,25 @@ fun isDesktopLayout(): Boolean {
     val uiType = configuration.uiMode and Configuration.UI_MODE_TYPE_MASK
     val legacyDex = uiType == Configuration.UI_MODE_TYPE_DESK
     val captionBarVisible = isCaptionBarVisible()
-    return legacyDex || captionBarVisible
+    val multiWindow = isInMultiWindowMode()
+    return legacyDex || captionBarVisible || multiWindow
+}
+
+/**
+ * OEM desktop/PC modes (e.g. Lenovo's "PC Mode"/"Productivity Mode" on ZUI)
+ * are proprietary freeform window managers with no public detection API and
+ * don't necessarily set UI_MODE_TYPE_DESK or a caption bar. Under the hood
+ * they still host the app as an Android multi-window/freeform session, so
+ * Activity.isInMultiWindowMode() is the most portable fallback signal
+ * available without an OEM-specific SDK. Combined with the maxWidth >= 600.dp
+ * gate in MainNavigation, this avoids switching narrow split-screen windows
+ * into the desktop UI while still catching wide OEM desktop-mode windows.
+ */
+@Composable
+private fun isInMultiWindowMode(): Boolean {
+    val context = LocalContext.current
+    val activity = context as? android.app.Activity ?: return false
+    return activity.isInMultiWindowMode
 }
 
 @Composable

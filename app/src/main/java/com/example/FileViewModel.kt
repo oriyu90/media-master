@@ -138,14 +138,7 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
         _viewMode.update { mode }
     }
 
-    private fun sortFiles(files: List<MediaFile>): List<MediaFile> {
-        return when (_sortOption.value) {
-            SortOption.NAME -> files.sortedBy { it.name.lowercase() }
-            SortOption.DATE_CREATED -> files.sortedByDescending { it.dateModified }
-            SortOption.SIZE -> files.sortedByDescending { it.size }
-            SortOption.TYPE -> files.sortedBy { it.mimeType }
-        }
-    }
+    private fun sortFiles(files: List<MediaFile>): List<MediaFile> = sortMediaFiles(files, _sortOption.value)
 
     fun reload() {
         // Cancel in-flight loads so only the latest request can publish.

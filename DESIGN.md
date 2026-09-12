@@ -1,7 +1,18 @@
 # 設計書兼仕様書 (Media Master)
 
 ## バージョン情報
-- **Version:** 1.5.0
+- **Version:** 1.6.0
+
+## v1.6.0 の設計変更（要約）
+- **ビューアーのスワイプナビゲーション修正**: `HorizontalPager`自体はv1.0.0から存在していたが、
+  画像のピンチズームジェスチャー（`detectTransformGestures`）と動画`PlayerView`（ネイティブView）
+  が等倍/コントローラー表示中でも1本指の横ドラッグを無条件に消費し、ページャーへスワイプが
+  届いていなかった。画像側は「2本指またはズーム中のみ消費」に変更、動画側はPlayerViewより
+  手前でInitialパスの軽量スワイプ検出を追加し、ページ送りを直接駆動するよう修正。
+- **動画の10秒シークボタン**: `ExoPlayer.Builder.setSeekBackIncrementMs`/`setSeekForwardIncrementMs`
+  を10秒に設定し、`PlayerView.setShowRewindButton`/`setShowFastForwardButton`を有効化。
+  タップでコントローラーを表示した際、再生/一時停止ボタンの両脇に表示される
+  （YouTube等と同様の配置。ExoPlayer/media3標準機能のみで実現、独自UIは追加していない）。
 
 ## v1.5.0 の設計変更（要約）
 - **管理カテゴリのデフォルト表示をカテゴリ種別で出し分け**: `CategoryScreen`が

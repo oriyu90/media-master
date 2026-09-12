@@ -1,26 +1,49 @@
-# Media Master v1.5.0 実装・保守メモ
+# Media Master v1.6.0 実装・保守メモ
 
-最終更新: 2026-09-12
+最終更新: 2026-09-13
 
 ## リリース情報
 
 | 項目 | 内容 |
 | --- | --- |
-| バージョン | `1.5.0` (`versionCode 9`) |
+| バージョン | `1.6.0` (`versionCode 10`) |
 | アプリケーションID | `com.yukiorita.mediamaster` |
 | 最小 SDK / target SDK | 24 / 36 |
 | ライセンス | MIT |
 | 著作者 | Yuki_Orita |
 | release APK | `app/build/outputs/apk/release/app-release.apk`（R8 + resource shrink 有効） |
-| APK SHA-256 | `94647242f431bfec7919fbbe24700ef6e3d0f04aa871127056a7b59ef3a6dc01` |
-| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.4.0 と同一鍵） |
-| GitHub Release | `v1.5.0` (GitHub Releases) |
+| APK SHA-256 | `f922b2b2d797f69fe4b1c9a7aca366e9f1664f8b47c8cfbeeb9aaeb02235b615` |
+| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.5.0 と同一鍵） |
+| GitHub Release | `v1.6.0` (GitHub Releases) |
 
 release APK は RSA 4096 ビット鍵・APK Signature Scheme v2 署名（`apksigner verify` で確認済み。v1無効、v3/v4はminSdk/AGP設定上有効化されていない——これまでの全リリースと同一の挙動）。署名鍵は `common-rules-document/keystores/media-master-upload-key.jks`（alias `upload`）。公開前には毎回 `apksigner verify --verbose` で署名を確認してください。
 
-v1.5.0 はJDK21+R8有効ビルドで`:app:assembleDebug`/`:app:assembleRelease`/`:app:testDebugUnitTest`(68件)/`:app:lintDebug`(0エラー)を確認。**実機（エミュレータ）デバッグ実施済み**——本番署名済みAPKをクリーンインストールしてクラッシュがないことを確認する手順を、v1.3.0/v1.4.0の教訓どおり今回も実施した（下記「v1.5.0 実機デバッグ」参照）。
+v1.6.0 はJDK21+R8有効ビルドで`:app:assembleDebug`/`:app:assembleRelease`/`:app:testDebugUnitTest`(68件)/`:app:lintDebug`(0エラー)を確認。**実機（エミュレータ）デバッグ実施済み**——本番署名済みAPKをクリーンインストールしてクラッシュがないことを確認する手順を、これまでのリリースの教訓どおり今回も実施した（下記「v1.6.0 実機デバッグ」参照）。
+
+v1.5.0 はJDK21+R8有効ビルドで`:app:assembleDebug`/`:app:assembleRelease`/`:app:testDebugUnitTest`(68件)/`:app:lintDebug`(0エラー)を確認。実機（エミュレータ）デバッグ実施済み。旧リリースの APK SHA-256: v1.5.0 `94647242f431bfec7919fbbe24700ef6e3d0f04aa871127056a7b59ef3a6dc01`。
 
 v1.4.0 は JDK21+R8有効ビルドで`:app:assembleDebug`/`:app:assembleRelease`/`:app:testDebugUnitTest`(68件)/`:app:lintDebug`(0エラー)を確認。実機（エミュレータ）デバッグ実施済み。旧リリースの APK SHA-256: v1.4.0 `2051ca8e092dd68a1bcdf0b2b65f40e8953ad80d66fa763cd5d1395e8cd4ad93`、v1.3.0（実機デバッグ後の最終版）`500ec32227858828e81370fc6b5d90f39495fc8b081a398a860610953ad06058`、v1.2.0 `a9be2530fc51397582a820b9e9c7404dad3d1374d685838e0170de495e591c33`、v1.1.0 `fe75d958b3c811a48582058903d95947b1f97ad108b8c23fd5338ec6ae8eb9a3`、v1.0.0 `255d8ed2b60e1f7a3dd51d1f933b08ae39cc7fa9a8398149202cb20d038b0082`、v0.3.0 `5f896b1bd15a65b4a947c428490ca63cc0ea0cac81332d89477029b5fe3d4bab`。
+
+## v1.6.0 実機デバッグ（2026-09、ユーザー依頼によるリリース前スモーク）
+
+エミュレータ（API 34, arm64, Google APIs, `mm_test` AVD）へ、日付をずらしたテスト画像2枚とテスト動画1本（ffmpeg生成、40秒）を配置し、デバッグビルドで新機能を実際に操作して確認した：
+
+- ライブラリで写真/動画を開いた状態からのスワイプで次/前のメディアに移動できることを確認。**実装直後の1回目の検証で、画像ページ・動画ページのどちらでもスワイプがページャーまで届かない実際のバグを発見した**（詳細は下記「実機デバッグで発見・修正したバグ」）。修正後、画像→動画・動画→画像・画像→画像のいずれの組み合わせでもスワイプ遷移が機能することを実機で確認済み。
+- 動画再生中に画面をタップすると、再生/一時停止ボタンと左右の「10秒戻す/進む」ボタンが一緒に表示されることを確認。「10秒進む」ボタンをタップし、シークバーの位置が実際に10秒分進むことを確認（例: 00:02→00:12、00:13→00:23）。
+- 上記のスワイプ修正がOCRモードの画像ズーム・トグル操作を壊していないことを確認（OCRボタンのタップでモード切替アイコンが正しく変わることを確認）。
+- 本番相当のデバッグビルドを一連の操作（動画再生・シーク・スワイプ・OCRトグル）の間、`adb logcat`でFATAL EXCEPTION・AndroidRuntimeエラーが0件であることを確認。
+- 本番署名済みAPK（`apksigner`でv2署名・検証済み、証明書はv0.1.0〜v1.5.0と同一）をアンインストール→クリーンインストールし、起動・Library・動画再生まで操作してクラッシュがないことを確認。
+
+### 実機デバッグで発見・修正したバグ（静的チェックでは検出不可能）
+
+- **症状**: ライブラリで写真/動画を開いた直後、画面を1本指で横にスワイプしても次/前のメディアに移動しない（`HorizontalPager`自体は実装済みだったにもかかわらず反応しない）。
+- **原因（画像ページ）**: OCRモード用のピンチズーム・パン検出（`ImageWithOcrOverlay`内の旧`detectTransformGestures`）が、ズームしていない等倍状態でも1本指の横ドラッグを無条件に「パン」として消費してしまい、親の`HorizontalPager`にドラッグイベントが一切渡っていなかった。
+- **原因（動画ページ）**: 上記に加えて、ExoPlayerの`PlayerView`（`AndroidView`経由で埋め込んだネイティブView）が、コントローラー表示用の`GestureDetector`によって`ACTION_DOWN`の時点でジェスチャー全体を握ってしまい、Compose側の`HorizontalPager`が指の動きを一切観測できない状態になっていた（Composeの`AndroidView`相互運用における既知の制約——埋め込みNativeViewは、祖先のCompose側ジェスチャー検出がInitialパス（親→子の順で先に実行される段階）で明示的に消費しない限り、ACTION_DOWNの時点でジェスチャー全体を握ってしまう）。
+- **修正**:
+  - `ImageWithOcrOverlay`（[ViewerScreen.kt](app/src/main/java/com/example/ViewerScreen.kt)）と共有`ZoomableBox`（[ZoomableBox.kt](app/src/main/java/com/example/ui/components/ZoomableBox.kt)）のジェスチャー検出を、「2本指(ピンチ)のとき」または「すでに拡大中のとき」だけイベントを消費するように変更。等倍時の1本指スワイプは消費せずページャーに委ねる。
+  - 動画ページには、`PlayerView`より手前（Compose階層で親側）に独自の軽量スワイプ検出を追加し、Initialパスで横方向のドラッグを検知した時点でイベントを消費して`pagerState.animateScrollToPage()`を直接呼び出すことで、ネイティブ`PlayerView`にジェスチャーを奪われる前にページ送りを行うようにした。
+  - いずれもズーム中（`isZoomedIn`）は無効化し、ズーム操作とスワイプ操作が競合しないようにしている。
+- この種のジェスチャー競合はユニットテスト・lintでは検出できず、実機（エミュレータ含む）での実際のタッチ操作でしか見つからないクラスのバグであり、今回も「実機で動かして初めて分かった」典型例だった。
 
 ## v1.5.0 実機デバッグ（2026-09、ユーザー依頼によるリリース前スモーク）
 
@@ -114,6 +137,12 @@ Android SDK cmdline-tools経由でAPI 34 arm64（Google APIs）システムイ�
 Shift_JIS/バイナリの全形式を実際にタップで開き、削除・共有・既定アプリ設定導線を含めて
 スクリーンショットとlogcat（`-b crash`）で確認。上記4件を検出・修正後、同じ手順で再検証し
 問題なしを確認してから、本番署名鍵で最終APKを作成しGitHub Releaseを差し替えた。
+
+## v1.6.0 の実装内容（ビューアーのスワイプナビゲーション・動画10秒シークボタン）
+
+- **ライブラリのビューアーでスワイプによる次/前メディア移動**: 画像/動画を開いた状態から1本指で左右にスワイプすると、`HorizontalPager`経由で次/前のメディアに移動する。既存の`HorizontalPager`自体はv1.0.0から存在していたが、画像のピンチズーム用ジェスチャーと動画の`PlayerView`（ネイティブView）がスワイプイベントを奪ってしまい実際には機能していなかったバグを、実機デバッグで発見・修正した（詳細は「実機デバッグで発見・修正したバグ」参照）。
+- **動画再生に「10秒戻す/進む」ボタンを追加（YouTube風）**: 再生中に画面をタップすると、中央の再生/一時停止ボタンの両脇に「10秒戻す」「10秒進む」ボタンが表示されるようになった。`ExoPlayer.Builder`の`setSeekBackIncrementMs`/`setSeekForwardIncrementMs`を10秒に設定し、`PlayerView`の`setShowRewindButton`/`setShowFastForwardButton`を有効化することで実現（ExoPlayer/media3標準機能の組み合わせで、独自のシークUIを新規実装する必要はなかった）。
+- 変更ファイルは[ViewerScreen.kt](app/src/main/java/com/example/ViewerScreen.kt)と[ZoomableBox.kt](app/src/main/java/com/example/ui/components/ZoomableBox.kt)のみ。
 
 ## v1.5.0 の実装内容（Manage/ライブラリ追加改善5件）
 
@@ -776,6 +805,7 @@ LenovoのPCモード/Productivity Modeのような、第三者向け検出APIを
 | `app/src/main/java/com/example/ui/components/BreadcrumbBar.kt`・`FolderPickerDialog.kt` | 管理画面のパンくず・移動/コピー先フォルダピッカー（新規フォルダ作成はv1.5.0〜）（v1.4.0〜） |
 | `app/src/main/java/com/example/ui/components/MediaThumbnail.kt` | 画像/動画/音声/フォルダの共有サムネイル・アイコン表示（v1.5.0〜） |
 | `app/src/main/java/com/example/ui/LibraryScreen.kt` | ライブラリ（日付グルーピング・ピンチ密度切替・複数選択アクション、v1.5.0で全面改修） |
+| `app/src/main/java/com/example/ViewerScreen.kt` | 画像/動画/音声ビューアー本体。`HorizontalPager`によるスワイプナビゲーション、動画10秒シークボタン（v1.6.0〜） |
 | `app/src/main/java/com/example/SettingsRepository.kt` | DataStore設定（ピン留めを含む） |
 | `app/src/main/java/com/example/SettingsViewModel.kt` | 設定操作のViewModel |
 | `app/src/main/res/values*/strings*.xml` | UI翻訳リソース |

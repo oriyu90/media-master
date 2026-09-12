@@ -4,6 +4,12 @@ Media Master is an open-source Android media and file manager built with Kotlin 
 
 Media Master は、Kotlin と Jetpack Compose で開発されたオープンソースのAndroid向けメディア・ファイル管理アプリです。写真・動画、音楽、書類、ストレージ、アプリ／APK、編集、バックアップを1つのアプリで扱えます。
 
+## v1.6.0
+
+- **Viewer gains swipe-to-navigate:** opening a photo or video from the Library now lets you swipe left/right to move to the next/previous item, the same gesture as Google Photos. The underlying `HorizontalPager` existed since v1.0.0, but on-device testing found it was silently non-functional — the image's pinch-zoom gesture and the video player's native touch handling both intercepted single-finger swipes before they ever reached the pager. Fixed by only claiming those gestures for an actual pinch or while already zoomed in.
+- **10-second rewind/fast-forward on video playback (YouTube-style):** tapping a playing video now shows rewind/fast-forward buttons alongside play/pause, each jumping 10 seconds.
+- Version `1.6.0` (`versionCode 10`), signed with the same upload key as v0.1.0–v1.5.0 (APK Signature Scheme v2 verified). **APK SHA-256: `f922b2b2d797f69fe4b1c9a7aca366e9f1664f8b47c8cfbeeb9aaeb02235b615`.**
+
 ## v1.5.0
 
 - **Manage → Images/Videos now open in grid view by default** (previously list view for every category, including photos/videos where a tile grid reads much faster).

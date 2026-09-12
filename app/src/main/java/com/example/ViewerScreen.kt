@@ -9,8 +9,11 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -27,7 +30,9 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -153,7 +158,12 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
         // Single player for the whole viewer session: pages share it instead of
         // each building an ExoPlayer (pager keeps neighbours composed, which
         // previously held up to 3 decoder instances alive at once).
-        val viewerPlayer = remember { ExoPlayer.Builder(context).build() }
+        val viewerPlayer = remember {
+            ExoPlayer.Builder(context)
+                .setSeekBackIncrementMs(10_000L)
+                .setSeekForwardIncrementMs(10_000L)
+                .build()
+        }
         DisposableEffect(viewerPlayer) {
             onDispose { viewerPlayer.release() }
         }
@@ -323,23 +333,69 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
                         // player to several PlayerViews would move the video output
                         // to an off-screen page. Neighbours show a placeholder.
                         if (page == pagerState.currentPage) {
-                            com.example.ui.components.ZoomableBox(
-                                modifier = Modifier.fillMaxSize(),
-                                enabled = pageIsVideo,
-                                onZoomChanged = { isZoomedIn = it },
-                            ) {
-                                AndroidView(
-                                    factory = {
-                                        PlayerView(context).apply {
-                                            player = viewerPlayer
-                                            setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { visibility ->
-                                                isFullScreen = visibility != android.view.View.VISIBLE
-                                            })
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    // ExoPlayer's PlayerView claims the whole gesture from
+                                    // ACTION_DOWN (for its tap-to-show-controls detector),
+                                    // which otherwise stops a single-finger swipe from ever
+                                    // reaching HorizontalPager: an embedded AndroidView wins
+                                    // touch ownership from any Compose ancestor whose own
+                                    // drag detection runs on the (later, child-to-parent)
+                                    // Main pass. Detecting the swipe ourselves on the
+                                    // (earlier, parent-to-child) Initial pass — before the
+                                    // event is forwarded into the native view — lets us
+                                    // consume it and drive the page change manually instead.
+                                    .pointerInput(pagerState.currentPage, mediaList.size) {
+                                        var dragTotal = Offset.Zero
+                                        var handedToPager = false
+                                        awaitEachGesture {
+                                            awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                                            dragTotal = Offset.Zero
+                                            handedToPager = false
+                                            do {
+                                                val event = awaitPointerEvent(PointerEventPass.Initial)
+                                                if (event.changes.size == 1) {
+                                                    val change = event.changes[0]
+                                                    dragTotal += change.positionChange()
+                                                    if (!handedToPager && !isZoomedIn &&
+                                                        kotlin.math.abs(dragTotal.x) > 60f &&
+                                                        kotlin.math.abs(dragTotal.x) > kotlin.math.abs(dragTotal.y) * 1.5f
+                                                    ) {
+                                                        handedToPager = true
+                                                        val targetPage = if (dragTotal.x < 0) pagerState.currentPage + 1 else pagerState.currentPage - 1
+                                                        if (targetPage in 0 until mediaList.size) {
+                                                            coroutineScope.launch { pagerState.animateScrollToPage(targetPage) }
+                                                        }
+                                                    }
+                                                    if (handedToPager) {
+                                                        change.consume()
+                                                    }
+                                                }
+                                            } while (event.changes.any { it.pressed })
                                         }
-                                    },
-                                    update = { it.player = viewerPlayer },
-                                    modifier = Modifier.fillMaxSize()
-                                )
+                                    }
+                            ) {
+                                com.example.ui.components.ZoomableBox(
+                                    modifier = Modifier.fillMaxSize(),
+                                    enabled = pageIsVideo,
+                                    onZoomChanged = { isZoomedIn = it },
+                                ) {
+                                    AndroidView(
+                                        factory = {
+                                            PlayerView(context).apply {
+                                                player = viewerPlayer
+                                                setShowRewindButton(true)
+                                                setShowFastForwardButton(true)
+                                                setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { visibility ->
+                                                    isFullScreen = visibility != android.view.View.VISIBLE
+                                                })
+                                            }
+                                        },
+                                        update = { it.player = viewerPlayer },
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
                             }
                         } else {
                             Box(
@@ -414,9 +470,21 @@ fun ImageWithOcrOverlay(
                 detectTapGestures(onTap = { onTap() })
             }
             .pointerInput(isOcrMode) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    scale = max(1f, scale * zoom)
-                    offset += pan
+                // Only claim the gesture for a pinch (2+ pointers) or while already
+                // zoomed in — a single-finger drag at rest must fall through
+                // unconsumed so the enclosing HorizontalPager can swipe pages.
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    do {
+                        val event = awaitPointerEvent()
+                        if (event.changes.size >= 2 || scale > 1f) {
+                            val zoom = event.calculateZoom()
+                            val pan = event.calculatePan()
+                            scale = max(1f, scale * zoom)
+                            offset += pan
+                            event.changes.forEach { it.consume() }
+                        }
+                    } while (event.changes.any { it.pressed })
                 }
             }
             .pointerInput(isOcrMode, recognizedText) {

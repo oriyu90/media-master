@@ -1,7 +1,10 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.runtime.Composable
@@ -53,11 +56,23 @@ fun ZoomableBox(
             }
             .pointerInput(enabled) {
                 if (!enabled) return@pointerInput
-                detectTransformGestures { _, pan, zoom, _ ->
-                    val newScale = (scale * zoom).coerceIn(minScale, maxScale)
-                    scale = newScale
-                    offset = if (newScale <= minScale) Offset.Zero else offset + pan
-                    onZoomChanged(newScale > minScale)
+                // Only claim the gesture for a pinch (2+ pointers) or while already
+                // zoomed in — a single-finger drag at rest must fall through
+                // unconsumed so an enclosing HorizontalPager can swipe pages.
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    do {
+                        val event = awaitPointerEvent()
+                        if (event.changes.size >= 2 || scale > minScale) {
+                            val zoom = event.calculateZoom()
+                            val pan = event.calculatePan()
+                            val newScale = (scale * zoom).coerceIn(minScale, maxScale)
+                            scale = newScale
+                            offset = if (newScale <= minScale) Offset.Zero else offset + pan
+                            onZoomChanged(newScale > minScale)
+                            event.changes.forEach { it.consume() }
+                        }
+                    } while (event.changes.any { it.pressed })
                 }
             }
             .graphicsLayer(

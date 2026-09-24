@@ -99,4 +99,10 @@
     <string name="minute_abbrev">د</string>
     <string name="trim_start_position">بداية القص %1$s</string>
     <string name="trim_end_position">نهاية القص %1$s</string>
+    <string name="desktop_mode">وضع سطح المكتب</string>
+    <string name="select_desktop_mode">اختر وضع سطح المكتب</string>
+    <string name="desktop_mode_auto">تلقائي (مُوصى به)</string>
+    <string name="desktop_mode_force_desktop">استخدام واجهة سطح المكتب دائمًا</string>
+    <string name="desktop_mode_force_touch">استخدام واجهة اللمس دائمًا</string>
+    <string name="desktop_mode_desc">يكتشف تلقائيًا Samsung DeX ونوافذ سطح مكتب Android وMotorola Smart Connect / Ready For وسطح مكتب Huawei EMUI وسطح مكتب HONOR ومنصة عمل Xiaomi HyperOS ووضع OPPO ColorOS PC ووضع Lenovo Tab PC. إذا لم يتم اكتشاف جهازك، بدّل يدويًا.</string>
 </resources>

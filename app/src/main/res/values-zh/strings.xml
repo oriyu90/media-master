@@ -99,4 +99,10 @@
     <string name="minute_abbrev">分</string>
     <string name="trim_start_position">剪辑起点 %1$s</string>
     <string name="trim_end_position">剪辑终点 %1$s</string>
+    <string name="desktop_mode">桌面模式</string>
+    <string name="select_desktop_mode">选择桌面模式</string>
+    <string name="desktop_mode_auto">自动（推荐）</string>
+    <string name="desktop_mode_force_desktop">始终使用桌面版界面</string>
+    <string name="desktop_mode_force_touch">始终使用触屏版界面</string>
+    <string name="desktop_mode_desc">自动检测 Samsung DeX、Android 桌面窗口、Motorola Smart Connect / Ready For、华为 EMUI 桌面、HONOR 桌面、小米 HyperOS 工作台、OPPO ColorOS PC 模式和联想平板 PC 模式。若设备未被识别，请手动切换。</string>
 </resources>

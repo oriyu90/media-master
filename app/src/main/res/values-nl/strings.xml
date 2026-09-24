@@ -61,4 +61,10 @@
     <string name="minute_abbrev">m</string>
     <string name="trim_start_position">Trimstart %1$s</string>
     <string name="trim_end_position">Trimeinde %1$s</string>
+    <string name="desktop_mode">Bureaubladmodus</string>
+    <string name="select_desktop_mode">Bureaubladmodus selecteren</string>
+    <string name="desktop_mode_auto">Automatisch (aanbevolen)</string>
+    <string name="desktop_mode_force_desktop">Altijd bureaublad-UI gebruiken</string>
+    <string name="desktop_mode_force_touch">Altijd touch-UI gebruiken</string>
+    <string name="desktop_mode_desc">Detecteert automatisch Samsung DeX, Android-desktopvensters, Motorola Smart Connect / Ready For, Huawei EMUI-desktop, HONOR-desktop, Xiaomi HyperOS-werkstation, OPPO ColorOS-pc-modus en Lenovo Tab-pc-modus. Schakel handmatig als je apparaat niet wordt gedetecteerd.</string>
 </resources>

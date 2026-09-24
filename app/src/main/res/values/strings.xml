@@ -99,4 +99,10 @@
     <string name="minute_abbrev">m</string>
     <string name="trim_start_position">Trim start %1$s</string>
     <string name="trim_end_position">Trim end %1$s</string>
+    <string name="desktop_mode">Desktop mode</string>
+    <string name="select_desktop_mode">Select desktop mode</string>
+    <string name="desktop_mode_auto">Auto (recommended)</string>
+    <string name="desktop_mode_force_desktop">Always use desktop UI</string>
+    <string name="desktop_mode_force_touch">Always use touch UI</string>
+    <string name="desktop_mode_desc">Auto detects Samsung DeX, Android desktop windowing, Motorola Smart Connect / Ready For, Huawei EMUI Desktop, HONOR Desktop, Xiaomi HyperOS Workstation, OPPO ColorOS PC mode, and Lenovo Tab PC Mode. Use manual options if your device is not detected.</string>
 </resources>

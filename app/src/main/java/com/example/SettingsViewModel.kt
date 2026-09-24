@@ -46,6 +46,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val backupWifiSsid = repository.backupWifiSsidFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
     val backupTargetPath = repository.backupTargetPathFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
     val backupDeletePrevious = repository.backupDeletePreviousFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val desktopModeOverride = repository.desktopModeOverrideFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     fun setThemeMode(mode: Int) {
         viewModelScope.launch { repository.setThemeMode(mode) }
@@ -82,4 +83,5 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setBackupWifiSsid(value: String) { viewModelScope.launch { repository.setBackupWifiSsid(value) } }
     fun setBackupTargetPath(value: String) { viewModelScope.launch { repository.setBackupTargetPath(value) } }
     fun setBackupDeletePrevious(value: Boolean) { viewModelScope.launch { repository.setBackupDeletePrevious(value) } }
+    fun setDesktopModeOverride(value: Int) { viewModelScope.launch { repository.setDesktopModeOverride(value) } }
 }

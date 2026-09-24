@@ -29,8 +29,10 @@
         <activity
             android:name=".MainActivity"
             android:launchMode="singleTask"
+            android:resizeableActivity="true"
             android:supportsPictureInPicture="true"
-            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|screenLayout|smallestScreenSize|density|layoutDirection|uiMode"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|screenLayout|smallestScreenSize|density|layoutDirection|uiMode|navigation|colorMode"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.MyApplication">

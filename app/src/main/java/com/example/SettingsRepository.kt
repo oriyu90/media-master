@@ -26,6 +26,7 @@ class SettingsRepository(private val context: Context) {
         val BACKUP_WIFI_SSID = stringPreferencesKey("backup_wifi_ssid")
         val BACKUP_TARGET_PATH = stringPreferencesKey("backup_target_path")
         val BACKUP_DELETE_PREVIOUS = booleanPreferencesKey("backup_delete_previous")
+        val DESKTOP_MODE_OVERRIDE = intPreferencesKey("desktop_mode_override")
     }
 
     val themeModeFlow: Flow<Int> = context.dataStore.data.map { preferences ->
@@ -57,6 +58,7 @@ class SettingsRepository(private val context: Context) {
     val backupWifiSsidFlow: Flow<String> = context.dataStore.data.map { it[BACKUP_WIFI_SSID] ?: "" }
     val backupTargetPathFlow: Flow<String> = context.dataStore.data.map { it[BACKUP_TARGET_PATH] ?: "" }
     val backupDeletePreviousFlow: Flow<Boolean> = context.dataStore.data.map { it[BACKUP_DELETE_PREVIOUS] ?: false }
+    val desktopModeOverrideFlow: Flow<Int> = context.dataStore.data.map { it[DESKTOP_MODE_OVERRIDE] ?: 0 }
 
     suspend fun setThemeMode(mode: Int) {
         context.dataStore.edit { preferences ->
@@ -122,4 +124,7 @@ class SettingsRepository(private val context: Context) {
     suspend fun setBackupWifiSsid(value: String) { context.dataStore.edit { it[BACKUP_WIFI_SSID] = value } }
     suspend fun setBackupTargetPath(value: String) { context.dataStore.edit { it[BACKUP_TARGET_PATH] = value } }
     suspend fun setBackupDeletePrevious(value: Boolean) { context.dataStore.edit { it[BACKUP_DELETE_PREVIOUS] = value } }
+    suspend fun setDesktopModeOverride(value: Int) {
+        context.dataStore.edit { it[DESKTOP_MODE_OVERRIDE] = value.coerceIn(0, 2) }
+    }
 }

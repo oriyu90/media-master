@@ -41,6 +41,7 @@ Media Master is a comprehensive Android application designed to manage, browse, 
 - **Minimum SDK**: 24 (Android 7.0)
 - **Target SDK**: 36
 - **Form Factors**: Adaptive layouts tailored for Phones, Foldables, and Tablets.
+- **Desktop / PC modes (v1.7.0+)**: Samsung DeX (classic + One UI 8 native), Android Desktop Windowing, Motorola Smart Connect / Ready For, Huawei EMUI Desktop Mode, HONOR Desktop Mode, Xiaomi HyperOS Desktop / Workstation Mode, OPPO ColorOS PC Mode, Lenovo Tab PC Mode. Unified dependency-free detection with ≥600dp width gate plus Settings → Desktop mode manual override (Auto / Always desktop / Always touch).
 
 ## 7. Known limitations
 - Legacy binary Office formats (`.doc`, `.ppt` — pre-2007) are not rendered in-app. Apache POI was evaluated as the renderer but rejected: its core module uses `java.lang.invoke.MethodHandle` in a way D8 cannot dex below `minSdk 26`, which would drop Android 7.0/7.1 support. These files keep the "open in another app" behavior instead.

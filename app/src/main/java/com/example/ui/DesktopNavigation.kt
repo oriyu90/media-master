@@ -50,42 +50,36 @@ import java.io.File
  * MainNavigation (maxWidth >= 600.dp) handles that. This function only decides
  * whether the *window itself* is being presented in a desktop/DeX-like way.
  *
- * UI_MODE_TYPE_DESK is the legacy classic-Samsung-DeX signal, but One UI 8
- * (Android 16-based) replaced classic DeX with Android's own desktop windowing
- * and no longer reliably sets this flag while genuinely running in a desktop
- * window — which is the root cause of "DeX mode but the app stays in phone
- * mode". Android's own desktop-windowing guidance doesn't rely on uiMode either;
- * a freeform/desktop-windowed session (old or new DeX, or generic Android
- * desktop windowing) is instead identifiable by the presence of a system
- * caption/title bar, which phone and normal fullscreen tablet layouts never
- * have. Check both signals so older devices that do still report
- * UI_MODE_TYPE_DESK keep working.
+ * v1.7.0 unified coverage (Sept 2026):
+ * Samsung DeX (classic + One UI 8 native) / Android Desktop Windowing /
+ * Motorola Smart Connect+Ready For / Huawei EMUI Desktop / HONOR Desktop /
+ * Xiaomi HyperOS Workstation / OPPO ColorOS PC Connect / Lenovo Tab PC Mode.
+ *
+ * No OEM SDK is used: all OEM shells host the app as a freeform/multi-window
+ * session under the hood, so generic AOSP signals (desk uiMode, caption bar,
+ * multi-window, freeform windowing) plus a best-effort Samsung reflection
+ * cover all 8. Keyboard/mouse/external-display are supporting info only and
+ * never trigger alone (avoids false positives on keyboard-attached tablets).
  */
 @Composable
-fun isDesktopLayout(): Boolean {
+fun isDesktopLayout(override: Int = com.example.desktop.DesktopMode.OVERRIDE_AUTO): Boolean {
     val configuration = LocalConfiguration.current
     val uiType = configuration.uiMode and Configuration.UI_MODE_TYPE_MASK
     val legacyDex = uiType == Configuration.UI_MODE_TYPE_DESK
     val captionBarVisible = isCaptionBarVisible()
-    val multiWindow = isInMultiWindowMode()
-    return legacyDex || captionBarVisible || multiWindow
-}
-
-/**
- * OEM desktop/PC modes (e.g. Lenovo's "PC Mode"/"Productivity Mode" on ZUI)
- * are proprietary freeform window managers with no public detection API and
- * don't necessarily set UI_MODE_TYPE_DESK or a caption bar. Under the hood
- * they still host the app as an Android multi-window/freeform session, so
- * Activity.isInMultiWindowMode() is the most portable fallback signal
- * available without an OEM-specific SDK. Combined with the maxWidth >= 600.dp
- * gate in MainNavigation, this avoids switching narrow split-screen windows
- * into the desktop UI while still catching wide OEM desktop-mode windows.
- */
-@Composable
-private fun isInMultiWindowMode(): Boolean {
     val context = LocalContext.current
-    val activity = context as? android.app.Activity ?: return false
-    return activity.isInMultiWindowMode
+    val activity = remember(context) { com.example.desktop.DesktopMode.activityOrNull(context) }
+    val multiWindow = activity?.let { com.example.desktop.DesktopMode.isInMultiWindow(it) } ?: false
+    val freeform = activity?.let { com.example.desktop.DesktopMode.isFreeformWindowing(it) } ?: false
+    val samsungDex = activity?.let { com.example.desktop.DesktopMode.isSamsungDesktopModeReflection(it) } ?: false
+    val signals = com.example.desktop.DesktopMode.Signals(
+        legacyDeskUiMode = legacyDex,
+        captionBarVisible = captionBarVisible,
+        multiWindow = multiWindow,
+        freeformWindowing = freeform,
+        samsungDexReflection = samsungDex,
+    )
+    return com.example.desktop.DesktopMode.resolve(signals, override)
 }
 
 @Composable

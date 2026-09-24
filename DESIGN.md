@@ -1,7 +1,13 @@
 # 設計書兼仕様書 (Media Master)
 
 ## バージョン情報
-- **Version:** 1.6.0
+- **Version:** 1.7.0
+
+## v1.7.0 の設計変更（要約）
+- **8ベンダーPCモード統合検出**: 新規 `desktop/DesktopMode.kt`（`Signals`+`resolve()`+`vendorForManufacturer()`、すべてpureで単体テスト可能）。AUTO時は従来信号（`UI_MODE_TYPE_DESK`・キャプションバー・`isInMultiWindowMode`）に加え、フリーフォーム（`Activity.getWindowingMode==5`、API 28+、reflection＋`runCatching`）とSamsung `SemDesktopModeManager.isDesktopMode` reflectionをOR。キーボード/マウス・外部ディスプレイは単独トリガーにしない（キーボード付きタブレットの誤判定防止）。`MainNavigation`の幅ゲート（≥600dp）は維持。
+- **手動オーバーライド**: `SettingsRepository.DESKTOP_MODE_OVERRIDE`（0=自動/1=常にデスクトップ/2=常にタッチ、DataStore永続化）＋設定画面のラジオダイアログ（日英中阿蘭5言語完全対応、`LocaleStringParityTest`で検証）。
+- **Manifest堅牢化**: `resizeableActivity="true"`明示、`windowSoftInputMode="adjustResize"`、`configChanges`に`navigation|colorMode`追加（ドック/キーボード着脱/ナイト切替でActivity再生成なし）。新規権限・新規Gradle依存なし。
+- **安全性**: 全リフレクション・システムサービス取得を`runCatching`で保護、Activity取得はContextWrapper遡及（最大8段）でクラッシュなし、ステートレスオブジェクトでメモリリークなし。既存の破壊的操作ガード・`update{}`・`use{}`方針は変更なし。
 
 ## v1.6.0 の設計変更（要約）
 - **ビューアーのスワイプナビゲーション修正**: `HorizontalPager`自体はv1.0.0から存在していたが、

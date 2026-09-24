@@ -35,6 +35,7 @@ import com.example.SettingsViewModel
 fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostController) {
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val language by viewModel.language.collectAsStateWithLifecycle()
+    val desktopModeOverride by viewModel.desktopModeOverride.collectAsStateWithLifecycle()
 
     val backupEnabled by viewModel.backupEnabled.collectAsStateWithLifecycle()
     val backupStartTime by viewModel.backupStartTime.collectAsStateWithLifecycle()
@@ -46,6 +47,7 @@ fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostControlle
     val backupDeletePrevious by viewModel.backupDeletePrevious.collectAsStateWithLifecycle()
     var showThemeDialog by remember { mutableStateOf(false) }
     var showLangDialog by remember { mutableStateOf(false) }
+    var showDesktopDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -76,6 +78,13 @@ fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostControlle
                     headlineContent = { Text(stringResource(R.string.language)) },
                     supportingContent = { Text(getLangString(language)) },
                     modifier = Modifier.clickable { showLangDialog = true }
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.desktop_mode)) },
+                    supportingContent = { Text(getDesktopModeString(desktopModeOverride)) },
+                    modifier = Modifier.clickable { showDesktopDialog = true }
                 )
             }
             item {
@@ -392,6 +401,52 @@ fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostControlle
             }
         )
     }
+
+    if (showDesktopDialog) {
+        AlertDialog(
+            onDismissRequest = { showDesktopDialog = false },
+            title = { Text(stringResource(R.string.select_desktop_mode)) },
+            text = {
+                Column(Modifier.selectableGroup()) {
+                    val modes = listOf(
+                        0 to stringResource(R.string.desktop_mode_auto),
+                        1 to stringResource(R.string.desktop_mode_force_desktop),
+                        2 to stringResource(R.string.desktop_mode_force_touch),
+                    )
+                    modes.forEach { (value, label) ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 48.dp)
+                                .selectable(
+                                    selected = desktopModeOverride == value,
+                                    role = Role.RadioButton,
+                                    onClick = {
+                                        viewModel.setDesktopModeOverride(value)
+                                        showDesktopDialog = false
+                                    },
+                                )
+                                .padding(vertical = 8.dp)
+                        ) {
+                            RadioButton(selected = desktopModeOverride == value, onClick = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(label)
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        stringResource(R.string.desktop_mode_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showDesktopDialog = false }) { Text(stringResource(R.string.cancel)) }
+            }
+        )
+    }
 }
 
 @Composable
@@ -409,4 +464,11 @@ fun getLangString(lang: String) = when(lang) {
     "ar" -> stringResource(R.string.arabic)
     "nl" -> stringResource(R.string.dutch)
     else -> stringResource(R.string.system_default)
+}
+
+@Composable
+fun getDesktopModeString(mode: Int) = when (mode) {
+    1 -> stringResource(R.string.desktop_mode_force_desktop)
+    2 -> stringResource(R.string.desktop_mode_force_touch)
+    else -> stringResource(R.string.desktop_mode_auto)
 }

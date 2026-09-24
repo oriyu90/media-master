@@ -95,8 +95,12 @@ fun MainNavigation(
     if (isGranted) {
         // DeX (desk uiMode) gets the desktop shell only when the window is wide
         // enough: small DeX / pop-up windows keep the normal touch UI readable.
+        // v1.7.0: manual override (Auto/Force desktop/Force touch) from Settings
+        // is honoured here; the width gate stays to avoid narrow split-screen
+        // windows switching into the desktop UI.
+        val desktopOverride by settingsViewModel.desktopModeOverride.collectAsStateWithLifecycle()
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val desktop = isDesktopLayout() && maxWidth >= 600.dp
+            val desktop = isDesktopLayout(desktopOverride) && maxWidth >= 600.dp
             if (desktop) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     DesktopNavigation(navController, fileViewModel, settingsViewModel) { onPinFolder, onOpenFolderInNewTab ->

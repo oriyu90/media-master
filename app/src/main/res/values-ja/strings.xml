@@ -99,4 +99,10 @@
     <string name="minute_abbrev">分</string>
     <string name="trim_start_position">トリミング開始位置 %1$s</string>
     <string name="trim_end_position">トリミング終了位置 %1$s</string>
+    <string name="desktop_mode">デスクトップモード</string>
+    <string name="select_desktop_mode">デスクトップモードを選択</string>
+    <string name="desktop_mode_auto">自動（推奨）</string>
+    <string name="desktop_mode_force_desktop">常にデスクトップUIを使う</string>
+    <string name="desktop_mode_force_touch">常にタッチUIを使う</string>
+    <string name="desktop_mode_desc">Samsung DeX、Androidデスクトップウィンドウ、Motorola Smart Connect / Ready For、Huawei EMUIデスクトップ、HONORデスクトップ、Xiaomi HyperOSワークステーション、OPPO ColorOS PCモード、Lenovo Tab PCモードを自動検出します。検出されない場合は手動で切り替えてください。</string>
 </resources>

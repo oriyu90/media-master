@@ -1,26 +1,47 @@
-# Media Master v1.6.0 実装・保守メモ
+# Media Master v1.7.0 実装・保守メモ
 
-最終更新: 2026-09-13
+最終更新: 2026-09-24
 
 ## リリース情報
 
 | 項目 | 内容 |
 | --- | --- |
-| バージョン | `1.6.0` (`versionCode 10`) |
+| バージョン | `1.7.0` (`versionCode 11`) |
 | アプリケーションID | `com.yukiorita.mediamaster` |
 | 最小 SDK / target SDK | 24 / 36 |
 | ライセンス | MIT |
 | 著作者 | Yuki_Orita |
 | release APK | `app/build/outputs/apk/release/app-release.apk`（R8 + resource shrink 有効） |
-| APK SHA-256 | `f922b2b2d797f69fe4b1c9a7aca366e9f1664f8b47c8cfbeeb9aaeb02235b615` |
-| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.5.0 と同一鍵） |
-| GitHub Release | `v1.6.0` (GitHub Releases) |
+| APK SHA-256 | `08236934c0cbf522ce0432595933e03976368ec3b0ee000ad4ced962b2fa9fd5` |
+| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.6.0 と同一鍵） |
+| GitHub Release | `v1.7.0` (GitHub Releases) |
 
 release APK は RSA 4096 ビット鍵・APK Signature Scheme v2 署名（`apksigner verify` で確認済み。v1無効、v3/v4はminSdk/AGP設定上有効化されていない——これまでの全リリースと同一の挙動）。署名鍵は `common-rules-document/keystores/media-master-upload-key.jks`（alias `upload`）。公開前には毎回 `apksigner verify --verbose` で署名を確認してください。
 
-v1.6.0 はJDK21+R8有効ビルドで`:app:assembleDebug`/`:app:assembleRelease`/`:app:testDebugUnitTest`(68件)/`:app:lintDebug`(0エラー)を確認。**実機（エミュレータ）デバッグ実施済み**——本番署名済みAPKをクリーンインストールしてクラッシュがないことを確認する手順を、これまでのリリースの教訓どおり今回も実施した（下記「v1.6.0 実機デバッグ」参照）。
+v1.7.0 はJDK21+R8有効ビルドで`:app:assembleDebug`/`:app:assembleRelease`/`:app:testDebugUnitTest`(73件)/`:app:lintDebug`(0エラー)を確認。**実機（エミュレータ）デバッグ実施済み**——本番署名済みAPKをクリーンインストールしてクラッシュがないことを確認する手順を、これまでのリリースの教訓どおり今回も実施した（下記「v1.7.0 実機デバッグ」参照）。
 
-v1.5.0 はJDK21+R8有効ビルドで`:app:assembleDebug`/`:app:assembleRelease`/`:app:testDebugUnitTest`(68件)/`:app:lintDebug`(0エラー)を確認。実機（エミュレータ）デバッグ実施済み。旧リリースの APK SHA-256: v1.5.0 `94647242f431bfec7919fbbe24700ef6e3d0f04aa871127056a7b59ef3a6dc01`。
+旧リリースの APK SHA-256: v1.6.0 `f922b2b2d797f69fe4b1c9a7aca366e9f1664f8b47c8cfbeeb9aaeb02235b615`、v1.5.0 `94647242f431bfec7919fbbe24700ef6e3d0f04aa871127056a7b59ef3a6dc01`。
+
+## v1.7.0 実機デバッグ（2026-09、リリース前スモーク）
+
+エミュレータ（API 34, arm64, Google APIs, `mm_test` AVD）へ本番署名済みAPK（v2署名・証明書はv0.1.0〜v1.6.0と同一 `332ce386…eba6`）をクリーンインストール：
+
+- 起動・Home表示まで操作してクラッシュなし（PID確認、`adb logcat -b crash`でFATAL 0件）。
+- `adb shell am start --windowingMode 5`（freeform）で起動してもクラッシュなし（singleTaskのため既存インスタンスへ配信される既定動作を確認）。
+- 新規 `DesktopModeTest` 5件を含む全73件の単体テストが通過（従来68件＋新規5件）。
+- `lintDebug`エラー0件（警告のみ、既存のdeprecation警告と同等）。
+- 幅ゲート（≥600dp）を満たさない小型エミュレータではデスクトップUIへの切替は目視未検証（v1.5.0と同一の制約）。Lenovo Tab 11インチ実機・Samsung DeX実機での最終確認を推奨。検出できない端末向けの手動オーバーライド（設定→デスクトップモード）を用意済み。
+
+## v1.7.0 の実装内容（8ベンダーPCモード対応）
+
+2026年9月時点の仕様調査に基づく（Samsung DeXはOne UI 8でAndroid 16ネイティブデスクトップへ再構築、`UI_MODE_TYPE_DESK`単独では検出不可。Motorola Smart Connect（旧Ready For）のMobile Desktop、Huawei Easy Projection、HONOR MagicOS PCモード、Xiaomi HyperOS Workstation、Lenovo ZUI PCモードはいずれも公開検出APIなし・内部的にはfreeform/multi-window。OPPO ColorOSはオンデバイスのネイティブデスクトップなし・PC ConnectはPC側ミラーリングのためAOSP信号に依存）。
+
+- 新規 `desktop/DesktopMode.kt`: `Signals`（desk uiMode/キャプションバー/multi-window/freeform/Samsung reflection＋参考情報のキーボード・外部ディスプレイ）＋pureな`resolve()`＋`vendorForManufacturer()`。OEM SDK依存なし、minSdk 24、全文`runCatching`保護、ステートレスでメモリ安全。
+- `DesktopNavigation.isDesktopLayout(override)`へ拡張（既存の無引数呼び出しと互換のためデフォルト引数AUTO）。`MainNavigation`で`settingsViewModel.desktopModeOverride`を購読し、幅ゲート（≥600dp）とAND条件でデスクトップシェルを切替。
+- 設定に「デスクトップモード」（自動/常にデスクトップ/常にタッチ）を追加。DataStore永続化、5言語（en/ja/zh/ar/nl）完全対応。
+- Manifest: `resizeableActivity="true"`明示、`windowSoftInputMode="adjustResize"`、`configChanges`に`navigation|colorMode`追加。新規権限・新規依存なし。
+- 新規テスト `DesktopModeTest` 5件（AUTO無信号・各トリガー・周辺機器単独では発火しない・オーバーライド優先・8ベンダー mapping）。`LocaleStringParityTest`で新6キーの5言語 parity を検証。
+- 変更ファイル: `desktop/DesktopMode.kt`（新）、`ui/DesktopNavigation.kt`、`ui/MainNavigation.kt`、`SettingsRepository.kt`、`SettingsViewModel.kt`、`ui/SettingsScreen.kt`、`AndroidManifest.xml`、5言語`strings.xml`、`app/build.gradle.kts`（1.7.0/11）。
 
 v1.4.0 は JDK21+R8有効ビルドで`:app:assembleDebug`/`:app:assembleRelease`/`:app:testDebugUnitTest`(68件)/`:app:lintDebug`(0エラー)を確認。実機（エミュレータ）デバッグ実施済み。旧リリースの APK SHA-256: v1.4.0 `2051ca8e092dd68a1bcdf0b2b65f40e8953ad80d66fa763cd5d1395e8cd4ad93`、v1.3.0（実機デバッグ後の最終版）`500ec32227858828e81370fc6b5d90f39495fc8b081a398a860610953ad06058`、v1.2.0 `a9be2530fc51397582a820b9e9c7404dad3d1374d685838e0170de495e591c33`、v1.1.0 `fe75d958b3c811a48582058903d95947b1f97ad108b8c23fd5338ec6ae8eb9a3`、v1.0.0 `255d8ed2b60e1f7a3dd51d1f933b08ae39cc7fa9a8398149202cb20d038b0082`、v0.3.0 `5f896b1bd15a65b4a947c428490ca63cc0ea0cac81332d89477029b5fe3d4bab`。
 

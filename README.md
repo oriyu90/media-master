@@ -4,6 +4,13 @@ Media Master is an open-source Android media and file manager built with Kotlin 
 
 Media Master は、Kotlin と Jetpack Compose で開発されたオープンソースのAndroid向けメディア・ファイル管理アプリです。写真・動画、音楽、書類、ストレージ、アプリ／APK、編集、バックアップを1つのアプリで扱えます。
 
+## v1.7.0
+
+- **8-vendor PC-mode support:** the desktop shell now covers Samsung DeX (classic + One UI 8 native), Android Desktop Windowing, Motorola Smart Connect / Ready For, Huawei EMUI Desktop, HONOR Desktop, Xiaomi HyperOS Workstation, OPPO ColorOS PC mode, and Lenovo Tab PC Mode. Detection is a unified, dependency-free `DesktopMode` resolver (desk uiMode, caption bar, multi-window, freeform windowing, Samsung reflection — all `runCatching`-guarded, minSdk 24 safe) with the existing ≥600dp width gate, plus a manual **Settings → Desktop mode** override (Auto / Always desktop / Always touch) for devices that expose no public signal.
+- **8ベンダーPCモード対応:** Samsung DeX（従来＋One UI 8ネイティブ）、Androidデスクトップウィンドウ、Motorola Smart Connect / Ready For、Huawei EMUIデスクトップ、HONORデスクトップ、Xiaomi HyperOSワークステーション、OPPO ColorOS PCモード、Lenovo Tab PCモードを統一検出。依存なし・クラッシュ安全（全リフレクションを`runCatching`で保護、minSdk 24互換）で、従来の幅≥600dpゲートを維持。検出できない端末向けに**設定 → デスクトップモード**（自動 / 常にデスクトップ / 常にタッチ）の手動切替を追加。
+- **Manifest hardened for desktop windowing:** `resizeableActivity="true"`, `windowSoftInputMode="adjustResize"`, and `navigation|colorMode` added to `configChanges` so docking, keyboard attach, and night-mode switches no longer recreate the activity.
+- Version `1.7.0` (`versionCode 11`), signed with the same upload key as v0.1.0–v1.6.0 (APK Signature Scheme v2 verified). **APK SHA-256: `08236934c0cbf522ce0432595933e03976368ec3b0ee000ad4ced962b2fa9fd5`.**
+
 ## v1.6.0
 
 - **Viewer gains swipe-to-navigate:** opening a photo or video from the Library now lets you swipe left/right to move to the next/previous item, the same gesture as Google Photos. The underlying `HorizontalPager` existed since v1.0.0, but on-device testing found it was silently non-functional — the image's pinch-zoom gesture and the video player's native touch handling both intercepted single-finger swipes before they ever reached the pager. Fixed by only claiming those gestures for an actual pinch or while already zoomed in.

@@ -1,6 +1,44 @@
-# Media Master v1.7.0 実装・保守メモ
+# Media Master v1.7.1 実装・保守メモ
 
-最終更新: 2026-09-24
+最終更新: 2026-09-25
+
+## リリース情報
+
+| 項目 | 内容 |
+| --- | --- |
+| バージョン | `1.7.1` (`versionCode 12`) |
+| アプリケーションID | `com.yukiorita.mediamaster` |
+| 最小 SDK / target SDK | 24 / 36 |
+| ライセンス | MIT |
+| 著作者 | Yuki_Orita |
+| release APK | `app/build/outputs/apk/release/app-release.apk`（R8 + resource shrink 有効） |
+| APK SHA-256 | `4f79abcc32747a6889787c22d051ff831d55aca27330f81923760fcc63fcc1ee` |
+| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.7.0 と同一鍵） |
+| GitHub Release | `v1.7.1` (GitHub Releases) |
+
+release APK は RSA 4096 ビット鍵・APK Signature Scheme v2 署名（`apksigner verify` で確認済み）。署名鍵は `common-rules-document/keystores/media-master-upload-key.jks`（alias `upload`）。
+
+v1.7.1 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitTest`(77件)/`:app:lintDebug`(0エラー)を確認。**実機（エミュレータ）デバッグ実施済み**——本番署名済みAPKをクリーンインストールし起動・Home表示でクラッシュ0件（`logcat -b crash` FATAL 0件）。
+
+旧リリースの APK SHA-256: v1.7.0 `08236934c0cbf522ce0432595933e03976368ec3b0ee000ad4ced962b2fa9fd5`、v1.6.0 `f922b2b2d797f69fe4b1c9a7aca366e9f1664f8b47c8cfbeeb9aaeb02235b615`。
+
+## v1.7.1 実装内容（Lenovo PCモード修正＋ダークモード視認性）
+
+ユーザー報告2件への対応（Lenovo TabでPCモードでもスマホUIのまま／ダークモードのコントラスト不足）。
+
+### 1. Lenovo Tab PCモードでデスクトップUIへ切り替わらない
+
+- 原因: ZUIのPCモードは公開検出APIがなく、desk uiMode・キャプションバー・multi-window・freeformのいずれも立てない場合がある。v1.7.0の汎用信号だけでは検出できずAUTOが偽のままになる。
+- 修正: `DesktopMode`に`oemDesktopHeuristic`を追加。`isLenovoDesktopHeuristic()`は①Lenovo製＋キーボード/マウス接続（Lenovo公式仕様のキーボード着脱でPCモード自動切替に追随）、②PCモード系設定キー（`pc_mode`等6候補をGlobal/Secure/Systemで横断プローブ）のいずれかで真。①はLenovo製にゲートし他社不変、②は全`runCatching`・権限不要。新規テスト1件、全77件通過。
+- 暫定回避（既にv1.7.0搭載）: **設定 → デスクトップモード → 常にデスクトップUI**で即時切替可能。Lenovo実機での最終確認を推奨。
+
+### 2. ダークモード視認性（白文字化・コントラスト）
+
+- `CategoryScreen`グリッドのファイル名スクリムを黒50%→72%へ（明背景での白文字が約3.9:1→約9.3:1に改善、AA適合）。文字色を`ViewerOnSurface`へ統一。
+- `DocumentsScreen`選択行を`background`直貼りから`ListItemDefaults.colors`の正規ペアリング（`primaryContainer`＋`onPrimaryContainer`）へ修正。見出し・補足・アイコンすべて明示。
+- `LibraryScreen`アルバム名を`Color.White`→`ViewerOnSurface`へ統一。
+- テーマ本体の主要ペアはすべてAA適合を確認済み（例: dark onSurface/surface 14.3:1）。新規`ThemeContrastTest`で回帰を防止。
+- 変更ファイル: `desktop/DesktopMode.kt`、`ui/DesktopNavigation.kt`、`ui/CategoryScreen.kt`、`ui/LibraryScreen.kt`、`ui/DocumentsScreen.kt`、新規`desktop/DesktopModeTest`追加分＋新規`ui/theme/ThemeContrastTest.kt`、`app/build.gradle.kts`（1.7.1/12）。
 
 ## リリース情報
 

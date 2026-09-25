@@ -366,8 +366,10 @@ fun CategoryFileGridItem(
             )
             Text(
                 text = file.name,
-                modifier = Modifier.align(Alignment.BottomCenter).background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.5f)).fillMaxWidth().padding(4.dp),
-                color = androidx.compose.ui.graphics.Color.White,
+                // 72% scrim keeps white text at >= 4.5:1 even over a bright
+                // card background (50% measured only ~3.9:1 and failed AA).
+                modifier = Modifier.align(Alignment.BottomCenter).background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.72f)).fillMaxWidth().padding(4.dp),
+                color = com.example.ui.theme.ViewerOnSurface,
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1
             )

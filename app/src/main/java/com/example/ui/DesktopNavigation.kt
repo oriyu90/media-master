@@ -72,12 +72,19 @@ fun isDesktopLayout(override: Int = com.example.desktop.DesktopMode.OVERRIDE_AUT
     val multiWindow = activity?.let { com.example.desktop.DesktopMode.isInMultiWindow(it) } ?: false
     val freeform = activity?.let { com.example.desktop.DesktopMode.isFreeformWindowing(it) } ?: false
     val samsungDex = activity?.let { com.example.desktop.DesktopMode.isSamsungDesktopModeReflection(it) } ?: false
+    // v1.7.1: Lenovo ZUI PC mode exposes no public signal and may set none of
+    // the above (user report: Lenovo Tab stays in phone UI). The heuristic is
+    // vendor-gated inside DesktopMode so other devices are unaffected.
+    val oemHeuristic = remember(context, activity) {
+        com.example.desktop.DesktopMode.isLenovoDesktopHeuristic(context, activity)
+    }
     val signals = com.example.desktop.DesktopMode.Signals(
         legacyDeskUiMode = legacyDex,
         captionBarVisible = captionBarVisible,
         multiWindow = multiWindow,
         freeformWindowing = freeform,
         samsungDexReflection = samsungDex,
+        oemDesktopHeuristic = oemHeuristic,
     )
     return com.example.desktop.DesktopMode.resolve(signals, override)
 }

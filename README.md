@@ -4,6 +4,12 @@ Media Master is an open-source Android media and file manager built with Kotlin 
 
 Media Master は、Kotlin と Jetpack Compose で開発されたオープンソースのAndroid向けメディア・ファイル管理アプリです。写真・動画、音楽、書類、ストレージ、アプリ／APK、編集、バックアップを1つのアプリで扱えます。
 
+## v1.7.1
+
+- **Lenovo Tab PCモード修正:** ZUIのPCモードではdesk uiMode・キャプションバー・multi-window/freeformのいずれも立たないため自動検出できずスマホUIのままになる報告を受け、ベンダーゲート付きのLenovoヒューリスティック（PCモード系システム設定キー＋キーボード接続——Lenovo自体がキーボード着脱でPCモードへ自動切替する動作に追随）を追加。他社端末の動作は不変。検出できない場合は従来どおり**設定 → デスクトップモード**の手動切替が有効。
+- **ダークモード視認性:** グリッドのファイル名スクリムを黒50%→72%に強化（白文字でAA適合。50%は明背景で約3.9:1しかなく不合格だった）、ドキュメント一覧の選択行を`primaryContainer`＋`onPrimaryContainer`の正規ペアリングに修正。新規`ThemeContrastTest`で主要ペアのWCAG AAを自動検証。
+- Version `1.7.1` (`versionCode 12`), signed with the same upload key as v0.1.0–v1.7.0 (APK Signature Scheme v2 verified). **APK SHA-256: `4f79abcc32747a6889787c22d051ff831d55aca27330f81923760fcc63fcc1ee`.**
+
 ## v1.7.0
 
 - **8-vendor PC-mode support:** the desktop shell now covers Samsung DeX (classic + One UI 8 native), Android Desktop Windowing, Motorola Smart Connect / Ready For, Huawei EMUI Desktop, HONOR Desktop, Xiaomi HyperOS Workstation, OPPO ColorOS PC mode, and Lenovo Tab PC Mode. Detection is a unified, dependency-free `DesktopMode` resolver (desk uiMode, caption bar, multi-window, freeform windowing, Samsung reflection — all `runCatching`-guarded, minSdk 24 safe) with the existing ≥600dp width gate, plus a manual **Settings → Desktop mode** override (Auto / Always desktop / Always touch) for devices that expose no public signal.

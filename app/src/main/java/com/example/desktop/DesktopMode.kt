@@ -54,13 +54,15 @@ object DesktopMode {
         val multiWindow: Boolean = false,
         val freeformWindowing: Boolean = false,
         val samsungDexReflection: Boolean = false,
+        /** Lenovo ZUI PC-mode heuristic (vendor-gated, see below). */
+        val oemDesktopHeuristic: Boolean = false,
         val hasKeyboardOrMouse: Boolean = false,
         val hasExternalDisplay: Boolean = false,
     ) {
         /** Core triggers that alone are enough to enter desktop UI (AUTO). */
         fun hasCoreTrigger(): Boolean =
             legacyDeskUiMode || captionBarVisible || multiWindow ||
-                freeformWindowing || samsungDexReflection
+                freeformWindowing || samsungDexReflection || oemDesktopHeuristic
     }
 
     /** Pure, unit-testable resolution. No Android framework calls. */
@@ -146,4 +148,51 @@ object DesktopMode {
 
     fun isInMultiWindow(activity: Activity): Boolean =
         runCatching { activity.isInMultiWindowMode }.getOrDefault(false)
+
+    /**
+     * Best-effort Lenovo ZUI PC-mode / Productivity-mode probe.
+     *
+     * Lenovo publishes no detection API and ZUI's PC mode does not reliably set
+     * desk uiMode, a caption bar, or multi-window/freeform flags, so AUTO mode
+     * otherwise stays in the phone UI on Lenovo Tabs (v1.7.0 user report).
+     * Two supporting signals are checked, both crash-safe and permission-free:
+     * 1. System settings keys that ZUI-style shells use for the PC-mode toggle
+     *    (probed across Global/Secure/System; missing keys simply read null).
+     * 2. Physical keyboard / mouse presence — Lenovo's own docs state PC mode
+     *    auto-activates on keyboard attach, so on Lenovo hardware this mirrors
+     *    the platform's behaviour.
+     *
+     * The keyboard branch is deliberately gated to Lenovo hardware only, so
+     * keyboard-attached tablets from other vendors never change behaviour.
+     * Returns false for non-Lenovo devices unless the settings flag matches.
+     */
+    fun isLenovoPcModeSettingEnabled(context: Context): Boolean = runCatching {
+        val candidates = listOf(
+            "pc_mode",
+            "lenovo_pc_mode",
+            "zui_pc_mode",
+            "productivity_mode",
+            "desktop_mode",
+            "lenovo_desktop_mode",
+        )
+        val resolvers: List<(String) -> String?> = listOf(
+            { k -> android.provider.Settings.Global.getString(context.contentResolver, k) },
+            { k -> android.provider.Settings.Secure.getString(context.contentResolver, k) },
+            { k -> android.provider.Settings.System.getString(context.contentResolver, k) },
+        )
+        candidates.any { key ->
+            resolvers.any { read ->
+                val v = runCatching { read(key) }.getOrNull()?.trim()?.lowercase()
+                v == "1" || v == "true" || v == "on" || v == "enable" || v == "enabled"
+            }
+        }
+    }.getOrDefault(false)
+
+    fun isLenovoDesktopHeuristic(context: Context, activity: Activity?): Boolean = runCatching {
+        val isLenovo = vendorForManufacturer(Build.MANUFACTURER) == Vendor.LENOVO ||
+            Build.BRAND.equals("lenovo", ignoreCase = true)
+        if (isLenovo && hasKeyboardOrMouse(context)) return true
+        if (isLenovoPcModeSettingEnabled(context)) return true
+        false
+    }.getOrDefault(false)
 }

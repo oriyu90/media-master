@@ -486,7 +486,7 @@ fun AlbumsView(viewState: ViewState, navController: NavHostController, excludedF
                             ) {
                                 Text(
                                     text = albumName,
-                                    color = androidx.compose.ui.graphics.Color.White,
+                                    color = com.example.ui.theme.ViewerOnSurface,
                                     style = MaterialTheme.typography.bodyMedium,
                                     maxLines = 1,
                                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,

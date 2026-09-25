@@ -503,6 +503,12 @@ fun DocumentListRow(file: MediaFile, isSelected: Boolean, isSelectionMode: Boole
         }
     }
 
+    // Selected rows sit on primaryContainer: pair every slot with
+    // onPrimaryContainer (never the default onSurface) so headline, supporting
+    // text and icons all keep >= 4.5:1 in light and dark themes alike.
+    val container = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+    val onContainer = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+    val onContainerVariant = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
     ListItem(
         headlineContent = { Text(file.name, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
         supportingContent = {
@@ -521,20 +527,26 @@ fun DocumentListRow(file: MediaFile, isSelected: Boolean, isSelectionMode: Boole
             Icon(
                 if (file.mimeType == "application/pdf" || file.name.endsWith(".pdf", ignoreCase = true)) Icons.Default.PictureAsPdf else Icons.AutoMirrored.Filled.InsertDriveFile,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = onContainer,
                 modifier = Modifier.size(40.dp)
             )
         },
         trailingContent = {
             if (isSelected) {
-                Icon(Icons.Default.CheckCircle, contentDescription = stringResource(R.string.selected), tint = MaterialTheme.colorScheme.primary)
+                Icon(Icons.Default.CheckCircle, contentDescription = stringResource(R.string.selected), tint = onContainer)
             }
         },
+        colors = androidx.compose.material3.ListItemDefaults.colors(
+            containerColor = container,
+            headlineColor = onContainer,
+            supportingColor = onContainerVariant,
+            leadingIconColor = onContainer,
+            trailingIconColor = onContainer,
+        ),
         modifier = Modifier
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = { onToggleSelect() }
             )
-            .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)
     )
 }

@@ -73,6 +73,22 @@ class DesktopModeTest {
     }
 
     @Test
+    fun `oem heuristic enters desktop UI and override still wins`() {
+        assertTrue(
+            DesktopMode.resolve(
+                DesktopMode.Signals(oemDesktopHeuristic = true),
+                DesktopMode.OVERRIDE_AUTO,
+            ),
+        )
+        assertFalse(
+            DesktopMode.resolve(
+                DesktopMode.Signals(oemDesktopHeuristic = true),
+                DesktopMode.OVERRIDE_FORCE_TOUCH,
+            ),
+        )
+    }
+
+    @Test
     fun `vendor mapping covers all eight PC modes`() {
         assertEquals(DesktopMode.Vendor.SAMSUNG_DEX, DesktopMode.vendorForManufacturer("samsung"))
         assertEquals(DesktopMode.Vendor.MOTOROLA, DesktopMode.vendorForManufacturer("motorola"))

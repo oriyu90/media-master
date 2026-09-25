@@ -1,7 +1,12 @@
 # 設計書兼仕様書 (Media Master)
 
 ## バージョン情報
-- **Version:** 1.7.0
+- **Version:** 1.7.1
+
+## v1.7.1 の設計変更（要約）
+- **Lenovoヒューリスティック**: `DesktopMode`に`oemDesktopHeuristic`信号を追加し`hasCoreTrigger()`へOR。実体は`isLenovoDesktopHeuristic()`（Lenovo製＋キーボード/マウス接続、またはPCモード系設定キー`pc_mode`/`lenovo_pc_mode`/`zui_pc_mode`/`productivity_mode`/`desktop_mode`/`lenovo_desktop_mode`のいずれかが有効値。Global/Secure/Systemを横断プローブ、全`runCatching`保護・権限不要）。キーボード分岐はLenovo製にゲートし他社動作不変。`isDesktopLayout()`側で`remember(context, activity)`収集。
+- **コントラスト修正**: `CategoryScreen`のファイル名スクリムを`Black 50%`→`72%`＋文字色を`ViewerOnSurface`へ（明背景での白文字が約3.9:1→約9.3:1に改善）。`DocumentsScreen.DocumentListRow`の選択行は`background`直貼りをやめ`ListItemDefaults.colors`でcontainer/headline/supporting/iconを`primaryContainer`/`onPrimaryContainer`へ明示。`LibraryScreen`のアルバム名を`Color.White`→`ViewerOnSurface`へ統一（同コントラスト）。新規`ThemeContrastTest`（JVMのみ、主要ペア＋スクリムの4.5:1を検証）。
+- 新規権限・新規Gradle依存なし。既存の幅ゲート・手動オーバーライド・破壊的操作ガードは変更なし。
 
 ## v1.7.0 の設計変更（要約）
 - **8ベンダーPCモード統合検出**: 新規 `desktop/DesktopMode.kt`（`Signals`+`resolve()`+`vendorForManufacturer()`、すべてpureで単体テスト可能）。AUTO時は従来信号（`UI_MODE_TYPE_DESK`・キャプションバー・`isInMultiWindowMode`）に加え、フリーフォーム（`Activity.getWindowingMode==5`、API 28+、reflection＋`runCatching`）とSamsung `SemDesktopModeManager.isDesktopMode` reflectionをOR。キーボード/マウス・外部ディスプレイは単独トリガーにしない（キーボード付きタブレットの誤判定防止）。`MainNavigation`の幅ゲート（≥600dp）は維持。

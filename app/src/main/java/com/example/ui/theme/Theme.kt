@@ -49,6 +49,9 @@ private val LightColors = lightColorScheme(
     inverseSurface = md_inverseSurface_light,
     inverseOnSurface = md_inverseOnSurface_light,
     inversePrimary = md_inversePrimary_light,
+    surfaceDim = md_surfaceDim_light,
+    surfaceBright = md_surfaceBright_light,
+    surfaceTint = md_surfaceTint_light,
     scrim = md_scrim_light,
 )
 
@@ -85,6 +88,9 @@ private val DarkColors = darkColorScheme(
     inverseSurface = md_inverseSurface_dark,
     inverseOnSurface = md_inverseOnSurface_dark,
     inversePrimary = md_inversePrimary_dark,
+    surfaceDim = md_surfaceDim_dark,
+    surfaceBright = md_surfaceBright_dark,
+    surfaceTint = md_surfaceTint_dark,
     scrim = md_scrim_dark,
 )
 
@@ -130,6 +136,7 @@ fun MediaMasterTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
+        shapes = AppShapes,
         content = content,
     )
 }

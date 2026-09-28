@@ -1,6 +1,7 @@
 package com.example.ui.components
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.foundation.layout.Box
@@ -39,20 +40,26 @@ fun SortViewMenu(
                 )
                 HorizontalDivider()
             }
+            // v1.9.0 (MD3 remake): trailing check marks the current sort
+            // instead of a "(Current)" text suffix.
             DropdownMenuItem(
-                text = { Text(menuLabel(R.string.sort_by_name, currentSort == SortOption.NAME)) },
+                text = { Text(stringResource(R.string.sort_by_name)) },
+                trailingIcon = checkMark(currentSort == SortOption.NAME),
                 onClick = { viewModel.setSortOption(SortOption.NAME); expanded = false }
             )
             DropdownMenuItem(
-                text = { Text(menuLabel(R.string.sort_by_date, currentSort == SortOption.DATE_CREATED)) },
+                text = { Text(stringResource(R.string.sort_by_date)) },
+                trailingIcon = checkMark(currentSort == SortOption.DATE_CREATED),
                 onClick = { viewModel.setSortOption(SortOption.DATE_CREATED); expanded = false }
             )
             DropdownMenuItem(
-                text = { Text(menuLabel(R.string.sort_by_size, currentSort == SortOption.SIZE)) },
+                text = { Text(stringResource(R.string.sort_by_size)) },
+                trailingIcon = checkMark(currentSort == SortOption.SIZE),
                 onClick = { viewModel.setSortOption(SortOption.SIZE); expanded = false }
             )
             DropdownMenuItem(
-                text = { Text(menuLabel(R.string.sort_by_type, currentSort == SortOption.TYPE)) },
+                text = { Text(stringResource(R.string.sort_by_type)) },
+                trailingIcon = checkMark(currentSort == SortOption.TYPE),
                 onClick = { viewModel.setSortOption(SortOption.TYPE); expanded = false }
             )
             HorizontalDivider()
@@ -82,7 +89,7 @@ fun SortViewMenu(
 }
 
 @Composable
-private fun menuLabel(labelRes: Int, selected: Boolean): String {
-    val label = stringResource(labelRes)
-    return if (selected) "$label (${stringResource(R.string.current)})" else label
-}
+private fun checkMark(selected: Boolean): @Composable (() -> Unit)? =
+    if (selected) {
+        { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.current)) }
+    } else null

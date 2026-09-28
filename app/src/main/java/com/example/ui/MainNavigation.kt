@@ -6,7 +6,8 @@ import android.provider.Settings
 import android.os.Environment
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -23,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.FileViewModel
 import com.example.R
@@ -112,13 +114,15 @@ fun MainNavigation(
                     )
                 }
             } else {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    MediaNavHost(navController, fileViewModel, settingsViewModel, false)
-                    com.example.playback.MiniPlayer(
-                        onNavigateToAudio = { navController.navigate("nowPlaying") { launchSingleTop = true } },
-                        modifier = Modifier.align(Alignment.BottomCenter),
-                    )
-                }
+                // v1.9.0 (MD3 remake): phone shell uses a Scaffold whose
+                // bottomBar stacks MiniPlayer above a persistent NavigationBar,
+                // so content padding always clears both and grids no longer
+                // slide underneath the player while audio plays.
+                PhoneScaffold(
+                    navController = navController,
+                    fileViewModel = fileViewModel,
+                    settingsViewModel = settingsViewModel,
+                )
             }
         }
     } else {
@@ -133,6 +137,81 @@ fun MainNavigation(
                 }
             }
         )
+    }
+}
+
+/** Top-level phone destinations shown in the persistent NavigationBar. */
+data class TopDestination(
+    val route: String,
+    val labelRes: Int,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+)
+
+val TOP_DESTINATIONS = listOf(
+    TopDestination("home", R.string.home, Icons.Default.Home),
+    TopDestination("library", R.string.library, Icons.Default.PhotoLibrary),
+    TopDestination("audio", R.string.audio, Icons.Default.LibraryMusic),
+    TopDestination("documents", R.string.documents, Icons.Default.Description),
+    TopDestination("manage", R.string.manage, Icons.Default.Folder),
+)
+
+/**
+ * Phone shell (v1.9.0 MD3 remake): a Material 3 Scaffold with a persistent
+ * [BottomNavBar] on top-level routes. MiniPlayer sits directly above the bar
+ * inside the same bottomBar slot, so the content padding Scaffold hands out
+ * always clears both — list grids can no longer end up underneath the player.
+ * Detail routes (viewer, editors, browsers, pickers) hide the bar and keep
+ * the TopAppBar-back pattern untouched.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PhoneScaffold(
+    navController: NavHostController,
+    fileViewModel: FileViewModel,
+    settingsViewModel: SettingsViewModel,
+) {
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = backStackEntry?.destination?.route
+    val showBar = TOP_DESTINATIONS.any { it.route == currentRoute }
+    Scaffold(
+        bottomBar = {
+            Column {
+                com.example.playback.MiniPlayer(
+                    onNavigateToAudio = { navController.navigate("nowPlaying") { launchSingleTop = true } },
+                )
+                if (showBar) {
+                    BottomNavBar(
+                        currentRoute = currentRoute,
+                        onNavigate = { route ->
+                            navController.navigate(route) {
+                                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                    )
+                }
+            }
+        }
+    ) { innerPadding ->
+        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            MediaNavHost(navController, fileViewModel, settingsViewModel, false)
+        }
+    }
+}
+
+/** Persistent phone navigation bar; hoisted for Robolectric behavior tests. */
+@Composable
+fun BottomNavBar(currentRoute: String?, onNavigate: (String) -> Unit) {
+    NavigationBar {
+        TOP_DESTINATIONS.forEach { dest ->
+            NavigationBarItem(
+                selected = currentRoute == dest.route,
+                onClick = { onNavigate(dest.route) },
+                icon = { Icon(dest.icon, contentDescription = null) },
+                label = { Text(stringResource(dest.labelRes)) },
+            )
+        }
     }
 }
 
@@ -287,18 +366,21 @@ fun HomeCard(
             modifier = Modifier.fillMaxSize().padding(16.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .background(MaterialTheme.colorScheme.primaryContainer, shape = androidx.compose.foundation.shape.CircleShape),
-                contentAlignment = Alignment.Center
+            // v1.9.0 (MD3 remake): tonal Surface halo instead of a raw
+            // background so icon tint comes from contentColor pairing.
+            Surface(
+                modifier = Modifier.size(44.dp),
+                shape = androidx.compose.foundation.shape.CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(24.dp),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
             }
             Column {
                 Text(text = title, style = MaterialTheme.typography.titleMedium)
@@ -327,6 +409,7 @@ fun PermissionScreen(
         modifier = Modifier
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.safeDrawing)
+            .verticalScroll(androidx.compose.foundation.rememberScrollState())
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center

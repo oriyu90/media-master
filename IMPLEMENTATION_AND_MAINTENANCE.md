@@ -1,26 +1,61 @@
-# Media Master v1.8.0 実装・保守メモ
+# Media Master v1.9.0 実装・保守メモ
 
-最終更新: 2026-09-28
+最終更新: 2026-09-29
 
 ## リリース情報
 
 | 項目 | 内容 |
 | --- | --- |
-| バージョン | `1.8.0` (`versionCode 13`) |
+| バージョン | `1.9.0` (`versionCode 14`) |
 | アプリケーションID | `com.yukiorita.mediamaster` |
 | 最小 SDK / target SDK | 24 / 36 |
 | ライセンス | MIT |
 | 著作者 | Yuki_Orita |
 | release APK | `app/build/outputs/apk/release/app-release.apk`（R8 + resource shrink 有効） |
-| APK SHA-256 | `e7c07575bbbc6675672d2cf64a30a093fd5b3df1c8fd875eec9d8bfd71caf6c4` |
-| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.7.1 と同一鍵） |
-| GitHub Release | `v1.8.0` (GitHub Releases) |
+| APK SHA-256 | `74994a9d1313cb0b2acdec9b15b329b1d3b85b110e9901ef542855b4b33ee85b` |
+| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.8.0 と同一鍵） |
+| GitHub Release | `v1.9.0` (GitHub Releases) |
 
 release APK は RSA 4096 ビット鍵・APK Signature Scheme v2 署名（`apksigner verify` で確認済み）。署名鍵は `common-rules-document/keystores/media-master-upload-key.jks`（alias `upload`）。
 
-v1.8.0 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitTest`(87件)/`:app:lintDebug`(0エラー)を確認。**実機（エミュレータ）デバッグ実施済み**——本番署名済みAPKをクリーンインストールし起動・Home表示でクラッシュ0件（`logcat -b crash` FATAL 0件）。証明書は v0.1.0〜v1.7.1 と同一 `332ce386…eba6`（v2のみ）。
+v1.9.0 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitTest`(104件)/`:app:lintDebug`(0エラー)/`verifyRoborazziDebug`(6件参照一致)/`:app:jacocoTestReport`を確認。**実機（エミュレータ）デバッグ実施済み**——本番署名済みAPKをクリーンインストールし起動・Home表示でクラッシュ0件（`logcat -b crash` FATAL 0件）。証明書は v0.1.0〜v1.8.0 と同一 `332ce386…eba6`（v2のみ）。
 
-旧リリースの APK SHA-256: v1.7.1 `4f79abcc32747a6889787c22d051ff831d55aca27330f81923760fcc63fcc1ee`、v1.7.0 `08236934c0cbf522ce0432595933e03976368ec3b0ee000ad4ced962b2fa9fd5`、v1.6.0 `f922b2b2d797f69fe4b1c9a7aca366e9f1664f8b47c8cfbeeb9aaeb02235b615`。
+旧リリースの APK SHA-256: v1.8.0 `e7c07575bbbc6675672d2cf64a30a093fd5b3df1c8fd875eec9d8bfd71caf6c4`、 v1.7.1 `4f79abcc32747a6889787c22d051ff831d55aca27330f81923760fcc63fcc1ee`、v1.7.0 `08236934c0cbf522ce0432595933e03976368ec3b0ee000ad4ced962b2fa9fd5`、v1.6.0 `f922b2b2d797f69fe4b1c9a7aca366e9f1664f8b47c8cfbeeb9aaeb02235b615`。
+
+## v1.9.0 実装内容（MD3 UIリメイク＋テスト戦略）
+
+ユーザー依頼「hamen/material-3-skill・android/skills testing-setupを取り込み、UIを精査してリメイク」への対応。両スキルは`.agent/skills/`へ同梱（LICENSE同梱・出典明記、改変なし）。
+
+### 監査結果（material-3スキル監査手順・10分類）
+- Color 8/10・Typography 8/10・Shape 6/10・Elevation 7/10・Components 7/10・Layout 7/10・Navigation 5/10・Motion 6/10・Accessibility 6/10・Theming 8/10（総合約68/100）。詳細は作業スレッドの監査ダイジェストを参照。
+
+### テーマ完結（T1）
+- `surfaceDim/Bright/Tint`をwarm-neutralランプで追加（light: dim `D8CFBC`/bright `FFFBF2`、dark: dim `110E07`/bright `39332B`、tintは各primary）。既定の紫ベース残存を解消。`shadow`は当該BOMのscheme factoryに引数が無いため見送り（既定黒と同値のため実害なし）。
+- `Shapes.kt`新設（extraSmall 4/small 8/medium 12/large 16/extraLarge 28dp）し`MediaMasterTheme(shapes=)`へ明示。既定値と同値のため見た目不変・将来のExpressiveトークンの受け皿。
+- 動的カラー既定OFF・`FontFamily.Default`・タイトルSemiBoldは意図通り維持（WCAG AAブランドパレット優先）。
+
+### ナビゲーション＋シェル（T2/T3）
+- 電話シェルに永続`NavigationBar`（Home/Library/Audio/Documents/Manage、`TOP_DESTINATIONS`＋`BottomNavBar`分離でテスト可能、詳細ルートでは非表示、`popUpTo(saveState)+launchSingleTop+restoreState`）。
+- MiniPlayerをbottomBar内上段へ積み、content paddingでグリッド下敷きを解消（デスクトップ側は84dp条件予約）。 viewer/player/PiP・DeX検出・幅ゲートは不変。
+- HomeCardハローを`Surface(Circle)`化（contentColorペアリング）、PermissionScreenをスクロール対応化。
+
+### コンポーネント正規化（T4/T5/T6/T7）
+- Library: アルバム`Card(onClick)`化、72%帯スクリムへ統一（gradient＋viewerトークン廃止）、グリッドにcheckbox role＋stateDescription、ソートメニューはtrailing check化。
+- SortViewMenu/BreadcrumbBar: checkアイコン化、Breadcrumbsはselected＋`navigate_to`説明＋スクロール競合修正（maxValue確定後にscrollTo）。
+- Settings: `SwitchRow`共有化（行全体toggle＋Role.Switch、Switch本体は表示専用）、バックアップ時刻は`TimePicker`＋Start/Endタブ化、SSID欄はDone IME＋imePadding。
+- FolderPicker: Createを`Button`化（空名で無効）＋Done IME＋imePadding。Network: 走査/停止を`IconButton`化、検出見出しをlabel化、編集欄imePadding＋password IME、編集/削除に間隔。MediaThumbnail: tonal placeholder＋errorフォールバック。Desktop tab stripにselected付与（レイアウト不変）。
+- 新規文字列は`navigate_to`のみ（5言語）。`R.string.current`はメニュー表示に使わなくなったが他参照があるため残置。
+
+### テスト戦略（T8・testing-setup準拠）
+- `docs/testing.md`＋`AGENTS.md`新設、JaCoCoレポート（`jacocoTestReport`）追加。Hilt/MockK/AGP更新は見送り（理由をtesting.mdに記録）。
+- Unit: `DiscoveredDraftTest`（pure seam `discoveredToDraft`、JVMのみ）3件。
+- 行為（Robolectric＋createComposeRule）: `BreadcrumbBarTest`3件・`SwitchRowTest`2件・`BottomNavBarTest`3件。セマンティクス優先・testTag不使用・復元は制御コンポーネントの再合成で代替（記録あり）。
+- スクリーンショット: `RemadeComponentScreenshotTest`6件（Empty/Error/SwitchRow/StatusPillのlight/dark、参照PNGを`src/test/screenshots/`へ同梱、`verifyRoborazziDebug`で一致確認）。
+- 変更ファイル: theme 3件＋新規Shapes、MainNavigation、DesktopNavigation、LibraryScreen、SortViewMenu、BreadcrumbBar、CommonUi（SwitchRow）、SettingsScreen、FolderPickerDialog、NetworkScreen、MediaThumbnail、NetworkModels/NetworkViewModel（pure seam）、strings_ui 5言語、tests 5件＋参照PNG 6件、build.gradle.kts（1.9.0/14＋jacoco）、docs/testing.md＋AGENTS.md。
+
+### 検証
+- `:app:testDebugUnitTest` 104件全通過（既存87＋新規17）/`:app:lintDebug` 0エラー/`verifyRoborazziDebug` 6件一致/`jacocoTestReport` 生成。
+- 実機（Medium_Phone_API_36.1）: 本番署名済みAPKをクリーンインストール→権限付与→Home表示でFATAL 0件。スクリーンショットで新NavigationBar（5宛先・Home選択）を確認、Libraryタップ遷移（選択移動・グリッド描画）でFATAL 0件。
 
 ## v1.8.0 実装内容（7件対応）
 

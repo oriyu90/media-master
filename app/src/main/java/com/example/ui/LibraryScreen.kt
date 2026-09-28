@@ -4,7 +4,6 @@ import android.net.Uri
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -16,6 +15,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -29,8 +29,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
@@ -273,9 +276,13 @@ private fun LibrarySortMenu(current: SortOption, onSelect: (SortOption) -> Unit)
                 SortOption.TYPE to R.string.sort_by_type,
             )
             options.forEach { (option, labelRes) ->
-                val label = stringResource(labelRes)
+                // v1.9.0 (MD3 remake): trailing check icon marks the current
+                // option instead of a "(Current)" text suffix.
                 DropdownMenuItem(
-                    text = { Text(if (option == current) "$label (${stringResource(R.string.current)})" else label) },
+                    text = { Text(stringResource(labelRes)) },
+                    trailingIcon = if (option == current) {
+                        { Icon(Icons.Default.Check, contentDescription = stringResource(R.string.current)) }
+                    } else null,
                     onClick = { onSelect(option); expanded = false }
                 )
             }
@@ -458,10 +465,12 @@ fun AlbumsView(viewState: ViewState, navController: NavHostController, excludedF
                     val files = albums[albumName] ?: emptyList()
                     val firstFile = files.firstOrNull()
 
+                    // v1.9.0 (MD3 remake): Card(onClick) overload for ripple +
+                    // role, and the shared 72% caption strip instead of a raw
+                    // gradient with a viewer token.
                     Card(
-                        modifier = Modifier.fillMaxWidth().aspectRatio(1f).clickable {
-                            navController.navigate("album/${Uri.encode(albumName)}")
-                        },
+                        onClick = { navController.navigate("album/${Uri.encode(albumName)}") },
+                        modifier = Modifier.fillMaxWidth().aspectRatio(1f),
                     ) {
                         Box(modifier = Modifier.fillMaxSize()) {
                             if (firstFile != null) {
@@ -476,17 +485,12 @@ fun AlbumsView(viewState: ViewState, navController: NavHostController, excludedF
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .align(Alignment.BottomStart)
-                                    .background(
-                                        androidx.compose.ui.graphics.Brush.verticalGradient(
-                                            0f to androidx.compose.ui.graphics.Color.Transparent,
-                                            1f to androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.72f),
-                                        )
-                                    )
+                                    .background(Color.Black.copy(alpha = 0.72f))
                                     .padding(horizontal = 8.dp, vertical = 6.dp)
                             ) {
                                 Text(
                                     text = albumName,
-                                    color = com.example.ui.theme.ViewerOnSurface,
+                                    color = Color.White,
                                     style = MaterialTheme.typography.bodyMedium,
                                     maxLines = 1,
                                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
@@ -509,10 +513,17 @@ fun AlbumsView(viewState: ViewState, navController: NavHostController, excludedF
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MediaGridItem(file: MediaFile, isSelected: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
+    val selectedText = stringResource(R.string.selected)
+    // v1.9.0 (MD3 remake): checkbox role + state description so selection is
+    // conveyed by semantics, not only by the border tint. Visuals unchanged.
     Box(
         modifier = Modifier
             .aspectRatio(1f)
-            .semantics { selected = isSelected }
+            .semantics {
+                selected = isSelected
+                role = Role.Checkbox
+                stateDescription = if (isSelected) selectedText else ""
+            }
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick

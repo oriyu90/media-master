@@ -262,7 +262,14 @@ fun DesktopNavigation(
                 }
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            // v1.9.0 (MD3 remake): reserve the overlay MiniPlayer's height so
+            // content grids never end up underneath it while audio plays.
+            // Detection/layout logic above is untouched (DeX freeze).
+            val miniTitle by com.example.playback.PlaybackManager.currentMediaTitle.collectAsStateWithLifecycle()
+            Box(
+                modifier = Modifier.weight(1f).fillMaxWidth()
+                    .padding(bottom = if (miniTitle.isNotEmpty()) 84.dp else 0.dp)
+            ) {
                 navHost(settingsViewModel::addPinnedFolder, ::openInNewTab)
             }
             // v1.8.0 (#7): always-visible mode indicator so users can tell
@@ -312,7 +319,10 @@ private fun DesktopTabStrip(
             tabs.forEach { tab ->
                 val selected = tab.id == selectedTabId
                 Surface(
-                    modifier = Modifier.widthIn(min = 132.dp, max = 220.dp).fillMaxHeight(),
+                    modifier = Modifier.widthIn(min = 132.dp, max = 220.dp).fillMaxHeight()
+                        // v1.9.0 (MD3 remake): expose tab semantics without
+                        // touching the custom strip layout (DeX freeze).
+                        .semantics { this.selected = selected },
                     color = if (selected) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceContainerLow,
                     contentColor = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                     onClick = { onSelect(tab) }

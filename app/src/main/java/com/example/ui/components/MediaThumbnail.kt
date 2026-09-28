@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -14,7 +15,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
@@ -48,7 +52,12 @@ fun MediaThumbnail(
         file.mimeType.startsWith("image/") || file.mimeType.startsWith("video/") -> {
             // v1.8.0 (#3): sized ImageRequest with memory-cache key + crossfade
             // so grids show cached thumbnails instantly instead of blank.
+            // v1.9.0 (MD3 remake): tonal placeholder ground + error fallback
+            // icon so a failed decode never leaves an unexplained blank tile.
             val context = LocalContext.current
+            var failed by androidx.compose.runtime.remember(file.path, file.contentUri) {
+                androidx.compose.runtime.mutableStateOf(false)
+            }
             val request = androidx.compose.runtime.remember(file.path, file.contentUri) {
                 coil.request.ImageRequest.Builder(context)
                     .data(file.contentUri ?: File(file.path))
@@ -58,12 +67,27 @@ fun MediaThumbnail(
                     .crossfade(true)
                     .build()
             }
-            AsyncImage(
-                model = request,
-                contentDescription = file.name,
-                modifier = modifier,
-                contentScale = contentScale,
-            )
+            androidx.compose.foundation.layout.Box(
+                modifier = modifier.background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (failed) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.InsertDriveFile,
+                        contentDescription = file.name,
+                        modifier = Modifier.size(iconSize),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    AsyncImage(
+                        model = request,
+                        contentDescription = file.name,
+                        onError = { failed = true },
+                        modifier = Modifier.matchParentSize(),
+                        contentScale = contentScale,
+                    )
+                }
+            }
         }
         file.mimeType.startsWith("audio/") -> AudioThumbnail(file, modifier, contentScale, iconSize)
         else -> Box(modifier, contentAlignment = Alignment.Center) {

@@ -12,10 +12,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.InsertDriveFile
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -74,15 +76,15 @@ fun NetworkScreen(navController: NavHostController, viewModel: NetworkViewModel 
                     }
                 },
                 actions = {
-                    // v1.8.0 (#6): one-tap LAN scan; safe single-shot, no background work.
+                    // v1.9.0 (MD3 remake): top-app-bar actions are IconButtons.
                     if (browseState is BrowseUiState.Idle) {
                         if (discovering) {
-                            TextButton(onClick = viewModel::stopDiscovery) {
-                                Text(stringResource(R.string.stop_scan))
+                            IconButton(onClick = viewModel::stopDiscovery) {
+                                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.stop_scan))
                             }
                         } else {
-                            TextButton(onClick = viewModel::startDiscovery) {
-                                Text(stringResource(R.string.scan_lan))
+                            IconButton(onClick = viewModel::startDiscovery) {
+                                Icon(Icons.Default.Search, contentDescription = stringResource(R.string.scan_lan))
                             }
                         }
                     }
@@ -201,7 +203,8 @@ private fun LocationList(
                 },
                 leadingContent = { Icon(Icons.Default.Storage, contentDescription = null) },
                 trailingContent = {
-                    Row {
+                    // v1.9.0 (MD3 remake): gap between the two 48dp targets.
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         IconButton(onClick = { onEdit(loc) }) {
                             Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.edit_location))
                         }
@@ -224,10 +227,12 @@ private fun DiscoveredSection(
     onAdd: (DiscoveredDevice) -> Unit,
 ) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        // v1.9.0 (MD3 remake): section header uses the label role, not title
+        // in primary.
         Text(
             text = stringResource(R.string.discovered_devices),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(vertical = 4.dp),
         )
         if (discovering && discovered.isEmpty()) {
@@ -293,7 +298,7 @@ private fun LocationEditorDialog(
         title = { Text(stringResource(if (existing == null) R.string.add_location else R.string.edit_location)) },
         text = {
             Column(
-                Modifier.verticalScroll(rememberScrollState()),
+                Modifier.verticalScroll(rememberScrollState()).imePadding(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 SingleLineField(name, { name = it }, R.string.location_name)
@@ -321,6 +326,10 @@ private fun LocationEditorDialog(
                     label = { Text(stringResource(R.string.password)) },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Done,
+                    ),
                     supportingText = if (existing != null) {
                         { Text(stringResource(R.string.password_keep_hint)) }
                     } else null,

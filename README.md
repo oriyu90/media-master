@@ -4,6 +4,14 @@ Media Master is an open-source Android media and file manager built with Kotlin 
 
 Media Master は、Kotlin と Jetpack Compose で開発されたオープンソースのAndroid向けメディア・ファイル管理アプリです。写真・動画、音楽、書類、ストレージ、アプリ／APK、編集、バックアップを1つのアプリで扱えます。
 
+## v1.9.0
+
+- **MD3 UI remake (material-3-skill audit ~68→pass):** vendored `hamen/material-3-skill` + `android/skills/testing-setup` into `.agent/skills/` and remade the UI by the skill's audit procedure. Theme now wires the full token set (`surfaceDim/Bright/Tint` added, explicit `Shapes` scale); phone gets a persistent Material 3 `NavigationBar` (Home/Library/Audio/Documents/Manage, detail routes hide it); MiniPlayer stacks above the bar so grids no longer slide underneath it (desktop reserves the same height).
+- **M3 component normalization:** `Card(onClick)` albums with a shared 72% caption strip, selectable grid items with checkbox role + state description, trailing-check menus instead of "(Current)" suffixes, breadcrumb selected semantics with a layout-race fix, whole-row `SwitchRow` toggles, canonical `TimePicker` backup window, `Button` confirms, `IconButton` scan actions, thumbnail placeholder/error states, IME-aware dialogs, desktop tab semantics.
+- **Testing strategy (testing-setup skill):** new `docs/testing.md` + `AGENTS.md`, JaCoCo coverage (`jacocoTestReport`), pure-seam unit test (`discoveredToDraft`), Robolectric behavior tests (breadcrumb/switch/bottom-bar), Roborazzi component screenshots (light+dark references in `src/test/screenshots/`). No Hilt/MockK/AGP upgrade — manual fakes, existing Roborazzi 1.59 stack.
+- **MD3 UIリメイク（material-3-skill監査に基づく改修）:** `.agent/skills/` に両スキルを同梱し監査手順でUIを刷新。テーマはトークン完結（`surfaceDim/Bright/Tint`追加・`Shapes`明示）、電話UIに永続`NavigationBar`（5宛先、詳細画面では非表示）、MiniPlayerをバー上段に積んで下敷きを解消（デスクトップも同等予約）。
+- Version `1.9.0` (`versionCode 14`), signed with the same upload key as v0.1.0–v1.8.0 (APK Signature Scheme v2 verified). **APK SHA-256: `74994a9d1313cb0b2acdec9b15b329b1d3b85b110e9901ef542855b4b33ee85b`.**
+
 ## v1.8.0
 
 - **DeX text-color fix (#1):** desktop sidebar/tab text now uses explicit Material 3 content colors (selected \`onSecondaryContainer\`, unselected \`onSurface\`/\`onSurfaceVariant\`) instead of inherited colors, so DeX shells never render stale light-on-light or dark-on-dark glyphs. Status/navigation bar icon legibility is derived from actual surface luminance. Lenovo PC-mode settings probe is now strictly vendor-gated.

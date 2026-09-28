@@ -59,6 +59,13 @@ val md_inverseOnSurface_light = Color(0xFFF8EFE1)
 val md_inversePrimary_light = Color(0xFFF2BF48)
 val md_scrim_light = Color(0xFF000000)
 
+// v1.9.0 (MD3 token completion): previously these fell back to the
+// purple-baseline defaults inside lightColorScheme(). Values follow the
+// surrounding warm-neutral ramp so tonal elevation stays on-brand.
+val md_surfaceDim_light = Color(0xFFD8CFBC)
+val md_surfaceBright_light = Color(0xFFFFFBF2)
+val md_surfaceTint_light = md_primary_light
+
 // ---------------------------------------------------------------------------
 // Dark
 // ---------------------------------------------------------------------------
@@ -101,6 +108,12 @@ val md_inverseSurface_dark = Color(0xFFEBE1D0)
 val md_inverseOnSurface_dark = Color(0xFF34302A)
 val md_inversePrimary_dark = Color(0xFF785A00)
 val md_scrim_dark = Color(0xFF000000)
+
+// v1.9.0 (MD3 token completion): dim keeps the darkest ramp value, bright
+// the lightest, so always-bright/always-dim surfaces never flip with theme.
+val md_surfaceDim_dark = Color(0xFF110E07)
+val md_surfaceBright_dark = Color(0xFF39332B)
+val md_surfaceTint_dark = md_primary_dark
 
 // ---------------------------------------------------------------------------
 // Media viewer surface — deliberately dark in both themes (photos/videos read

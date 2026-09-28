@@ -78,19 +78,8 @@ class NetworkViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Prefill helper: discovered device -> unsaved NetworkLocation draft. */
-    fun draftFromDiscovered(device: DiscoveredDevice): NetworkLocation {
-        val protocol = device.hint ?: NetworkProtocol.SMB
-        return NetworkLocation(
-            id = newLocationId(),
-            name = device.serviceName.take(48),
-            protocol = protocol,
-            host = device.host,
-            port = device.port,
-            share = "",
-            basePath = "",
-            username = "",
-        )
-    }
+    fun draftFromDiscovered(device: DiscoveredDevice): NetworkLocation =
+        discoveredToDraft(device, newLocationId())
 
     fun open(location: NetworkLocation) = navigate(location, "")
 

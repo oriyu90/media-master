@@ -34,4 +34,5 @@
     <string name="video_buffering">جارٍ التخزين المؤقت…</string>
     <string name="video_error">تعذر تشغيل هذا الفيديو.</string>
     <string name="image_load_error">تعذر تحميل هذه الصورة.</string>
+    <string name="navigate_to">انتقل إلى %1$s</string>
 </resources>

@@ -34,4 +34,5 @@
     <string name="video_buffering">Bufferen…</string>
     <string name="video_error">Deze video kan niet worden afgespeeld.</string>
     <string name="image_load_error">Deze afbeelding kan niet worden geladen.</string>
+    <string name="navigate_to">Navigeren naar %1$s</string>
 </resources>

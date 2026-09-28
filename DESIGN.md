@@ -1,7 +1,14 @@
 # 設計書兼仕様書 (Media Master)
 
 ## バージョン情報
-- **Version:** 1.8.0
+- **Version:** 1.9.0
+
+## v1.9.0 の設計変更（要約）
+- **スキル同梱**: `hamen/material-3-skill`（MIT）と`android/skills/testing-setup`（Apache-2.0）を`.agent/skills/`へ同梱（LICENSE同梱・出典明記）。監査はスキル手順の10分類で実施（総合約68/100）。
+- **テーマ完結**: `surfaceDim/Bright/Tint`をwarm-neutralランプで追加配線（既定の紫ベース残存を解消）。`Shapes.kt`新設（4/8/12/16/28dp）し`MediaMasterTheme(shapes=)`へ明示（既定値と同値のため見た目不変）。動的カラー既定OFF・書体既定・タイトルウェイトは意図通り維持。
+- **電話NavigationBar**: 上位5ルートのみ表示する永続バー（`TOP_DESTINATIONS`＋`BottomNavBar`分離でテスト可能）。`popUpTo(saveState)+launchSingleTop+restoreState`遷移。MiniPlayerはbottomBar内上段に積み、content paddingで下敷きを解消（デスクトップは84dp予約）。DeX検出・幅ゲート・viewer/player・データ層は不変。
+- **正規化**: アルバム`Card(onClick)`＋72%帯スクリム、グリッドcheckboxセマンティクス、メニューはtrailing check、Breadcrumbsはselected＋スクロール競合修正、`SwitchRow`共有化（行全体toggle）、時刻は`TimePicker`＋Start/Endタブ、FolderPickerのCreateは`Button`＋Done IME、Network走査は`IconButton`化＋見出しlabel化＋imePadding、サムネイルはplaceholder/error、デスクトップタブにselected。
+- **テスト**: `docs/testing.md`＋`AGENTS.md`、JaCoCo（`jacocoTestReport`）、pure seam（`discoveredToDraft`）、Robolectric行為3件、Breadcrumbs/Switch/BottomNav、Roborazzi部品6件（light/dark参照PNG同梱）。Hilt/MockK/AGP更新なし。
 
 ## v1.7.1 の設計変更（要約）
 - **Lenovoヒューリスティック**: `DesktopMode`に`oemDesktopHeuristic`信号を追加し`hasCoreTrigger()`へOR。実体は`isLenovoDesktopHeuristic()`（Lenovo製＋キーボード/マウス接続、またはPCモード系設定キー`pc_mode`/`lenovo_pc_mode`/`zui_pc_mode`/`productivity_mode`/`desktop_mode`/`lenovo_desktop_mode`のいずれかが有効値。Global/Secure/Systemを横断プローブ、全`runCatching`保護・権限不要）。キーボード分岐はLenovo製にゲートし他社動作不変。`isDesktopLayout()`側で`remember(context, activity)`収集。

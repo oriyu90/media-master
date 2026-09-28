@@ -50,10 +50,18 @@ fun FolderPickerDialog(
                     onValueChange = { newFolderName = it },
                     label = { Text(stringResource(R.string.folder_name)) },
                     singleLine = true,
+                    // v1.9.0 (MD3 remake): Done IME action + ime padding so
+                    // the keyboard never covers the field.
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Done,
+                    ),
+                    modifier = Modifier.fillMaxWidth().imePadding(),
                 )
             },
             confirmButton = {
-                TextButton(
+                // v1.9.0 (MD3 remake): primary create action uses Button,
+                // not TextButton.
+                Button(
                     onClick = {
                         val name = newFolderName.trim()
                         if (name.isNotEmpty()) {
@@ -61,7 +69,8 @@ fun FolderPickerDialog(
                             refreshTrigger++
                         }
                         showNewFolderDialog = false
-                    }
+                    },
+                    enabled = newFolderName.isNotBlank(),
                 ) { Text(stringResource(R.string.create)) }
             },
             dismissButton = {

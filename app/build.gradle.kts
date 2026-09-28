@@ -1,8 +1,10 @@
+import org.gradle.testing.jacoco.tasks.JacocoReport
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.kotlin.serialization)
   alias(libs.plugins.roborazzi)
+  jacoco
 }
 
 android {
@@ -13,8 +15,8 @@ android {
     applicationId = "com.yukiorita.mediamaster"
     minSdk = 24
     targetSdk = 36
-    versionCode = 13
-    versionName = "1.8.0"
+    versionCode = 14
+    versionName = "1.9.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -115,4 +117,25 @@ dependencies {
   androidTestImplementation(libs.androidx.runner)
   debugImplementation(libs.androidx.compose.ui.test.manifest)
   debugImplementation(libs.androidx.compose.ui.tooling)
+}
+
+// v1.9.0 (testing-setup Step 14): local unit-test coverage. The plain
+// `jacoco` plugin alone creates no report task for AGP test tasks, so it is
+// registered explicitly against testDebugUnitTest's .exec output.
+tasks.register<JacocoReport>("jacocoTestReport") {
+    group = "verification"
+    description = "Generates JaCoCo coverage for debug unit tests."
+    dependsOn("testDebugUnitTest")
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
+    classDirectories.setFrom(
+        files(
+            "$buildDir/tmp/kotlin-classes/debug",
+            "$buildDir/intermediates/javac/debug/classes",
+        )
+    )
+    sourceDirectories.setFrom(files("src/main/java"))
+    executionData.setFrom(files("$buildDir/jacoco/testDebugUnitTest.exec"))
 }

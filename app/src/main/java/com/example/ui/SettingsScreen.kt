@@ -3,8 +3,10 @@ package com.example.ui
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -127,12 +129,12 @@ fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostControlle
                 )
             }
             item {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.enable_backup)) },
-                    supportingContent = { Text(stringResource(R.string.auto_backup)) },
-                    trailingContent = {
-                        Switch(checked = backupEnabled, onCheckedChange = { viewModel.setBackupEnabled(it) })
-                    }
+                // v1.9.0 (MD3 remake): whole-row toggle with Switch role.
+                com.example.ui.components.SwitchRow(
+                    headline = stringResource(R.string.enable_backup),
+                    supporting = stringResource(R.string.auto_backup),
+                    checked = backupEnabled,
+                    onCheckedChange = { viewModel.setBackupEnabled(it) },
                 )
             }
             if (backupEnabled) {
@@ -169,58 +171,55 @@ fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostControlle
                         modifier = Modifier.clickable { showTimeDialog = true }
                     )
                     if (showTimeDialog) {
-                        var startH by remember { mutableStateOf((backupStartTime / 60).toString()) }
-                        var startM by remember { mutableStateOf((backupStartTime % 60).toString()) }
-                        var endH by remember { mutableStateOf((backupEndTime / 60).toString()) }
-                        var endM by remember { mutableStateOf((backupEndTime % 60).toString()) }
+                        // v1.9.0 (MD3 remake): canonical TimePicker with
+                        // Start/End tabs replaces the hand-rolled H/M number
+                        // fields (which had no validation or error state).
+                        val dialogContext = LocalContext.current
+                        val is24Hour = remember {
+                            android.text.format.DateFormat.is24HourFormat(dialogContext)
+                        }
+                        var timeTab by remember { mutableIntStateOf(0) }
+                        val startState = rememberTimePickerState(
+                            initialHour = backupStartTime / 60,
+                            initialMinute = backupStartTime % 60,
+                            is24Hour = is24Hour,
+                        )
+                        val endState = rememberTimePickerState(
+                            initialHour = backupEndTime / 60,
+                            initialMinute = backupEndTime % 60,
+                            is24Hour = is24Hour,
+                        )
                         AlertDialog(
                             onDismissRequest = { showTimeDialog = false },
                             title = { Text(stringResource(R.string.time_window)) },
                             text = {
-                                Column {
-                                    Text(stringResource(R.string.start_time))
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        OutlinedTextField(
-                                            value = startH, onValueChange = { startH = it.filter(Char::isDigit).take(2) },
-                                            label = { Text(stringResource(R.string.hour_abbrev)) }, singleLine = true,
-                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                            modifier = Modifier.weight(1f),
+                                Column(Modifier.verticalScroll(rememberScrollState()).imePadding()) {
+                                    TabRow(selectedTabIndex = timeTab) {
+                                        Tab(
+                                            selected = timeTab == 0,
+                                            onClick = { timeTab = 0 },
+                                            text = { Text(stringResource(R.string.start_time)) },
                                         )
-                                        Text(":", modifier = Modifier.padding(horizontal = 8.dp))
-                                        OutlinedTextField(
-                                            value = startM, onValueChange = { startM = it.filter(Char::isDigit).take(2) },
-                                            label = { Text(stringResource(R.string.minute_abbrev)) }, singleLine = true,
-                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                            modifier = Modifier.weight(1f),
+                                        Tab(
+                                            selected = timeTab == 1,
+                                            onClick = { timeTab = 1 },
+                                            text = { Text(stringResource(R.string.end_time)) },
                                         )
                                     }
                                     Spacer(modifier = Modifier.height(16.dp))
-                                    Text(stringResource(R.string.end_time))
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        OutlinedTextField(
-                                            value = endH, onValueChange = { endH = it.filter(Char::isDigit).take(2) },
-                                            label = { Text(stringResource(R.string.hour_abbrev)) }, singleLine = true,
-                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                            modifier = Modifier.weight(1f),
-                                        )
-                                        Text(":", modifier = Modifier.padding(horizontal = 8.dp))
-                                        OutlinedTextField(
-                                            value = endM, onValueChange = { endM = it.filter(Char::isDigit).take(2) },
-                                            label = { Text(stringResource(R.string.minute_abbrev)) }, singleLine = true,
-                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                            modifier = Modifier.weight(1f),
-                                        )
+                                    Box(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        if (timeTab == 0) TimePicker(state = startState)
+                                        else TimePicker(state = endState)
                                     }
                                 }
                             },
                             confirmButton = {
                                 Button(onClick = {
-                                    val sh = (startH.toIntOrNull() ?: 0).coerceIn(0, 23)
-                                    val sm = (startM.toIntOrNull() ?: 0).coerceIn(0, 59)
-                                    val eh = (endH.toIntOrNull() ?: 0).coerceIn(0, 23)
-                                    val em = (endM.toIntOrNull() ?: 0).coerceIn(0, 59)
-                                    viewModel.setBackupStartTime(sh * 60 + sm)
-                                    viewModel.setBackupEndTime(eh * 60 + em)
+                                    viewModel.setBackupStartTime(startState.hour * 60 + startState.minute)
+                                    viewModel.setBackupEndTime(endState.hour * 60 + endState.minute)
                                     showTimeDialog = false
                                 }) { Text(stringResource(R.string.save)) }
                             },
@@ -231,19 +230,17 @@ fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostControlle
                     }
                 }
                 item {
-                    ListItem(
-                        headlineContent = { Text(stringResource(R.string.require_charging)) },
-                        trailingContent = {
-                            Switch(checked = backupRequiresCharging, onCheckedChange = { viewModel.setBackupRequiresCharging(it) })
-                        }
+                    com.example.ui.components.SwitchRow(
+                        headline = stringResource(R.string.require_charging),
+                        checked = backupRequiresCharging,
+                        onCheckedChange = { viewModel.setBackupRequiresCharging(it) },
                     )
                 }
                 item {
-                    ListItem(
-                        headlineContent = { Text(stringResource(R.string.require_wifi)) },
-                        trailingContent = {
-                            Switch(checked = backupRequiresWifi, onCheckedChange = { viewModel.setBackupRequiresWifi(it) })
-                        }
+                    com.example.ui.components.SwitchRow(
+                        headline = stringResource(R.string.require_wifi),
+                        checked = backupRequiresWifi,
+                        onCheckedChange = { viewModel.setBackupRequiresWifi(it) },
                     )
                 }
                 if (backupRequiresWifi) {
@@ -264,7 +261,9 @@ fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostControlle
                                         value = ssidInput,
                                         onValueChange = { ssidInput = it },
                                         label = { Text(stringResource(R.string.ssid)) },
-                                        singleLine = true
+                                        singleLine = true,
+                                        keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done),
+                                        modifier = Modifier.fillMaxWidth().imePadding(),
                                     )
                                 },
                                 confirmButton = {
@@ -281,11 +280,10 @@ fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostControlle
                     }
                 }
                 item {
-                    ListItem(
-                        headlineContent = { Text(stringResource(R.string.delete_previous)) },
-                        trailingContent = {
-                            Switch(checked = backupDeletePrevious, onCheckedChange = { viewModel.setBackupDeletePrevious(it) })
-                        }
+                    com.example.ui.components.SwitchRow(
+                        headline = stringResource(R.string.delete_previous),
+                        checked = backupDeletePrevious,
+                        onCheckedChange = { viewModel.setBackupDeletePrevious(it) },
                     )
                 }
                 item {

@@ -10,19 +10,23 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -155,6 +159,34 @@ fun LoadingButton(
             modifier = Modifier.padding(start = if (loading) 8.dp else 0.dp),
         )
     }
+}
+
+/**
+ * v1.9.0 (MD3 remake): a ListItem whose whole row toggles with
+ * [Role.Switch] semantics, so TalkBack users and small-target users get the
+ * full 56dp row instead of only the switch thumb. The inner [Switch] is
+ * display-only (`onCheckedChange = null`) to avoid double handling.
+ */
+@Composable
+fun SwitchRow(
+    headline: String,
+    supporting: String? = null,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    ListItem(
+        headlineContent = { Text(headline) },
+        supportingContent = supporting?.let { { Text(it) } },
+        trailingContent = {
+            Switch(checked = checked, onCheckedChange = null)
+        },
+        modifier = modifier.toggleable(
+            value = checked,
+            role = Role.Switch,
+            onValueChange = onCheckedChange,
+        ),
+    )
 }
 
 /** Small pill used to surface a non-blocking status line (e.g. "3 duplicates found"). */

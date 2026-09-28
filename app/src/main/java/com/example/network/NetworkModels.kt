@@ -52,3 +52,22 @@ sealed interface BrowseUiState {
     ) : BrowseUiState
     data class Error(val message: String) : BrowseUiState
 }
+
+/**
+ * Pure draft builder for LAN-discovered devices (v1.9.0 testing seam).
+ *
+ * Kept outside the ViewModel so unit tests cover the mapping without an
+ * `Application`/DataStore/EncryptedSharedPreferences. Never auto-saves and
+ * never carries a password — the editor collects credentials explicitly.
+ */
+fun discoveredToDraft(device: DiscoveredDevice, id: String): NetworkLocation =
+    NetworkLocation(
+        id = id,
+        name = device.serviceName.take(48),
+        protocol = device.hint ?: NetworkProtocol.SMB,
+        host = device.host,
+        port = device.port,
+        share = "",
+        basePath = "",
+        username = "",
+    )

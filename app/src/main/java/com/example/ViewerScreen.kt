@@ -40,7 +40,18 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
@@ -167,20 +178,63 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
         DisposableEffect(viewerPlayer) {
             onDispose { viewerPlayer.release() }
         }
-        LaunchedEffect(currentFile) {
+        // v1.8.0 (#3): buffering spinner + error retry state. Listener is
+        // registered once; LaunchedEffect below only swaps the media item.
+        var isBuffering by remember { mutableStateOf(false) }
+        var playerError by remember { mutableStateOf<String?>(null) }
+        DisposableEffect(viewerPlayer) {
+            val listener = object : Player.Listener {
+                override fun onPlaybackStateChanged(state: Int) {
+                    isBuffering = state == Player.STATE_BUFFERING
+                    if (state == Player.STATE_READY) playerError = null
+                }
+                override fun onPlayerError(error: PlaybackException) {
+                    playerError = error.message
+                    isBuffering = false
+                }
+            }
+            viewerPlayer.addListener(listener)
+            onDispose { viewerPlayer.removeListener(listener) }
+        }
+        // Pause when backgrounded so audio/video never keeps playing behind
+        // another app (was missing: perceived as hang on return).
+        val lifecycleOwner = LocalLifecycleOwner.current
+        DisposableEffect(lifecycleOwner, viewerPlayer) {
+            val observer = LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_STOP) viewerPlayer.pause()
+            }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        }
+        // Stable key (path + uri string) so a MediaStore rescan that returns
+        // an equal-path but unequal MediaFile object does not spuriously
+        // restart playback. stop() before setMediaItem avoids video->video race.
+        val mediaKey = remember(currentFile.path, contentUri) { currentFile.path + "|" + contentUri.toString() }
+        LaunchedEffect(mediaKey) {
+            playerError = null
             if (isVideo || isAudio) {
+                runCatching { viewerPlayer.stop() }
                 viewerPlayer.setMediaItem(MediaItem.fromUri(contentUri))
                 viewerPlayer.prepare()
                 viewerPlayer.playWhenReady = true
             } else {
                 viewerPlayer.playWhenReady = false
-                viewerPlayer.stop()
+                runCatching { viewerPlayer.stop() }
             }
         }
 
+        // v1.8.0 (#5): Scaffold content ignores innerPadding so the media
+        // stays full-bleed; the bar is a translucent fade overlay that never
+        // triggers remeasure/resize when toggled.
         Scaffold(
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            containerColor = ViewerScrim,
             topBar = {
-                if (!isFullScreen) {
+                AnimatedVisibility(
+                    visible = !isFullScreen,
+                    enter = fadeIn() + slideInVertically(initialOffsetY = { -it }),
+                    exit = fadeOut() + slideOutVertically(targetOffsetY = { -it }),
+                ) {
                     TopAppBar(
                         title = { Text(currentFile.name) },
                         navigationIcon = {
@@ -305,17 +359,17 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
                             titleContentColor = ViewerOnSurface,
                             actionIconContentColor = ViewerOnSurface,
                             navigationIconContentColor = ViewerOnSurface
-                        )
+                        ),
+                        modifier = Modifier.statusBarsPadding(),
                     )
                 }
             }
-        ) { innerPadding ->
+        ) { _ ->
             androidx.compose.foundation.pager.HorizontalPager(
                 state = pagerState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(ViewerScrim)
-                    .padding(if (isFullScreen) PaddingValues(0.dp) else innerPadding),
+                    .background(ViewerScrim),
                 userScrollEnabled = !isOcrMode && !isZoomedIn
             ) { page ->
                 val pageFile = mediaList[page]
@@ -422,9 +476,41 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
                     }
                 }
             }
+            // v1.8.0 (#3): buffering spinner + error retry overlay for video/audio.
+            // Local playback only — no external API; spinner avoids black-screen
+            // confusion, retry re-prepares the same contentUri without rescan.
+            if ((isVideo || isAudio) && pageAwareOverlay(pagerState.currentPage, mediaList)) {
+                if (isBuffering) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = ViewerOnSurface)
+                    }
+                }
+                val err = playerError
+                if (err != null) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                stringResource(R.string.video_error),
+                                color = ViewerOnSurface,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(16.dp),
+                            )
+                            Button(onClick = {
+                                playerError = null
+                                runCatching { viewerPlayer.prepare() }
+                            }) { Text(stringResource(R.string.retry)) }
+                        }
+                    }
+                }
+            }
         }
         } // when (Success)
     } // when
+}
+
+@Composable
+private fun pageAwareOverlay(currentPage: Int, mediaList: List<MediaFile>): Boolean {
+    return currentPage in mediaList.indices
 }
 
 @Composable
@@ -599,18 +685,45 @@ fun ImageWithOcrOverlay(
                 }
             }
     ) {
-        AsyncImage(
-            model = uri,
-            contentDescription = stringResource(R.string.image_viewer),
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer(
-                    scaleX = scale,
-                    scaleY = scale,
-                    translationX = offset.x,
-                    translationY = offset.y
-                )
-        )
+        // v1.8.0 (#3): cached request + error placeholder so a failed decode
+        // never leaves a permanent blank page requiring manual reload.
+        var imageError by remember(uri) { mutableStateOf(false) }
+        val imageRequest = remember(uri) {
+            coil.request.ImageRequest.Builder(context)
+                .data(uri)
+                .memoryCacheKey("viewer:" + uri.toString() + "")
+                .diskCacheKey("viewer:" + uri.toString() + "")
+                .crossfade(true)
+                .build()
+        }
+        if (imageError) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.BrokenImage, contentDescription = null, tint = ViewerOnSurface.copy(alpha = 0.6f), modifier = Modifier.size(64.dp))
+                    Text(
+                        stringResource(R.string.image_load_error),
+                        color = ViewerOnSurface,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(16.dp),
+                    )
+                    Button(onClick = { imageError = false }) { Text(stringResource(R.string.retry)) }
+                }
+            }
+        } else {
+            AsyncImage(
+                model = imageRequest,
+                contentDescription = stringResource(R.string.image_viewer),
+                onError = { imageError = true },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer(
+                        scaleX = scale,
+                        scaleY = scale,
+                        translationX = offset.x,
+                        translationY = offset.y
+                    )
+            )
+        }
         
         if (isOcrMode && recognizedText != null && imageSize != IntSize.Zero) {
             Canvas(

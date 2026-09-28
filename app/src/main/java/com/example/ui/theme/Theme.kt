@@ -114,10 +114,15 @@ fun MediaMasterTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as? Activity)?.window ?: return@SideEffect
-            // Edge-to-edge: keep system bar icons legible against the app background.
+            // v1.8.0 (DeX text-color fix #1): derive icon legibility from the
+            // actual surface luminance instead of the raw darkTheme flag, so a
+            // light DeX caption bar / system shell never gets dark-on-dark or
+            // light-on-light glyphs when the phone and the desktop display
+            // disagree about night mode.
+            val lightBars = isLight(colorScheme.surface)
             WindowCompat.getInsetsController(window, view).apply {
-                isAppearanceLightStatusBars = !darkTheme
-                isAppearanceLightNavigationBars = !darkTheme
+                isAppearanceLightStatusBars = lightBars
+                isAppearanceLightNavigationBars = lightBars
             }
         }
     }

@@ -12,4 +12,9 @@
     <string name="doc_unsupported_desc">旧形式の.doc/.pptファイルはアプリ内表示に対応していません。他のアプリで開いてください。</string>
     <string name="default_apps_title">既定のアプリ</string>
     <string name="default_apps_desc">システム設定でMedia Masterを各ファイル形式の既定のビューアーに設定できます。</string>
+    <string name="doc_view_asis">そのまま表示</string>
+    <string name="doc_table_caption">表</string>
+    <string name="doc_chart_title">グラフ</string>
+    <string name="doc_chart_empty">表示できるグラフデータがありません。</string>
+    <string name="doc_mermaid_note">図は「そのまま表示」で描画されます。</string>
 </resources>

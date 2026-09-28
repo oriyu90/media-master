@@ -14,4 +14,10 @@
     <string name="password_keep_hint">空欄で保存済みのパスワードを維持</string>
     <string name="smb">SMB</string>
     <string name="webdav">WebDAV</string>
+    <string name="scan_lan">LANをスキャン</string>
+    <string name="scanning_lan">ローカルネットワークをスキャン中…</string>
+    <string name="no_servers_found">サーバーが見つかりません。同じWi-Fiに接続しているか確認してください。</string>
+    <string name="discovered_devices">見つかった機器</string>
+    <string name="add_discovered">追加</string>
+    <string name="stop_scan">停止</string>
 </resources>

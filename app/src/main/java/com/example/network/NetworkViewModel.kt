@@ -26,6 +26,10 @@ class NetworkViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = NetworkLocationRepository(app)
     private val credentials = NetworkCredentialStore(app)
     private val client = NetworkStorageClient()
+    // v1.8.0 (#6): LAN auto-discovery (in-memory only, never auto-saves).
+    private val discovery = NetworkDiscoveryManager(app.applicationContext)
+    val discovered: StateFlow<List<DiscoveredDevice>> = discovery.devices
+    val discovering: StateFlow<Boolean> = discovery.scanning
 
     val locations: StateFlow<List<NetworkLocation>> =
         repo.locations.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -52,6 +56,41 @@ class NetworkViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun closeBrowser() { _browse.update { BrowseUiState.Idle } }
+
+    fun startDiscovery() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { discovery.start() }
+            // Auto-stop after 25s to save battery (single-shot scan).
+            kotlinx.coroutines.delay(25_000)
+            runCatching { discovery.stop() }
+        }
+    }
+
+    fun stopDiscovery() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { discovery.stop() }
+        }
+    }
+
+    override fun onCleared() {
+        runCatching { discovery.stop() }
+        super.onCleared()
+    }
+
+    /** Prefill helper: discovered device -> unsaved NetworkLocation draft. */
+    fun draftFromDiscovered(device: DiscoveredDevice): NetworkLocation {
+        val protocol = device.hint ?: NetworkProtocol.SMB
+        return NetworkLocation(
+            id = newLocationId(),
+            name = device.serviceName.take(48),
+            protocol = protocol,
+            host = device.host,
+            port = device.port,
+            share = "",
+            basePath = "",
+            username = "",
+        )
+    }
 
     fun open(location: NetworkLocation) = navigate(location, "")
 

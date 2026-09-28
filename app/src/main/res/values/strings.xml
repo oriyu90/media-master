@@ -105,4 +105,8 @@
     <string name="desktop_mode_force_desktop">Always use desktop UI</string>
     <string name="desktop_mode_force_touch">Always use touch UI</string>
     <string name="desktop_mode_desc">Auto detects Samsung DeX, Android desktop windowing, Motorola Smart Connect / Ready For, Huawei EMUI Desktop, HONOR Desktop, Xiaomi HyperOS Workstation, OPPO ColorOS PC mode, and Lenovo Tab PC Mode. Use manual options if your device is not detected.</string>
+    <string name="desktop_mode_active">Desktop UI active (%1$s)</string>
+    <string name="desktop_mode_status">Status: %1$s</string>
+    <string name="mode_touch">Touch UI</string>
+    <string name="mode_desktop">Desktop UI</string>
 </resources>

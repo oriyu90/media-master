@@ -67,4 +67,8 @@
     <string name="desktop_mode_force_desktop">Altijd bureaublad-UI gebruiken</string>
     <string name="desktop_mode_force_touch">Altijd touch-UI gebruiken</string>
     <string name="desktop_mode_desc">Detecteert automatisch Samsung DeX, Android-desktopvensters, Motorola Smart Connect / Ready For, Huawei EMUI-desktop, HONOR-desktop, Xiaomi HyperOS-werkstation, OPPO ColorOS-pc-modus en Lenovo Tab-pc-modus. Schakel handmatig als je apparaat niet wordt gedetecteerd.</string>
+    <string name="desktop_mode_active">Bureaublad-UI actief (%1$s)</string>
+    <string name="desktop_mode_status">Status: %1$s</string>
+    <string name="mode_touch">Touch-UI</string>
+    <string name="mode_desktop">Bureaublad-UI</string>
 </resources>

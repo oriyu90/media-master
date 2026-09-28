@@ -61,10 +61,27 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         pendingDeepLink.value = DeepLinks.resolve(intent)
         PlaybackManager.initialize(this)
+        // v1.8.0 (#3): centralised Coil cache so grid thumbnails and viewer
+        // images reuse decoded thumbnails instead of full-res re-decode on
+        // every scroll/pager settle (perceived as slow load / blank-until-load).
+        // Video frames use a 1s microsecond hint; all local, no network fetch.
         val imageLoader = coil.ImageLoader.Builder(this)
             .components {
                 add(coil.decode.VideoFrameDecoder.Factory())
             }
+            .memoryCache {
+                coil.memory.MemoryCache.Builder(this)
+                    .maxSizePercent(0.25)
+                    .build()
+            }
+            .diskCache {
+                coil.disk.DiskCache.Builder()
+                    .directory(cacheDir.resolve("image_cache"))
+                    .maxSizeBytes(256L * 1024 * 1024)
+                    .build()
+            }
+            .crossfade(true)
+            .respectCacheHeaders(false)
             .build()
         coil.Coil.setImageLoader(imageLoader)
         enableEdgeToEdge()

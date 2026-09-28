@@ -14,4 +14,10 @@
     <string name="password_keep_hint">Laat leeg om het opgeslagen wachtwoord te behouden</string>
     <string name="smb">SMB</string>
     <string name="webdav">WebDAV</string>
+    <string name="scan_lan">LAN scannen</string>
+    <string name="scanning_lan">Lokaal netwerk scannen…</string>
+    <string name="no_servers_found">Geen servers gevonden. Controleer of het apparaat op hetzelfde wifi-netwerk zit.</string>
+    <string name="discovered_devices">Gevonden apparaten</string>
+    <string name="add_discovered">Toevoegen</string>
+    <string name="stop_scan">Stoppen</string>
 </resources>

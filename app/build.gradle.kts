@@ -13,8 +13,8 @@ android {
     applicationId = "com.yukiorita.mediamaster"
     minSdk = 24
     targetSdk = 36
-    versionCode = 12
-    versionName = "1.7.1"
+    versionCode = 13
+    versionName = "1.8.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -96,6 +96,7 @@ dependencies {
   implementation(libs.kotlinx.coroutines.play.services)
   implementation(libs.okhttp)
   implementation(libs.commonmark)
+  implementation(libs.commonmark.tables)
   implementation(libs.androidx.webkit)
   // implementation(libs.play.services.location)
   testImplementation(libs.androidx.compose.ui.test.junit4)

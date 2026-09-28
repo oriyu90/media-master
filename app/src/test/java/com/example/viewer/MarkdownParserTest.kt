@@ -90,6 +90,28 @@ class MarkdownParserTest {
     }
 
     @Test
+    fun `gfm tables parse to Table blocks`() {
+        val blocks = MarkdownParser.parse("| A | B |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |\n")
+        val table = blocks.single() as MdBlock.Table
+        assertEquals(2, table.headers.size)
+        assertEquals(2, table.rows.size)
+    }
+
+    @Test
+    fun `chart fenced blocks become ChartBlock`() {
+        val blocks = MarkdownParser.parse("```chart\nJan,10\nFeb,20\n```")
+        val chart = blocks.single() as MdBlock.ChartBlock
+        assertTrue(chart.raw.contains("Jan"))
+    }
+
+    @Test
+    fun `mermaid fenced blocks become MermaidBlock`() {
+        val blocks = MarkdownParser.parse("```mermaid\ngraph TD; A-->B;\n```")
+        val m = blocks.single() as MdBlock.MermaidBlock
+        assertTrue(m.code.contains("graph"))
+    }
+
+    @Test
     fun `a document with no math is unaffected by the math pass`() {
         val blocks = MarkdownParser.parse("# Title\n\nJust text, no formulas.")
         assertTrue(blocks.none { it is MdBlock.MathBlock })

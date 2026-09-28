@@ -31,4 +31,7 @@
     <string name="new_folder">مجلد جديد</string>
     <string name="folder_name">اسم المجلد</string>
     <string name="create">إنشاء</string>
+    <string name="video_buffering">جارٍ التخزين المؤقت…</string>
+    <string name="video_error">تعذر تشغيل هذا الفيديو.</string>
+    <string name="image_load_error">تعذر تحميل هذه الصورة.</string>
 </resources>

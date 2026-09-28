@@ -46,8 +46,20 @@ fun MediaThumbnail(
             Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(iconSize))
         }
         file.mimeType.startsWith("image/") || file.mimeType.startsWith("video/") -> {
+            // v1.8.0 (#3): sized ImageRequest with memory-cache key + crossfade
+            // so grids show cached thumbnails instantly instead of blank.
+            val context = LocalContext.current
+            val request = androidx.compose.runtime.remember(file.path, file.contentUri) {
+                coil.request.ImageRequest.Builder(context)
+                    .data(file.contentUri ?: File(file.path))
+                    .memoryCacheKey("thumb:" + file.path)
+                    .diskCacheKey("thumb:" + file.path)
+                    .size(512)
+                    .crossfade(true)
+                    .build()
+            }
             AsyncImage(
-                model = file.contentUri ?: File(file.path),
+                model = request,
                 contentDescription = file.name,
                 modifier = modifier,
                 contentScale = contentScale,

@@ -31,6 +31,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.R
 import com.example.network.BrowseUiState
+import com.example.network.DiscoveredDevice
 import com.example.network.NetworkLocation
 import com.example.network.NetworkProtocol
 import com.example.network.NetworkViewModel
@@ -42,8 +43,15 @@ import com.example.ui.components.ErrorState
 fun NetworkScreen(navController: NavHostController, viewModel: NetworkViewModel = viewModel()) {
     val locations by viewModel.locations.collectAsStateWithLifecycle()
     val browse by viewModel.browse.collectAsStateWithLifecycle()
+    // v1.8.0 (#6): LAN discovery state; scan stops when leaving the screen.
+    val discovered by viewModel.discovered.collectAsStateWithLifecycle()
+    val discovering by viewModel.discovering.collectAsStateWithLifecycle()
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onDispose { viewModel.stopDiscovery() }
+    }
 
     var editing by remember { mutableStateOf<NetworkLocation?>(null) }
+    var editorIsNew by remember { mutableStateOf(true) }
     var showEditor by remember { mutableStateOf(false) }
 
     val browseState = browse
@@ -65,11 +73,25 @@ fun NetworkScreen(navController: NavHostController, viewModel: NetworkViewModel 
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
+                actions = {
+                    // v1.8.0 (#6): one-tap LAN scan; safe single-shot, no background work.
+                    if (browseState is BrowseUiState.Idle) {
+                        if (discovering) {
+                            TextButton(onClick = viewModel::stopDiscovery) {
+                                Text(stringResource(R.string.stop_scan))
+                            }
+                        } else {
+                            TextButton(onClick = viewModel::startDiscovery) {
+                                Text(stringResource(R.string.scan_lan))
+                            }
+                        }
+                    }
+                },
             )
         },
         floatingActionButton = {
             if (browseState is BrowseUiState.Idle) {
-                FloatingActionButton(onClick = { editing = null; showEditor = true }) {
+                FloatingActionButton(onClick = { editing = null; editorIsNew = true; showEditor = true }) {
                     Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_location))
                 }
             }
@@ -79,9 +101,16 @@ fun NetworkScreen(navController: NavHostController, viewModel: NetworkViewModel 
             when (val s = browseState) {
                 is BrowseUiState.Idle -> LocationList(
                     locations = locations,
+                    discovered = discovered,
+                    discovering = discovering,
                     onOpen = viewModel::open,
-                    onEdit = { editing = it; showEditor = true },
+                    onEdit = { editing = it; editorIsNew = false; showEditor = true },
                     onDelete = viewModel::deleteLocation,
+                    onAddDiscovered = { device ->
+                        editing = viewModel.draftFromDiscovered(device)
+                        editorIsNew = true
+                        showEditor = true
+                    },
                 )
                 is BrowseUiState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
                 is BrowseUiState.Error -> Box(Modifier.fillMaxSize(), Alignment.Center) {
@@ -120,7 +149,8 @@ fun NetworkScreen(navController: NavHostController, viewModel: NetworkViewModel 
 
     if (showEditor) {
         LocationEditorDialog(
-            existing = editing,
+            existing = if (editorIsNew) null else editing,
+            draft = if (editorIsNew) editing else null,
             onDismiss = { showEditor = false },
             onSave = { location, password ->
                 viewModel.saveLocation(location, password)
@@ -134,21 +164,35 @@ fun NetworkScreen(navController: NavHostController, viewModel: NetworkViewModel 
 @Composable
 private fun LocationList(
     locations: List<NetworkLocation>,
+    discovered: List<DiscoveredDevice>,
+    discovering: Boolean,
     onOpen: (NetworkLocation) -> Unit,
     onEdit: (NetworkLocation) -> Unit,
     onDelete: (String) -> Unit,
+    onAddDiscovered: (DiscoveredDevice) -> Unit,
 ) {
-    if (locations.isEmpty()) {
-        Box(Modifier.fillMaxSize(), Alignment.Center) {
-            EmptyState(
-                icon = Icons.Default.Storage,
-                title = stringResource(R.string.network_storage),
-                description = stringResource(R.string.no_network_locations),
+    LazyColumn(Modifier.fillMaxSize()) {
+        // v1.8.0 (#6): discovered section first — tap Add to prefill the
+        // manual editor (never auto-saves, never auto-connects with passwords).
+        item {
+            DiscoveredSection(
+                discovered = discovered,
+                discovering = discovering,
+                onAdd = onAddDiscovered,
             )
         }
-        return
-    }
-    LazyColumn(Modifier.fillMaxSize()) {
+        if (locations.isEmpty() && discovered.isEmpty() && !discovering) {
+            item {
+                Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                    EmptyState(
+                        icon = Icons.Default.Storage,
+                        title = stringResource(R.string.network_storage),
+                        description = stringResource(R.string.no_network_locations),
+                    )
+                }
+            }
+            return@LazyColumn
+        }
         items(locations, key = { it.id }) { loc ->
             ListItem(
                 headlineContent = { Text(loc.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
@@ -173,22 +217,76 @@ private fun LocationList(
     }
 }
 
+@Composable
+private fun DiscoveredSection(
+    discovered: List<DiscoveredDevice>,
+    discovering: Boolean,
+    onAdd: (DiscoveredDevice) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text(
+            text = stringResource(R.string.discovered_devices),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(vertical = 4.dp),
+        )
+        if (discovering && discovered.isEmpty()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.scanning_lan),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else if (discovered.isEmpty()) {
+            Text(
+                text = stringResource(R.string.no_servers_found),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            discovered.forEach { device ->
+                ListItem(
+                    headlineContent = { Text(device.serviceName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    supportingContent = {
+                        val proto = device.hint?.name?.lowercase() ?: "lan"
+                        Text(proto + "://" + device.host + ":" + device.port.toString())
+                    },
+                    leadingContent = { Icon(Icons.Default.Storage, contentDescription = null) },
+                    trailingContent = {
+                        TextButton(onClick = { onAdd(device) }) {
+                            Text(stringResource(R.string.add_discovered))
+                        }
+                    },
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LocationEditorDialog(
     existing: NetworkLocation?,
+    draft: NetworkLocation? = null,
     onDismiss: () -> Unit,
     onSave: (NetworkLocation, String) -> Unit,
     newId: () -> String,
 ) {
-    var name by remember { mutableStateOf(existing?.name.orEmpty()) }
-    var protocol by remember { mutableStateOf(existing?.protocol ?: NetworkProtocol.SMB) }
-    var host by remember { mutableStateOf(existing?.host.orEmpty()) }
-    var port by remember { mutableStateOf(existing?.port?.takeIf { it != 0 }?.toString().orEmpty()) }
-    var share by remember { mutableStateOf(existing?.share.orEmpty()) }
-    var basePath by remember { mutableStateOf(existing?.basePath.orEmpty()) }
-    var username by remember { mutableStateOf(existing?.username.orEmpty()) }
-    var password by remember { mutableStateOf("") }
+    // v1.8.0 (#6): draft is a prefilled unsaved device (discovered); existing
+    // is a saved location being edited. Draft values prefill, title stays Add.
+    val initial = draft ?: existing
+    var name by remember(initial) { mutableStateOf(initial?.name.orEmpty()) }
+    var protocol by remember(initial) { mutableStateOf(initial?.protocol ?: NetworkProtocol.SMB) }
+    var host by remember(initial) { mutableStateOf(initial?.host.orEmpty()) }
+    var port by remember(initial) { mutableStateOf(initial?.port?.takeIf { it != 0 }?.toString().orEmpty()) }
+    var share by remember(initial) { mutableStateOf(initial?.share.orEmpty()) }
+    var basePath by remember(initial) { mutableStateOf(initial?.basePath.orEmpty()) }
+    var username by remember(initial) { mutableStateOf(initial?.username.orEmpty()) }
+    var password by remember(initial) { mutableStateOf("") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -236,7 +334,7 @@ private fun LocationEditorDialog(
                 onClick = {
                     onSave(
                         NetworkLocation(
-                            id = existing?.id ?: newId(),
+                            id = existing?.id ?: draft?.id ?: newId(),
                             name = name.trim(),
                             protocol = protocol,
                             host = host.trim(),

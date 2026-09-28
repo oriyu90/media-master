@@ -88,6 +88,9 @@ fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostControlle
                 )
             }
             item {
+                DesktopModeStatusRow(override = desktopModeOverride)
+            }
+            item {
                 ListItem(
                     headlineContent = { Text(stringResource(R.string.server_connection)) },
                     supportingContent = { Text(stringResource(R.string.network_locations)) },
@@ -464,6 +467,24 @@ fun getLangString(lang: String) = when(lang) {
     "ar" -> stringResource(R.string.arabic)
     "nl" -> stringResource(R.string.dutch)
     else -> stringResource(R.string.system_default)
+}
+
+
+/**
+ * v1.8.0 (#7): shows whether the app is currently running in desktop/DeX
+ * mode or normal touch mode, with the detected vendor shell. Read-only
+ * status — the override dialog above changes behaviour.
+ */
+@Composable
+private fun DesktopModeStatusRow(override: Int) {
+    val isDesktop = isDesktopLayout(override)
+    val vendor = androidx.compose.runtime.remember { com.example.desktop.DesktopMode.currentVendor() }
+    val vendorName = androidx.compose.runtime.remember(vendor) { com.example.desktop.DesktopMode.vendorDisplayName(vendor) }
+    val modeLabel = if (isDesktop) stringResource(com.example.R.string.mode_desktop) else stringResource(com.example.R.string.mode_touch)
+    ListItem(
+        headlineContent = { androidx.compose.material3.Text(stringResource(com.example.R.string.desktop_mode_status, "$modeLabel · $vendorName")) },
+        supportingContent = { androidx.compose.material3.Text(stringResource(com.example.R.string.desktop_mode)) },
+    )
 }
 
 @Composable

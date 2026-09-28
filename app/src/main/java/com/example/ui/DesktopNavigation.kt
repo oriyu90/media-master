@@ -68,14 +68,49 @@ fun isDesktopLayout(override: Int = com.example.desktop.DesktopMode.OVERRIDE_AUT
     val legacyDex = uiType == Configuration.UI_MODE_TYPE_DESK
     val captionBarVisible = isCaptionBarVisible()
     val context = LocalContext.current
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val activity = remember(context) { com.example.desktop.DesktopMode.activityOrNull(context) }
+    // v1.8.0 (#1/#7): one-shot Activity flags must be re-polled when the
+    // window docks/undocks or the lifecycle resumes — otherwise DeX attach
+    // while running never recomposes and the phone UI gets stuck.
+    var tick by remember { mutableStateOf(0) }
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner, configuration) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) tick++
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        tick++ // re-evaluate on every configuration change (uiMode/density)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    // External display count is observed via DisplayManager listener so
+    // plugging/unplugging a monitor recomposes the layout decision.
+    var displayCount by remember { mutableStateOf(1) }
+    androidx.compose.runtime.DisposableEffect(context) {
+        val dm = runCatching {
+            context.getSystemService(android.content.Context.DISPLAY_SERVICE) as? android.hardware.display.DisplayManager
+        }.getOrNull()
+        val listener = object : android.hardware.display.DisplayManager.DisplayListener {
+            override fun onDisplayAdded(id: Int) { displayCount = dm?.displays?.size ?: displayCount }
+            override fun onDisplayRemoved(id: Int) { displayCount = dm?.displays?.size ?: displayCount }
+            override fun onDisplayChanged(id: Int) {}
+        }
+        runCatching { dm?.registerDisplayListener(listener, android.os.Handler(android.os.Looper.getMainLooper())) }
+        displayCount = dm?.displays?.size ?: 1
+        onDispose { runCatching { dm?.unregisterDisplayListener(listener) } }
+    }
+    // Read tick/displayCount so Compose tracks them even though they are only
+    // used as recompose triggers for the flags below.
+    @Suppress("UNUSED_EXPRESSION") tick
+    @Suppress("UNUSED_EXPRESSION") displayCount
     val multiWindow = activity?.let { com.example.desktop.DesktopMode.isInMultiWindow(it) } ?: false
     val freeform = activity?.let { com.example.desktop.DesktopMode.isFreeformWindowing(it) } ?: false
-    val samsungDex = activity?.let { com.example.desktop.DesktopMode.isSamsungDesktopModeReflection(it) } ?: false
+    val samsungDex = remember(tick) {
+        activity?.let { com.example.desktop.DesktopMode.isSamsungDesktopModeReflection(it) } ?: false
+    }
     // v1.7.1: Lenovo ZUI PC mode exposes no public signal and may set none of
     // the above (user report: Lenovo Tab stays in phone UI). The heuristic is
     // vendor-gated inside DesktopMode so other devices are unaffected.
-    val oemHeuristic = remember(context, activity) {
+    val oemHeuristic = remember(context, activity, tick) {
         com.example.desktop.DesktopMode.isLenovoDesktopHeuristic(context, activity)
     }
     val signals = com.example.desktop.DesktopMode.Signals(
@@ -230,7 +265,28 @@ fun DesktopNavigation(
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 navHost(settingsViewModel::addPinnedFolder, ::openInNewTab)
             }
+            // v1.8.0 (#7): always-visible mode indicator so users can tell
+            // desktop/DeX UI apart from the normal touch UI.
+            DesktopModeFooter()
         }
+    }
+}
+
+@Composable
+private fun DesktopModeFooter() {
+    val context = LocalContext.current
+    val vendor = remember { com.example.desktop.DesktopMode.currentVendor() }
+    val vendorName = remember(vendor) { com.example.desktop.DesktopMode.vendorDisplayName(vendor) }
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(
+            text = context.getString(R.string.desktop_mode_active, vendorName),
+            style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+        )
     }
 }
 
@@ -241,29 +297,46 @@ private fun DesktopTabStrip(
     onSelect: (DesktopTab) -> Unit,
     onClose: (DesktopTab) -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().height(48.dp).background(MaterialTheme.colorScheme.surfaceContainerLow),
-        verticalAlignment = Alignment.CenterVertically
+    // v1.8.0 (#1): use Surface with explicit contentColor instead of a raw
+    // background Modifier so unselected tab text never inherits a wrong
+    // onSurface color on surfaceContainerLow in DeX shells.
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.fillMaxWidth().height(48.dp),
     ) {
-        tabs.forEach { tab ->
-            Surface(
-                modifier = Modifier.widthIn(min = 132.dp, max = 220.dp).fillMaxHeight(),
-                color = if (tab.id == selectedTabId) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceContainerLow,
-                onClick = { onSelect(tab) }
-            ) {
-                Row(
-                    modifier = Modifier.padding(start = 14.dp, end = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            tabs.forEach { tab ->
+                val selected = tab.id == selectedTabId
+                Surface(
+                    modifier = Modifier.widthIn(min = 132.dp, max = 220.dp).fillMaxHeight(),
+                    color = if (selected) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceContainerLow,
+                    contentColor = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                    onClick = { onSelect(tab) }
                 ) {
-                    Text(tab.title, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                    if (tabs.size > 1) {
-                        IconButton(onClick = { onClose(tab) }) {
-                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close_tab), modifier = Modifier.size(18.dp))
+                    Row(
+                        modifier = Modifier.padding(start = 14.dp, end = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            tab.title,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                            color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (tabs.size > 1) {
+                            IconButton(onClick = { onClose(tab) }) {
+                                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close_tab), modifier = Modifier.size(18.dp))
+                            }
                         }
                     }
                 }
+                VerticalDivider(modifier = Modifier.height(24.dp), color = MaterialTheme.colorScheme.outlineVariant)
             }
-            VerticalDivider(modifier = Modifier.height(24.dp), color = MaterialTheme.colorScheme.outlineVariant)
         }
     }
 }
@@ -337,6 +410,12 @@ private fun SidebarSectionTitle(text: String) {
 
 @Composable
 private fun SidebarDestination(title: String, icon: ImageVector, selected: Boolean, onClick: () -> Unit) {
+    // v1.8.0 (#1): explicit content colors — unselected rows use onSurface on
+    // surfaceContainerLow (AA-checked), selected rows use onSecondaryContainer
+    // on secondaryContainer. Never rely on inherited LocalContentColor here
+    // because DeX shells may recompose with a stale theme.
+    val container = if (selected) MaterialTheme.colorScheme.secondaryContainer else androidx.compose.ui.graphics.Color.Transparent
+    val content = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface
     Surface(
         onClick = onClick,
         modifier = Modifier
@@ -344,14 +423,15 @@ private fun SidebarDestination(title: String, icon: ImageVector, selected: Boole
             .heightIn(min = 48.dp)
             .semantics { this.selected = selected },
         shape = MaterialTheme.shapes.small,
-        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else androidx.compose.ui.graphics.Color.Transparent
+        color = container,
+        contentColor = content,
     ) {
         Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
-                Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+                Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp), tint = content)
             }
             Spacer(Modifier.width(10.dp))
-            Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
+            Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, color = content)
         }
     }
 }
@@ -367,6 +447,9 @@ private fun PinnedFolderItem(
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     val title = File(path).name.ifBlank { path }
+    // v1.8.0 (#1): explicit onSurface text on the sidebar surfaceContainerLow
+    // background so DeX shells never render stale/inherited colors.
+    val textColor = MaterialTheme.colorScheme.onSurface
     Box {
         Row(
             modifier = Modifier
@@ -399,6 +482,7 @@ private fun PinnedFolderItem(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.bodyMedium,
+                color = textColor,
                 modifier = Modifier.weight(1f),
             )
             // Keyboard/touch-accessible alternative to right-click / long-press.

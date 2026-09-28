@@ -191,8 +191,41 @@ object DesktopMode {
     fun isLenovoDesktopHeuristic(context: Context, activity: Activity?): Boolean = runCatching {
         val isLenovo = vendorForManufacturer(Build.MANUFACTURER) == Vendor.LENOVO ||
             Build.BRAND.equals("lenovo", ignoreCase = true)
-        if (isLenovo && hasKeyboardOrMouse(context)) return true
+        if (!isLenovo) return false
+        if (hasKeyboardOrMouse(context)) return true
         if (isLenovoPcModeSettingEnabled(context)) return true
         false
     }.getOrDefault(false)
+
+    /**
+     * v1.8.0: human-readable description of the current detection state.
+     * Pure function so it can be unit-tested and shown in Settings
+     * (requirement #7: the app must be able to tell DeX vs normal mode).
+     */
+    fun describe(signals: Signals, override: Int, vendor: Vendor): String {
+        val mode = if (resolve(signals, override)) "desktop" else "touch"
+        val active = buildList {
+            if (signals.legacyDeskUiMode) add("deskUiMode")
+            if (signals.captionBarVisible) add("captionBar")
+            if (signals.multiWindow) add("multiWindow")
+            if (signals.freeformWindowing) add("freeform")
+            if (signals.samsungDexReflection) add("samsungDex")
+            if (signals.oemDesktopHeuristic) add("oemHeuristic")
+        }
+        val trigger = if (active.isEmpty()) "none" else active.joinToString(",")
+        return "$mode|vendor=${vendor.name}|override=$override|signals=$trigger"
+    }
+
+    /** Display name for the detected vendor shell (used in Settings status row). */
+    fun vendorDisplayName(vendor: Vendor): String = when (vendor) {
+        Vendor.SAMSUNG_DEX -> "Samsung DeX"
+        Vendor.ANDROID_DESKTOP -> "Android Desktop"
+        Vendor.MOTOROLA -> "Motorola Smart Connect"
+        Vendor.HUAWEI -> "Huawei EMUI Desktop"
+        Vendor.HONOR -> "HONOR Desktop"
+        Vendor.XIAOMI -> "Xiaomi HyperOS Workstation"
+        Vendor.OPPO -> "OPPO ColorOS PC"
+        Vendor.LENOVO -> "Lenovo PC Mode"
+        Vendor.GENERIC -> "Standard"
+    }
 }

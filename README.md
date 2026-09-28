@@ -4,6 +4,17 @@ Media Master is an open-source Android media and file manager built with Kotlin 
 
 Media Master は、Kotlin と Jetpack Compose で開発されたオープンソースのAndroid向けメディア・ファイル管理アプリです。写真・動画、音楽、書類、ストレージ、アプリ／APK、編集、バックアップを1つのアプリで扱えます。
 
+## v1.8.0
+
+- **DeX text-color fix (#1):** desktop sidebar/tab text now uses explicit Material 3 content colors (selected \`onSecondaryContainer\`, unselected \`onSurface\`/\`onSurfaceVariant\`) instead of inherited colors, so DeX shells never render stale light-on-light or dark-on-dark glyphs. Status/navigation bar icon legibility is derived from actual surface luminance. Lenovo PC-mode settings probe is now strictly vendor-gated.
+- **DeX mode detection display (#7):** the app now shows whether it is running in desktop/DeX UI or normal touch UI — a footer badge in the desktop shell (\`Desktop UI active (Samsung DeX)\` etc.) plus a read-only **Settings → Desktop mode** status row with vendor + mode. Detection itself is reactive (lifecycle RESUME + DisplayManager listener + captionBar insets) so docking while running switches correctly.
+- **LaTeX + graphs (#2):** Markdown GFM tables render natively; \`\`\`chart blocks (CSV/\`label: value\`/JSON) render as native bar charts (offline, capped 24 entries); \`\`\`mermaid shows source + note; \`.tex\` \\section/\\subsection/\\subsubsection render as headings, \\textbf/\\textit stripped to style, \\item as bullets.
+- **Image/video preview reliability (#3, external-API audit):** audit confirmed local preview uses no network APIs (Coil local + ExoPlayer local + ML Kit OCR on-demand + local WebViewAssetLoader only). Fixed slow/blank/reload issues with a central Coil cache (25% memory + 256MB disk + crossfade), sized thumbnail requests, ExoPlayer buffering spinner + error retry, lifecycle pause on STOP, stable media keys with stop-before-set, and image error retry UI.
+- **Documents Show-as-is (#4):** document viewer top bar now has a **Show as-is / そのまま表示** button (Markdown/LaTeX/DOCX/PPTX only) toggling between the native Compose renderer and a single hardened WebView that shows tables/charts/images with original layout (offline, CSP locked, KaTeX via bundled assets, images via data: URIs).
+- **Viewer toolbar overlay (#5):** the image/video toolbar is now a translucent fade overlay (\`ViewerChromeContainer\` + AnimatedVisibility slide/fade + statusBarsPadding) over full-bleed media; showing/hiding never remeasures the media (Scaffold content ignores innerPadding).
+- **LAN auto-discovery (#6):** Network tab has a **Scan LAN** action using framework NsdManager (\`_smb._tcp.\` + \`_http._tcp.\`) with 25s auto-stop, MulticastLock safety, in-memory results only. Tap Add to prefill the manual editor (never auto-saves or auto-connects with passwords). Needs \`ACCESS_NETWORK_STATE\` + \`CHANGE_WIFI_MULTICAST_STATE\`.
+- Version \`1.8.0\` (\`versionCode 13\`), signed with the same upload key as v0.1.0–v1.7.1 (APK Signature Scheme v2 verified). **APK SHA-256: \`e7c07575bbbc6675672d2cf64a30a093fd5b3df1c8fd875eec9d8bfd71caf6c4\`.**
+
 ## v1.7.1
 
 - **Lenovo Tab PCモード修正:** ZUIのPCモードではdesk uiMode・キャプションバー・multi-window/freeformのいずれも立たないため自動検出できずスマホUIのままになる報告を受け、ベンダーゲート付きのLenovoヒューリスティック（PCモード系システム設定キー＋キーボード接続——Lenovo自体がキーボード着脱でPCモードへ自動切替する動作に追随）を追加。他社端末の動作は不変。検出できない場合は従来どおり**設定 → デスクトップモード**の手動切替が有効。

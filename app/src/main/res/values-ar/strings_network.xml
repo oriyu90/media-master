@@ -14,4 +14,10 @@
     <string name="password_keep_hint">اتركه فارغًا للإبقاء على كلمة المرور المحفوظة</string>
     <string name="smb">SMB</string>
     <string name="webdav">WebDAV</string>
+    <string name="scan_lan">فحص الشبكة المحلية</string>
+    <string name="scanning_lan">جارٍ فحص الشبكة المحلية…</string>
+    <string name="no_servers_found">لم يتم العثور على خوادم. تأكد من الاتصال بنفس شبكة Wi-Fi.</string>
+    <string name="discovered_devices">الأجهزة المكتشفة</string>
+    <string name="add_discovered">إضافة</string>
+    <string name="stop_scan">إيقاف</string>
 </resources>

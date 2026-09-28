@@ -12,4 +12,9 @@
     <string name="doc_unsupported_desc">ملفات ‎.doc/.ppt‎ القديمة غير مدعومة للعرض داخل التطبيق بعد. افتحها باستخدام تطبيق آخر.</string>
     <string name="default_apps_title">التطبيقات الافتراضية</string>
     <string name="default_apps_desc">يمكنك تعيين Media Master كعارض افتراضي لأنواع الملفات من إعدادات النظام.</string>
+    <string name="doc_view_asis">عرض كما هو</string>
+    <string name="doc_table_caption">جدول</string>
+    <string name="doc_chart_title">رسم بياني</string>
+    <string name="doc_chart_empty">لا توجد بيانات رسم لعرضها.</string>
+    <string name="doc_mermaid_note">يتم عرض المخطط في وضع "عرض كما هو".</string>
 </resources>

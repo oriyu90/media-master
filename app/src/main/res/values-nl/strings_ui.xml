@@ -31,4 +31,7 @@
     <string name="new_folder">Nieuwe map</string>
     <string name="folder_name">Mapnaam</string>
     <string name="create">Maken</string>
+    <string name="video_buffering">Bufferen…</string>
+    <string name="video_error">Deze video kan niet worden afgespeeld.</string>
+    <string name="image_load_error">Deze afbeelding kan niet worden geladen.</string>
 </resources>

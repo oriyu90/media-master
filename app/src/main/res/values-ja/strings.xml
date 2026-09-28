@@ -105,4 +105,8 @@
     <string name="desktop_mode_force_desktop">常にデスクトップUIを使う</string>
     <string name="desktop_mode_force_touch">常にタッチUIを使う</string>
     <string name="desktop_mode_desc">Samsung DeX、Androidデスクトップウィンドウ、Motorola Smart Connect / Ready For、Huawei EMUIデスクトップ、HONORデスクトップ、Xiaomi HyperOSワークステーション、OPPO ColorOS PCモード、Lenovo Tab PCモードを自動検出します。検出されない場合は手動で切り替えてください。</string>
+    <string name="desktop_mode_active">デスクトップUI動作中（%1$s）</string>
+    <string name="desktop_mode_status">状態: %1$s</string>
+    <string name="mode_touch">タッチUI</string>
+    <string name="mode_desktop">デスクトップUI</string>
 </resources>

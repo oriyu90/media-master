@@ -14,4 +14,10 @@
     <string name="password_keep_hint">Leave blank to keep the saved password</string>
     <string name="smb">SMB</string>
     <string name="webdav">WebDAV</string>
+    <string name="scan_lan">Scan LAN</string>
+    <string name="scanning_lan">Scanning local network…</string>
+    <string name="no_servers_found">No servers found. Make sure the device is on the same Wi-Fi.</string>
+    <string name="discovered_devices">Discovered devices</string>
+    <string name="add_discovered">Add</string>
+    <string name="stop_scan">Stop</string>
 </resources>

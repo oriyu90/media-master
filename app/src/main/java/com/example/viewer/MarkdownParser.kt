@@ -18,6 +18,12 @@ import org.commonmark.node.SoftLineBreak
 import org.commonmark.node.StrongEmphasis
 import org.commonmark.node.Text
 import org.commonmark.node.ThematicBreak
+import org.commonmark.ext.gfm.tables.TableBlock
+import org.commonmark.ext.gfm.tables.TableBody
+import org.commonmark.ext.gfm.tables.TableCell
+import org.commonmark.ext.gfm.tables.TableHead
+import org.commonmark.ext.gfm.tables.TableRow
+import org.commonmark.ext.gfm.tables.TablesExtension
 import org.commonmark.parser.Parser
 
 /**
@@ -33,8 +39,14 @@ sealed class MdBlock {
     data class Quote(val blocks: List<MdBlock>) : MdBlock()
     data object Rule : MdBlock()
     data class ImageBlock(val url: String, val alt: String) : MdBlock()
+    /** GFM table: header + body rows as plain inline runs (v1.8.0 #2). */
+    data class Table(val headers: List<List<MdInline>>, val rows: List<List<List<MdInline>>>) : MdBlock()
     /** A `$$...$$` display-math block, rendered full-width via KaTeX. */
     data class MathBlock(val latex: String) : MdBlock()
+    /** A ```chart fenced block: lightweight native bar/line chart (v1.8.0 #2). */
+    data class ChartBlock(val raw: String) : MdBlock()
+    /** A ```mermaid fenced block: diagram source, fully drawn in As-Is WebView. */
+    data class MermaidBlock(val code: String) : MdBlock()
 }
 
 sealed class MdInline {
@@ -51,7 +63,8 @@ sealed class MdInline {
 /** Parses CommonMark source into [MdBlock] trees. Never throws — falls back to an empty document. */
 object MarkdownParser {
 
-    private val parser: Parser = Parser.builder().build()
+    private val tablesExt = listOf(TablesExtension.create())
+    private val parser: Parser = Parser.builder().extensions(tablesExt).build()
 
     fun parse(markdown: String): List<MdBlock> {
         val extraction = MathExtractor.extract(markdown)
@@ -77,6 +90,10 @@ object MarkdownParser {
                 is MdBlock.BulletListBlock -> MdBlock.BulletListBlock(block.items.map { substituteMath(it, extraction) })
                 is MdBlock.OrderedListBlock -> MdBlock.OrderedListBlock(block.startNumber, block.items.map { substituteMath(it, extraction) })
                 is MdBlock.Quote -> MdBlock.Quote(substituteMath(block.blocks, extraction))
+                is MdBlock.Table -> MdBlock.Table(
+                    block.headers.map { substituteInlineMath(it, extraction) },
+                    block.rows.map { row -> row.map { substituteInlineMath(it, extraction) } },
+                )
                 else -> block
             }
         }
@@ -126,13 +143,55 @@ object MarkdownParser {
                 MdBlock.Paragraph(convertInline(node))
             }
         }
-        is FencedCodeBlock -> MdBlock.CodeBlock(node.literal.orEmpty(), node.info?.takeIf { it.isNotBlank() })
+        is FencedCodeBlock -> {
+            val lang = node.info?.trim()?.lowercase()
+            val literal = node.literal.orEmpty()
+            when (lang) {
+                "chart" -> MdBlock.ChartBlock(literal)
+                "mermaid" -> MdBlock.MermaidBlock(literal)
+                else -> MdBlock.CodeBlock(literal, node.info?.takeIf { it.isNotBlank() })
+            }
+        }
+        is TableBlock -> convertTable(node)
         is IndentedCodeBlock -> MdBlock.CodeBlock(node.literal.orEmpty(), null)
         is BulletList -> MdBlock.BulletListBlock(convertListItems(node))
         is OrderedList -> MdBlock.OrderedListBlock(node.markerStartNumber, convertListItems(node))
         is BlockQuote -> MdBlock.Quote(convertChildren(node))
         is ThematicBreak -> MdBlock.Rule
         else -> null // Unrecognised block (e.g. HTML block): omit rather than mis-render.
+    }
+
+    private fun convertTable(node: TableBlock): MdBlock.Table {
+        var headers: List<List<MdInline>> = emptyList()
+        val rows = mutableListOf<List<List<MdInline>>>()
+        var child = node.firstChild
+        while (child != null) {
+            when (child) {
+                is TableHead -> {
+                    val headRow = child.firstChild as? TableRow
+                    if (headRow != null) headers = convertTableRow(headRow)
+                }
+                is TableBody -> {
+                    var rowNode = child.firstChild
+                    while (rowNode != null) {
+                        if (rowNode is TableRow) rows.add(convertTableRow(rowNode))
+                        rowNode = rowNode.next
+                    }
+                }
+            }
+            child = child.next
+        }
+        return MdBlock.Table(headers, rows)
+    }
+
+    private fun convertTableRow(row: TableRow): List<List<MdInline>> {
+        val cells = mutableListOf<List<MdInline>>()
+        var cell = row.firstChild
+        while (cell != null) {
+            if (cell is TableCell) cells.add(convertInline(cell))
+            cell = cell.next
+        }
+        return cells
     }
 
     private fun convertListItems(listNode: Node): List<List<MdBlock>> {

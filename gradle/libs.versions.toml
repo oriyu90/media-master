@@ -90,6 +90,7 @@ mlkit-text-recognition-japanese = { group = "com.google.mlkit", name = "text-rec
 smbj = { group = "com.hierynomus", name = "smbj", version.ref = "smbj" }
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
 commonmark = { group = "org.commonmark", name = "commonmark", version.ref = "commonmark" }
+commonmark-tables = { group = "org.commonmark", name = "commonmark-ext-gfm-tables", version.ref = "commonmark" }
 androidx-webkit = { group = "androidx.webkit", name = "webkit", version.ref = "webkit" }
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

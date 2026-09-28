@@ -12,4 +12,9 @@
     <string name="doc_unsupported_desc">Legacy .doc/.ppt files aren\'t supported for in-app viewing yet. Open with another app instead.</string>
     <string name="default_apps_title">Default apps</string>
     <string name="default_apps_desc">Choose Media Master as the default viewer for file types in system settings.</string>
+    <string name="doc_view_asis">Show as-is</string>
+    <string name="doc_table_caption">Table</string>
+    <string name="doc_chart_title">Chart</string>
+    <string name="doc_chart_empty">No chart data to display.</string>
+    <string name="doc_mermaid_note">Diagram renders in Show as-is mode.</string>
 </resources>

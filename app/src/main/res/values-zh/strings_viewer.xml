@@ -12,4 +12,9 @@
     <string name="doc_unsupported_desc">旧版.doc/.ppt文件暂不支持应用内查看,请使用其他应用打开。</string>
     <string name="default_apps_title">默认应用</string>
     <string name="default_apps_desc">可在系统设置中将Media Master设为各文件类型的默认查看器。</string>
+    <string name="doc_view_asis">按原样显示</string>
+    <string name="doc_table_caption">表格</string>
+    <string name="doc_chart_title">图表</string>
+    <string name="doc_chart_empty">没有可显示的图表数据。</string>
+    <string name="doc_mermaid_note">图表将在“按原样显示”模式下渲染。</string>
 </resources>

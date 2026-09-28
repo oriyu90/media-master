@@ -1,7 +1,7 @@
 # 設計書兼仕様書 (Media Master)
 
 ## バージョン情報
-- **Version:** 1.7.1
+- **Version:** 1.8.0
 
 ## v1.7.1 の設計変更（要約）
 - **Lenovoヒューリスティック**: `DesktopMode`に`oemDesktopHeuristic`信号を追加し`hasCoreTrigger()`へOR。実体は`isLenovoDesktopHeuristic()`（Lenovo製＋キーボード/マウス接続、またはPCモード系設定キー`pc_mode`/`lenovo_pc_mode`/`zui_pc_mode`/`productivity_mode`/`desktop_mode`/`lenovo_desktop_mode`のいずれかが有効値。Global/Secure/Systemを横断プローブ、全`runCatching`保護・権限不要）。キーボード分岐はLenovo製にゲートし他社動作不変。`isDesktopLayout()`側で`remember(context, activity)`収集。

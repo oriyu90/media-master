@@ -12,4 +12,9 @@
     <string name="doc_unsupported_desc">Oude .doc/.ppt-bestanden worden nog niet ondersteund voor weergave in de app. Open ze met een andere app.</string>
     <string name="default_apps_title">Standaard-apps</string>
     <string name="default_apps_desc">Stel Media Master in de systeeminstellingen in als standaardviewer voor bestandstypen.</string>
+    <string name="doc_view_asis">Toon zoals-is</string>
+    <string name="doc_table_caption">Tabel</string>
+    <string name="doc_chart_title">Grafiek</string>
+    <string name="doc_chart_empty">Geen grafiekgegevens om weer te geven.</string>
+    <string name="doc_mermaid_note">Diagram wordt weergegeven in de Zoals-is-modus.</string>
 </resources>

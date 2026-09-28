@@ -1,28 +1,72 @@
-# Media Master v1.7.1 実装・保守メモ
+# Media Master v1.8.0 実装・保守メモ
 
-最終更新: 2026-09-25
+最終更新: 2026-09-28
 
 ## リリース情報
 
 | 項目 | 内容 |
 | --- | --- |
-| バージョン | `1.7.1` (`versionCode 12`) |
+| バージョン | `1.8.0` (`versionCode 13`) |
 | アプリケーションID | `com.yukiorita.mediamaster` |
 | 最小 SDK / target SDK | 24 / 36 |
 | ライセンス | MIT |
 | 著作者 | Yuki_Orita |
 | release APK | `app/build/outputs/apk/release/app-release.apk`（R8 + resource shrink 有効） |
-| APK SHA-256 | `4f79abcc32747a6889787c22d051ff831d55aca27330f81923760fcc63fcc1ee` |
-| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.7.0 と同一鍵） |
-| GitHub Release | `v1.7.1` (GitHub Releases) |
+| APK SHA-256 | `e7c07575bbbc6675672d2cf64a30a093fd5b3df1c8fd875eec9d8bfd71caf6c4` |
+| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.7.1 と同一鍵） |
+| GitHub Release | `v1.8.0` (GitHub Releases) |
 
 release APK は RSA 4096 ビット鍵・APK Signature Scheme v2 署名（`apksigner verify` で確認済み）。署名鍵は `common-rules-document/keystores/media-master-upload-key.jks`（alias `upload`）。
 
-v1.7.1 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitTest`(77件)/`:app:lintDebug`(0エラー)を確認。**実機（エミュレータ）デバッグ実施済み**——本番署名済みAPKをクリーンインストールし起動・Home表示でクラッシュ0件（`logcat -b crash` FATAL 0件）。
+v1.8.0 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitTest`(87件)/`:app:lintDebug`(0エラー)を確認。**実機（エミュレータ）デバッグ実施済み**——本番署名済みAPKをクリーンインストールし起動・Home表示でクラッシュ0件（`logcat -b crash` FATAL 0件）。証明書は v0.1.0〜v1.7.1 と同一 `332ce386…eba6`（v2のみ）。
 
-旧リリースの APK SHA-256: v1.7.0 `08236934c0cbf522ce0432595933e03976368ec3b0ee000ad4ced962b2fa9fd5`、v1.6.0 `f922b2b2d797f69fe4b1c9a7aca366e9f1664f8b47c8cfbeeb9aaeb02235b615`。
+旧リリースの APK SHA-256: v1.7.1 `4f79abcc32747a6889787c22d051ff831d55aca27330f81923760fcc63fcc1ee`、v1.7.0 `08236934c0cbf522ce0432595933e03976368ec3b0ee000ad4ced962b2fa9fd5`、v1.6.0 `f922b2b2d797f69fe4b1c9a7aca366e9f1664f8b47c8cfbeeb9aaeb02235b615`。
+
+## v1.8.0 実装内容（7件対応）
+
+### 1. DeXモード文字色 (#1)
+- DesktopSidebar/SidebarDestination/DesktopTabStrip/PinnedFolderItem の文字色を明示化（選択 onSecondaryContainer、非選択 onSurface/onSurfaceVariant）。surfaceContainerLow 上の継承色依存を排除。
+- Theme のステータス/ナビゲーションバーアイコンを darkTheme フラグではなく surface luminance (isLight) から決定。DeX キャプションバーと電話側 night 設定の不一致でも判読性を維持。
+- Lenovo 設定キー横断プローブを Lenovo 製に厳密ゲート（他社で desktop_mode 系キーが立っても誤検出しない）。
+
+### 7. DeX/通常モード検出表示 (#7)
+- isDesktopLayout をリアクティブ化（lifecycle RESUME + configuration 変化で tick、DisplayManager.DisplayListener で外部ディスプレイ増減を監視、samsungDex/oemHeuristic を remember(tick) で再評価）。
+- DesktopMode.describe()/vendorDisplayName() を新設（pure、単体テスト済み）。
+- デスクトップシェル下部に常時フッター `Desktop UI active (vendor)`、設定画面に読み取り専用ステータス行（モード·ベンダー）を追加。5言語対応。
+
+### 2. LaTeX/グラフ (#2)
+- commonmark-ext-gfm-tables 0.22.0 を追加し MdBlock.Table を新設・描画（CSV流用パターン）。
+- ```chart を ChartParser（CSV/colon/JSON、24件・値域クランプ）+ Canvas バーチャートで描画。失敗時はコード表示にフォールバック。
+- ```mermaid は MermaidBlock としてソース表示 + As-Is 誘導（2MB JS を既定経路に入れない）。
+- .tex は LatexPlainTextView で section/subsection/subsubsection 見出し化、textbf/textit/emph 除去、item 箇条書き化、documentclass 等プレアンブル noise を1行スキップ。
+
+### 3. 画像/動画プレビュー (#3)
+- 外部API監査: ローカルプレビュー経路にネットワークAPIなし（Coil ローカル + ExoPlayer ローカル + ML Kit OCR オンデマンド + WebViewAssetLoader ローカルのみ）を確認。INTERNET 権限は Network 画面のみ使用。
+- Coil ImageLoader に memoryCache 25% + diskCache 256MB + crossfade を集中設定。MediaThumbnail/Viewer を ImageRequest（512px サムネイルキー、viewer キー、crossfade）に変更。
+- ExoPlayer に Player.Listener（buffering spinner + error retry）、ON_STOP pause、path+uri 安定キー + stop-before-set を追加。画像デコード失敗時は BrokenImage + retry UI（再スキャン不要）。
+
+### 4. そのまま表示 (#4)
+- DocViewMode(NATIVE/AS_IS) + TopAppBar TextButton（MARKDOWN/LATEX_SOURCE/DOCX/PPTX のみ、5言語 `doc_view_asis`）。
+- AsIsHtmlBuilder（JVMテスト可能、CSP locked、KaTeX は data-tex + katex.render 方式でバックスラッシュ地獄を回避、画像は data: URI）+ AsIsHtmlView（ hardened WebView + AssetLoader）。
+- Markdown 表/チャート表、TEX 数式、DOCX/PPTX 段落・見出し・画像を忠実レイアウトで表示。失敗時は ErrorState にフォールバック。
+
+### 5. ツールバー (#5)
+- ViewerScreen の Scaffold を contentWindowInsets=0 + content が innerPadding を無視する全画面構成に変更。TopAppBar は AnimatedVisibility（fade+slide）+ statusBarsPadding + 半透明 ViewerChromeContainer のオーバーレイ。表示/非表示でメディアの再測定なし。
+
+### 6. ネットワーク自動検出 (#6)
+- NetworkDiscoveryManager（NsdManager のみ、新規依存なし）を新設。_smb._tcp./_http._tcp. を single-shot 25s auto-stop、MulticastLock try/finally、メモリ内結果のみ。
+- Manifest に ACCESS_NETWORK_STATE + CHANGE_WIFI_MULTICAST_STATE を追加。
+- NetworkViewModel に discovered/discovering + start/stop + draftFromDiscovered を追加（onCleared で stop）。
+- NetworkScreen に Scan LAN/Stop ボタン + Discovered devices セクション（Add で editor へプリフィル、自動保存・自動接続なし）。5言語対応。
+
+### 検証
+- `:app:testDebugUnitTest` 87件全通過（新規: DesktopMode describe/display 2、ChartParser 5、Markdown table/chart/mermaid 3、既存77）。
+- `:app:lintDebug` エラー0件。
+- 実機（Medium_Phone_API_36.1）: debug + 本番署名済み release のクリーンインストール・起動で FATAL 0件。署名 v2 のみ、証明書 v0.1.0〜v1.7.1 と同一。
+- 変更ファイル: DesktopMode.kt、DesktopNavigation.kt、Theme.kt、SettingsScreen.kt、MarkdownParser.kt(+tables dep)、ChartParser.kt(新規)、DocumentViewerScreen.kt、AsIsHtmlBuilder.kt(新規)、AsIsHtmlView.kt(新規)、ViewerScreen.kt、MainActivity.kt(Coil cache)、MediaThumbnail.kt、NetworkDiscoveryManager.kt(新規)、NetworkViewModel.kt、NetworkScreen.kt、AndroidManifest.xml、strings 5言語×4種、tests 3件、build.gradle.kts(1.8.0/13)。
 
 ## v1.7.1 実装内容（Lenovo PCモード修正＋ダークモード視認性）
+
 
 ユーザー報告2件への対応（Lenovo TabでPCモードでもスマホUIのまま／ダークモードのコントラスト不足）。
 

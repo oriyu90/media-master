@@ -89,6 +89,25 @@ class DesktopModeTest {
     }
 
     @Test
+    fun `describe exposes mode vendor and signals for settings UI`() {
+        val s = DesktopMode.Signals(captionBarVisible = true, multiWindow = true)
+        val desc = DesktopMode.describe(s, DesktopMode.OVERRIDE_AUTO, DesktopMode.Vendor.SAMSUNG_DEX)
+        assertTrue(desc.startsWith("desktop|"))
+        assertTrue("SAMSUNG_DEX" in desc)
+        assertTrue("captionBar" in desc)
+        val touch = DesktopMode.describe(DesktopMode.Signals(), DesktopMode.OVERRIDE_AUTO, DesktopMode.Vendor.GENERIC)
+        assertTrue(touch.startsWith("touch|"))
+        assertTrue("signals=none" in touch)
+    }
+
+    @Test
+    fun `vendor display names are non-blank`() {
+        for (v in DesktopMode.Vendor.values()) {
+            assertTrue(DesktopMode.vendorDisplayName(v).isNotBlank())
+        }
+    }
+
+    @Test
     fun `vendor mapping covers all eight PC modes`() {
         assertEquals(DesktopMode.Vendor.SAMSUNG_DEX, DesktopMode.vendorForManufacturer("samsung"))
         assertEquals(DesktopMode.Vendor.MOTOROLA, DesktopMode.vendorForManufacturer("motorola"))

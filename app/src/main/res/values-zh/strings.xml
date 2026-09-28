@@ -105,4 +105,8 @@
     <string name="desktop_mode_force_desktop">始终使用桌面版界面</string>
     <string name="desktop_mode_force_touch">始终使用触屏版界面</string>
     <string name="desktop_mode_desc">自动检测 Samsung DeX、Android 桌面窗口、Motorola Smart Connect / Ready For、华为 EMUI 桌面、HONOR 桌面、小米 HyperOS 工作台、OPPO ColorOS PC 模式和联想平板 PC 模式。若设备未被识别，请手动切换。</string>
+    <string name="desktop_mode_active">桌面版界面运行中（%1$s）</string>
+    <string name="desktop_mode_status">状态：%1$s</string>
+    <string name="mode_touch">触屏版界面</string>
+    <string name="mode_desktop">桌面版界面</string>
 </resources>

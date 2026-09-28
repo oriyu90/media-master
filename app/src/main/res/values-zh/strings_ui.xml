@@ -31,4 +31,7 @@
     <string name="new_folder">新建文件夹</string>
     <string name="folder_name">文件夹名称</string>
     <string name="create">创建</string>
+    <string name="video_buffering">缓冲中…</string>
+    <string name="video_error">无法播放此视频。</string>
+    <string name="image_load_error">无法加载此图片。</string>
 </resources>

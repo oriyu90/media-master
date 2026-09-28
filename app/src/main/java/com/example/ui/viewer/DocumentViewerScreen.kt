@@ -103,6 +103,13 @@ import java.io.File
  * Master doesn't own the index for — e.g. a `content://` URI handed to us by
  * another app via `ACTION_VIEW`.
  */
+/**
+ * v1.8.0 (#4): native Compose renderer (default) vs single-WebView
+ * faithful renderer. As-is shows tables/graphs/images with original
+ * layout; native stays selectable/themed.
+ */
+enum class DocViewMode { NATIVE, AS_IS }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DocumentViewerScreen(
@@ -137,6 +144,9 @@ fun DocumentViewerScreen(
     // we have no business deleting storage we don't manage.
     val canDelete = path != null && viewModel != null
     var confirmDelete by remember(uri) { mutableStateOf(false) }
+    var viewMode by remember(uri, kind) { mutableStateOf(DocViewMode.NATIVE) }
+    val showAsIsToggle = kind == ViewerKind.MARKDOWN || kind == ViewerKind.LATEX_SOURCE ||
+        kind == ViewerKind.DOCX || kind == ViewerKind.PPTX
 
     val openExternally: () -> Unit = {
         val intent = Intent(Intent.ACTION_VIEW).apply {
@@ -156,6 +166,17 @@ fun DocumentViewerScreen(
                     }
                 },
                 actions = {
+                    if (showAsIsToggle) {
+                        TextButton(onClick = {
+                            viewMode = if (viewMode == DocViewMode.NATIVE) DocViewMode.AS_IS else DocViewMode.NATIVE
+                        }) {
+                            Text(
+                                stringResource(
+                                    if (viewMode == DocViewMode.NATIVE) R.string.doc_view_asis else R.string.doc_view_rendered,
+                                ),
+                            )
+                        }
+                    }
                     IconButton(onClick = openExternally) {
                         Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = stringResource(R.string.doc_open_externally))
                     }
@@ -199,11 +220,11 @@ fun DocumentViewerScreen(
                 ViewerKind.TEXT -> TextViewerBody(context, uri)
                 ViewerKind.CSV -> CsvViewerBody(context, uri)
                 ViewerKind.JSON -> JsonViewerBody(context, uri)
-                ViewerKind.MARKDOWN -> MarkdownViewerBody(context, uri)
-                ViewerKind.LATEX_SOURCE -> LatexSourceBody(context, uri)
+                ViewerKind.MARKDOWN -> if (viewMode == DocViewMode.AS_IS) AsIsMarkdownBody(context, uri) else MarkdownViewerBody(context, uri)
+                ViewerKind.LATEX_SOURCE -> if (viewMode == DocViewMode.AS_IS) AsIsTexBody(context, uri) else LatexSourceBody(context, uri)
                 ViewerKind.PDF -> PdfViewerBody(context, uri)
-                ViewerKind.DOCX -> DocxViewerBody(context, uri)
-                ViewerKind.PPTX -> PptxViewerBody(context, uri)
+                ViewerKind.DOCX -> if (viewMode == DocViewMode.AS_IS) AsIsDocxBody(context, uri) else DocxViewerBody(context, uri)
+                ViewerKind.PPTX -> if (viewMode == DocViewMode.AS_IS) AsIsPptxBody(context, uri) else PptxViewerBody(context, uri)
                 ViewerKind.EXTERNAL_ONLY -> ExternalOnlyBody(onOpenExternally = openExternally)
                 ViewerKind.HEX -> HexViewerBody(context, uri)
             }
@@ -523,6 +544,9 @@ private fun MarkdownBlockView(
         ) {
             Column(Modifier.padding(12.dp)) { block.blocks.forEach { MarkdownBlockView(it, linkColor, mathSizeCache) } }
         }
+        is MdBlock.Table -> MarkdownTableView(block)
+        is MdBlock.ChartBlock -> MarkdownChartView(block)
+        is MdBlock.MermaidBlock -> MarkdownMermaidPlaceholder(block)
         MdBlock.Rule -> HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
         is MdBlock.ImageBlock -> Text(
             text = "[${block.alt.ifBlank { block.url }}]",
@@ -530,6 +554,173 @@ private fun MarkdownBlockView(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(vertical = 4.dp),
         )
+    }
+}
+
+/**
+ * v1.8.0 (#2): native GFM table renderer. Reuses the CSV viewer pattern
+ * (fixed 140.dp columns + shared horizontal scroll + divider) so wide tables
+ * stay readable without breaking the surrounding LazyColumn.
+ */
+@Composable
+private fun MarkdownTableView(block: MdBlock.Table) {
+    val columnCount = maxOf(block.headers.size, block.rows.maxOfOrNull { it.size } ?: 0)
+    if (columnCount == 0) return
+    val columnWidth = 140.dp
+    val scroll = rememberScrollState()
+    Column(
+        Modifier.fillMaxWidth().padding(vertical = 4.dp)
+            .horizontalScroll(scroll),
+    ) {
+        Row(Modifier.padding(vertical = 6.dp)) {
+            repeat(columnCount) { col ->
+                val cell = block.headers.getOrNull(col)
+                Text(
+                    text = cell?.let { inlineToPlainText(it) }.orEmpty(),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.width(columnWidth).padding(end = 8.dp),
+                )
+            }
+        }
+        HorizontalDivider()
+        block.rows.forEach { row ->
+            Row(Modifier.padding(vertical = 6.dp)) {
+                repeat(columnCount) { col ->
+                    val cell = row.getOrNull(col)
+                    Text(
+                        text = cell?.let { inlineToPlainText(it) }.orEmpty(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.width(columnWidth).padding(end = 8.dp),
+                    )
+                }
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        }
+    }
+}
+
+private fun inlineToPlainText(inline: List<MdInline>): String = buildString {
+    fun appendNodes(nodes: List<MdInline>) {
+        nodes.forEach { node ->
+            when (node) {
+                is MdInline.PlainText -> append(node.text)
+                is MdInline.Bold -> appendNodes(node.children)
+                is MdInline.Italic -> appendNodes(node.children)
+                is MdInline.InlineCode -> append(node.text)
+                is MdInline.LinkText -> appendNodes(node.children)
+                MdInline.LineBreak -> append(" ")
+                is MdInline.Math -> append(node.latex)
+            }
+        }
+    }
+    appendNodes(inline)
+}
+
+/**
+ * v1.8.0 (#2): native bar chart for ```chart blocks (offline, Canvas).
+ * Falls back to a monospace code box when the data cannot be parsed —
+ * never blank, never crash.
+ */
+@Composable
+private fun MarkdownChartView(block: MdBlock.ChartBlock) {
+    val data = remember(block.raw) { com.example.viewer.ChartParser.parse(block.raw) }
+    if (data == null) {
+        androidx.compose.material3.Surface(
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(com.example.ui.components.Hallmark.RadiusSmall),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        ) {
+            Text(
+                text = block.raw,
+                fontFamily = FontFamily.Monospace,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(12.dp).horizontalScroll(rememberScrollState()),
+            )
+        }
+        return
+    }
+    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Text(
+            text = stringResource(R.string.doc_chart_title),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 8.dp),
+        )
+        val maxAbs = (data.maxValue.takeIf { it > 0f } ?: 1f)
+        val barColor = MaterialTheme.colorScheme.primary
+        val trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+        data.entries.forEach { entry ->
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = entry.label,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.width(72.dp),
+                )
+                Box(
+                    Modifier.weight(1f).padding(horizontal = 8.dp)
+                        .horizontalScroll(rememberScrollState(), enabled = false),
+                ) {
+                    androidx.compose.foundation.Canvas(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                        val w = size.width
+                        val h = 14.dp.toPx()
+                        drawRoundRect(trackColor, size = androidx.compose.ui.geometry.Size(w, h), cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx()))
+                        val frac = (kotlin.math.abs(entry.value) / maxAbs).coerceIn(0f, 1f)
+                        if (frac > 0f) drawRoundRect(barColor, size = androidx.compose.ui.geometry.Size(w * frac, h), cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx()))
+                    }
+                }
+                Text(
+                    text = formatChartValue(entry.value),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.width(64.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                )
+            }
+        }
+    }
+}
+
+private fun formatChartValue(v: Float): String {
+    return if (v % 1f == 0f) v.toLong().toString() else String.format(java.util.Locale.US, "%.2f", v)
+}
+
+/**
+ * v1.8.0 (#2): Mermaid placeholder in the native renderer. The diagram
+ * source stays visible/selectable here; the full drawing is rendered in
+ * the top-bar "Show as-is" WebView mode (#4) so no 2MB JS bundle is
+ * forced into the default path.
+ */
+@Composable
+private fun MarkdownMermaidPlaceholder(block: MdBlock.MermaidBlock) {
+    androidx.compose.material3.Surface(
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(com.example.ui.components.Hallmark.RadiusSmall),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+    ) {
+        Column(Modifier.padding(12.dp)) {
+            Text(
+                text = stringResource(R.string.doc_mermaid_note),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 6.dp),
+            )
+            Text(
+                text = block.code,
+                fontFamily = FontFamily.Monospace,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+            )
+        }
     }
 }
 
@@ -632,14 +823,13 @@ private fun LatexSourceBody(context: Context, uri: Uri) {
                 LazyColumn(Modifier.fillMaxSize().padding(horizontal = Hallmark.ContentEdge)) {
                     items(segments.size) { i ->
                         when (val segment = segments[i]) {
+                            // v1.8.0 (#2): \section/\subsection/\subsubsection lines
+                            // render as real headings; \textbf/\textit get bold/italic;
+                            // itemize/enumerate \item lines render as bullets. The raw
+                            // preamble (\documentclass etc.) is still shown verbatim
+                            // so nothing is silently dropped.
                             is TexSegment.PlainText -> if (segment.text.isNotBlank()) {
-                                SelectionContainer {
-                                    Text(
-                                        text = segment.text,
-                                        style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-                                        modifier = Modifier.padding(vertical = 2.dp),
-                                    )
-                                }
+                                LatexPlainTextView(segment.text)
                             }
                             is TexSegment.Math -> Box(
                                 // See the equivalent MdBlock.MathBlock note: no horizontalScroll —
@@ -655,6 +845,77 @@ private fun LatexSourceBody(context: Context, uri: Uri) {
             }
         }
     }
+}
+
+/**
+ * v1.8.0 (#2): minimal LaTeX structure styling without on-device TeX
+ * compilation. Pure string mapping, never throws.
+ */
+@Composable
+private fun LatexPlainTextView(text: String) {
+    val lines = text.split("\n")
+    Column(Modifier.fillMaxWidth()) {
+        var bulletIndex = 1
+        lines.forEach { rawLine ->
+            val line = rawLine.trim()
+            if (line.isEmpty()) return@forEach
+            val section = Regex("\\\\(sub)*section\\*?\\{([^}]*)\\}").find(line)
+            if (section != null) {
+                val title = section.groupValues[2].ifBlank { line }
+                val level = when {
+                    line.startsWith("\\subsubsection") -> 3
+                    line.startsWith("\\subsection") -> 2
+                    else -> 1
+                }
+                Text(
+                    text = title,
+                    style = when (level) {
+                        1 -> MaterialTheme.typography.headlineSmall
+                        2 -> MaterialTheme.typography.titleLarge
+                        else -> MaterialTheme.typography.titleMedium
+                    },
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(vertical = 6.dp),
+                )
+                bulletIndex = 1
+                return@forEach
+            }
+            if (line.startsWith("\\item")) {
+                val content = line.removePrefix("\\item").trim()
+                Row(Modifier.padding(start = 16.dp, top = 2.dp, bottom = 2.dp)) {
+                    Text("•  ", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        text = stripSimpleLatex(content),
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                bulletIndex++
+                return@forEach
+            }
+            // Skip pure preamble noise on its own line to reduce clutter,
+            // but keep everything else verbatim.
+            if (line.startsWith("\\documentclass") || line.startsWith("\\usepackage") ||
+                line.startsWith("\\begin{document}") || line.startsWith("\\end{document}")
+            ) return@forEach
+            SelectionContainer {
+                Text(
+                    text = stripSimpleLatex(rawLine),
+                    style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                    modifier = Modifier.padding(vertical = 2.dp),
+                )
+            }
+        }
+    }
+}
+
+private fun stripSimpleLatex(s: String): String {
+    var out = s
+    out = Regex("\\\\textbf\\{([^}]*)\\}").replace(out, "$1")
+    out = Regex("\\\\textit\\{([^}]*)\\}").replace(out, "$1")
+    out = Regex("\\\\emph\\{([^}]*)\\}").replace(out, "$1")
+    out = out.replace("\\", "")
+    return out
 }
 
 // ---------------------------------------------------------------------------
@@ -829,6 +1090,70 @@ private fun slideRunsToAnnotatedString(runs: List<SlideRun>): AnnotatedString = 
         pushStyle(SpanStyle(fontWeight = if (run.bold) FontWeight.Bold else FontWeight.Normal))
         append(run.text)
         pop()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// v1.8.0 (#4): Show-as-is bodies (single WebView, faithful tables/images)
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun AsIsMarkdownBody(context: Context, uri: Uri) {
+    val dark = androidx.compose.foundation.isSystemInDarkTheme()
+    when (val loadable = rememberLoadable(uri) { TextCharsetReader.read(context, uri, 4 * 1024 * 1024) }) {
+        Loadable.Loading -> CenteredProgress()
+        Loadable.Failed -> ErrorState(message = stringResource(R.string.doc_parse_error), modifier = Modifier.fillMaxSize())
+        is Loadable.Ready -> {
+            val html = remember(loadable.value.text, dark) {
+                AsIsHtmlBuilder.markdownToHtml(loadable.value.text, dark)
+            }
+            AsIsHtmlView(html = html)
+        }
+    }
+}
+
+@Composable
+private fun AsIsTexBody(context: Context, uri: Uri) {
+    val dark = androidx.compose.foundation.isSystemInDarkTheme()
+    when (val loadable = rememberLoadable(uri) { TextCharsetReader.read(context, uri, 4 * 1024 * 1024) }) {
+        Loadable.Loading -> CenteredProgress()
+        Loadable.Failed -> ErrorState(message = stringResource(R.string.doc_parse_error), modifier = Modifier.fillMaxSize())
+        is Loadable.Ready -> {
+            val html = remember(loadable.value.text, dark) {
+                AsIsHtmlBuilder.texToHtml(loadable.value.text, dark)
+            }
+            AsIsHtmlView(html = html)
+        }
+    }
+}
+
+@Composable
+private fun AsIsDocxBody(context: Context, uri: Uri) {
+    val dark = androidx.compose.foundation.isSystemInDarkTheme()
+    when (val loadable = rememberLoadable(uri) { OoxmlDocumentReader.read(context, uri) }) {
+        Loadable.Loading -> CenteredProgress()
+        Loadable.Failed -> ErrorState(message = stringResource(R.string.doc_parse_error), modifier = Modifier.fillMaxSize())
+        is Loadable.Ready -> {
+            val html = remember(loadable.value, dark) {
+                AsIsHtmlBuilder.docxToHtml(loadable.value, dark)
+            }
+            AsIsHtmlView(html = html)
+        }
+    }
+}
+
+@Composable
+private fun AsIsPptxBody(context: Context, uri: Uri) {
+    val dark = androidx.compose.foundation.isSystemInDarkTheme()
+    when (val loadable = rememberLoadable(uri) { OoxmlSlideReader.read(context, uri) }) {
+        Loadable.Loading -> CenteredProgress()
+        Loadable.Failed -> ErrorState(message = stringResource(R.string.doc_parse_error), modifier = Modifier.fillMaxSize())
+        is Loadable.Ready -> {
+            val html = remember(loadable.value, dark) {
+                AsIsHtmlBuilder.pptxToHtml(loadable.value, dark)
+            }
+            AsIsHtmlView(html = html)
+        }
     }
 }
 

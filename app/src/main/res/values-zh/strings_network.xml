@@ -14,4 +14,10 @@
     <string name="password_keep_hint">留空则保留已保存的密码</string>
     <string name="smb">SMB</string>
     <string name="webdav">WebDAV</string>
+    <string name="scan_lan">扫描局域网</string>
+    <string name="scanning_lan">正在扫描本地网络…</string>
+    <string name="no_servers_found">未找到服务器。请确认设备连接在同一 Wi-Fi。</string>
+    <string name="discovered_devices">发现的设备</string>
+    <string name="add_discovered">添加</string>
+    <string name="stop_scan">停止</string>
 </resources>

@@ -4,6 +4,13 @@ Media Master is an open-source Android media and file manager built with Kotlin 
 
 Media Master は、Kotlin と Jetpack Compose で開発されたオープンソースのAndroid向けメディア・ファイル管理アプリです。写真・動画、音楽、書類、ストレージ、アプリ／APK、編集、バックアップを1つのアプリで扱えます。
 
+## v1.9.2
+
+- **Swipe down to go back in the viewer:** dragging a photo/video downward (single finger, not zoomed, OCR off) now follows the finger with a dimming veil; past 140dp it flings off-screen and returns to the list, otherwise it springs back. Horizontal paging, pinch zoom, and OCR text selection are never stolen (mutually exclusive gesture arbitration, multi-touch aborts). Audio pages unchanged.
+- **Seamless viewer fade:** the toolbar overlay is now pure fade (no slide, which left transient seams), guaranteed full-width, with a continuous 96dp gradient scrim below the bar fading in sync — no more see-through gaps between buttons over bright media. Chrome hides during dismiss drags.
+- **Manage shows real folder names:** storage-device cards now headline the actual volume name (`ABCD-1234`, `UsbDriveA`, …; generic label only when blank) with the full path as supporting text, so SD/USB volumes are distinguishable.
+- Version `1.9.2` (`versionCode 16`), signed with the same upload key as v0.1.0–v1.9.1 (APK Signature Scheme v2 verified). **APK SHA-256: `0d41403ece4d59eb94e62a5a4cb5e385f239d22614b16dd727c0d5154e4bc20a`.**
+
 ## v1.9.1
 
 - **Desktop divider contrast fix:** the three structural hairlines in the desktop shell (sidebar/content boundary, tab-strip base, tab separators) used `outlineVariant`, which is only ~1.9:1 on near-black dark surfaces — nearly invisible dark-gray-on-black lines. They now use `outline` (≥3:1 in both themes, 5.4–5.8:1 in dark), which M3 reserves for important boundaries. Desktop text pairings were re-measured and all pass AA; new regression test pins separator (3:1) + desktop text (4.5:1) contrast.

@@ -82,7 +82,14 @@ fun ManageDashboardScreen(navController: NavHostController, viewModel: FileViewM
                 Text(stringResource(R.string.storage_devices), style = MaterialTheme.typography.titleMedium)
                 storageRoots.forEachIndexed { index, path ->
                     val isInternal = path.contains("emulated")
-                    val title = if (isInternal) stringResource(R.string.internal_storage) else stringResource(R.string.external_storage)
+                    // v1.9.2: show the real volume name (e.g. "ABCD-1234" for
+                    // SD cards, "UsbDriveA" for USB-OTG) so multiple external
+                    // volumes are distinguishable; previously every external
+                    // root rendered the same generic label. Full path stays as
+                    // supporting text so nothing is hidden.
+                    val volumeName = volumeDisplayName(path)
+                    val title = if (isInternal) stringResource(R.string.internal_storage)
+                        else volumeName.ifBlank { stringResource(R.string.external_storage) }
                     val icon = if (isInternal) Icons.Default.Smartphone else Icons.Default.SdStorage
                     
                     Card(
@@ -93,7 +100,7 @@ fun ManageDashboardScreen(navController: NavHostController, viewModel: FileViewM
                     ) {
                         ListItem(
                             headlineContent = { Text(title) },
-                            supportingContent = { Text(stringResource(R.string.browse_all_folders)) },
+                            supportingContent = { Text(path) },
                             leadingContent = { Icon(icon, contentDescription = null) },
                             colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent)
                         )
@@ -231,6 +238,13 @@ private fun RecentFilesRow(mediaViewState: ViewState, onOpen: (MediaFile) -> Uni
 
 private fun categoryIconFor(file: MediaFile): androidx.compose.ui.graphics.vector.ImageVector =
     MediaCategory.entries.firstOrNull { it.matches(file) }?.icon ?: Icons.AutoMirrored.Filled.InsertDriveFile
+
+/**
+ * v1.9.2: last path segment for volume labels ("/storage/ABCD-1234" ->
+ * "ABCD-1234"). Pure (java.io only) so unit tests pin it without Android.
+ */
+internal fun volumeDisplayName(path: String): String =
+    runCatching { File(path.trimEnd('/')).name }.getOrDefault("")
 
 @Composable
 fun CategoryGrid(onCategoryClick: (MediaCategory) -> Unit) {

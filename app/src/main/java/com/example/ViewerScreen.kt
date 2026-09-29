@@ -34,6 +34,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -41,10 +42,10 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -159,11 +160,39 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
         val isImage = currentFile.mimeType.startsWith("image/")
 
         var isZoomedIn by remember { mutableStateOf(false) }
+        // v1.9.2: drag-to-dismiss (swipe down returns to the list). The
+        // Animatable drives both the follow-finger translation and the dim
+        // fade; settleDismiss() either flings off-screen + pops, or springs
+        // back. Detection lives per page (image overlay / video detector) and
+        // only arms for single-finger, non-zoomed, non-OCR downward drags so
+        // horizontal paging, pinch zoom and OCR selection are never stolen.
+        // Offset is a plain state (not Animatable): the restricted
+        // pointer-input scope forbids suspending snapTo(), so the finger
+        // writes directly and only the release settles via animation.
+        var dismissOffsetY by remember { mutableStateOf(0f) }
+        var dismissEngaged by remember { mutableStateOf(false) }
+        var viewerHeightPx by remember { mutableStateOf(0f) }
+        val density = LocalDensity.current
+        val dismissThresholdPx = remember(density) { with(density) { 140.dp.toPx() } }
+        fun settleDismiss(totalDy: Float) {
+            coroutineScope.launch {
+                val anim = Animatable(dismissOffsetY)
+                if (shouldConfirmDismiss(totalDy, dismissThresholdPx) && viewerHeightPx > 0f) {
+                    runCatching { anim.animateTo(viewerHeightPx, tween(220)) { dismissOffsetY = value } }
+                    navController.popBackStack()
+                } else {
+                    runCatching { anim.animateTo(0f, tween(180)) { dismissOffsetY = value } }
+                }
+                dismissEngaged = false
+            }
+        }
         LaunchedEffect(pagerState.currentPage) {
             isOcrMode = false
             recognizedText = null
             imageSize = IntSize.Zero
             isZoomedIn = false
+            dismissEngaged = false
+            dismissOffsetY = 0f
         }
 
         // Single player for the whole viewer session: pages share it instead of
@@ -231,10 +260,16 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
             containerColor = ViewerScrim,
             topBar = {
                 AnimatedVisibility(
-                    visible = !isFullScreen,
-                    enter = fadeIn() + slideInVertically(initialOffsetY = { -it }),
-                    exit = fadeOut() + slideOutVertically(targetOffsetY = { -it }),
+                    // v1.9.2: pure fade (no slide) + guaranteed full width +
+                    // a continuous gradient scrim below the bar, so the veil
+                    // has no sliding seams or see-through gaps. Chrome also
+                    // hides while a dismiss drag is active.
+                    visible = !isFullScreen && !dismissEngaged,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
                     TopAppBar(
                         title = { Text(currentFile.name) },
                         navigationIcon = {
@@ -362,6 +397,22 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
                         ),
                         modifier = Modifier.statusBarsPadding(),
                     )
+                    // Continuous veil below the bar: the translucent bar alone
+                    // leaves see-through gaps between buttons over bright
+                    // media; this gradient fades with the same visibility so
+                    // coverage stays seamless from status bar to content.
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(96.dp)
+                            .background(
+                                androidx.compose.ui.graphics.Brush.verticalGradient(
+                                    0f to Color.Black.copy(alpha = 0.45f),
+                                    1f to Color.Transparent,
+                                )
+                            )
+                    )
+                    }
                 }
             }
         ) { _ ->
@@ -369,8 +420,13 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
                 state = pagerState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(ViewerScrim),
-                userScrollEnabled = !isOcrMode && !isZoomedIn
+                    .background(ViewerScrim)
+                    .onGloballyPositioned { viewerHeightPx = it.size.height.toFloat() }
+                    .graphicsLayer {
+                        translationY = dismissOffsetY
+                        alpha = dismissScrimAlpha(dismissOffsetY, size.height)
+                    },
+                userScrollEnabled = !isOcrMode && !isZoomedIn && !dismissEngaged
             ) { page ->
                 val pageFile = mediaList[page]
                 val pageUri = pageFile.contentUri ?: Uri.fromFile(File(pageFile.path))
@@ -400,19 +456,29 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
                                     // (earlier, parent-to-child) Initial pass — before the
                                     // event is forwarded into the native view — lets us
                                     // consume it and drive the page change manually instead.
-                                    .pointerInput(pagerState.currentPage, mediaList.size) {
+                                    .pointerInput(pagerState.currentPage, mediaList.size, isZoomedIn, dismissThresholdPx) {
                                         var dragTotal = Offset.Zero
                                         var handedToPager = false
+                                        // v1.9.2: downward dismiss tracking. Mutually
+                                        // exclusive with the horizontal branch (a
+                                        // drag cannot be dominant in both axes).
+                                        var dismissArmed = false
+                                        var multiTouchAbort = false
+                                        val engageSlop = dismissThresholdPx * 0.2f
                                         awaitEachGesture {
                                             awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                                             dragTotal = Offset.Zero
                                             handedToPager = false
+                                            dismissArmed = false
+                                            multiTouchAbort = false
                                             do {
                                                 val event = awaitPointerEvent(PointerEventPass.Initial)
-                                                if (event.changes.size == 1) {
+                                                if (event.changes.size != 1) {
+                                                    if (dismissArmed) multiTouchAbort = true
+                                                } else {
                                                     val change = event.changes[0]
                                                     dragTotal += change.positionChange()
-                                                    if (!handedToPager && !isZoomedIn &&
+                                                    if (!handedToPager && !dismissArmed && !isZoomedIn &&
                                                         kotlin.math.abs(dragTotal.x) > 60f &&
                                                         kotlin.math.abs(dragTotal.x) > kotlin.math.abs(dragTotal.y) * 1.5f
                                                     ) {
@@ -422,11 +488,25 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
                                                             coroutineScope.launch { pagerState.animateScrollToPage(targetPage) }
                                                         }
                                                     }
-                                                    if (handedToPager) {
+                                                    if (!handedToPager && !dismissArmed && !multiTouchAbort && !isZoomedIn &&
+                                                        dragTotal.y > engageSlop &&
+                                                        dragTotal.y > kotlin.math.abs(dragTotal.x) * 1.2f
+                                                    ) {
+                                                        dismissArmed = true
+                                                        dismissEngaged = true
+                                                    }
+                                                    if (dismissArmed && !multiTouchAbort) {
+                                                        dismissOffsetY = max(0f, dragTotal.y)
+                                                    }
+                                                    if (handedToPager || (dismissArmed && !multiTouchAbort)) {
                                                         change.consume()
                                                     }
                                                 }
                                             } while (event.changes.any { it.pressed })
+                                            if (dismissArmed) {
+                                                val total = if (multiTouchAbort) 0f else max(0f, dragTotal.y)
+                                                settleDismiss(total)
+                                            }
                                         }
                                     }
                             ) {
@@ -471,7 +551,11 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
                             isOcrMode = isOcrMode && page == pagerState.currentPage,
                             recognizedText = if (page == pagerState.currentPage) recognizedText else null,
                             imageSize = if (page == pagerState.currentPage) imageSize else IntSize.Zero,
-                            context = context
+                            context = context,
+                            dismissThresholdPx = dismissThresholdPx,
+                            onDismissDrag = { dismissOffsetY = it },
+                            onDismissEngage = { dismissEngaged = it },
+                            onDismissSettle = ::settleDismiss,
                         )
                     }
                 }
@@ -513,6 +597,20 @@ private fun pageAwareOverlay(currentPage: Int, mediaList: List<MediaFile>): Bool
     return currentPage in mediaList.indices
 }
 
+/**
+ * v1.9.2 drag-to-dismiss decision: fling off-screen only past the threshold,
+ * otherwise spring back. Pure so unit tests pin it without Compose.
+ */
+internal fun shouldConfirmDismiss(dragDyPx: Float, thresholdPx: Float): Boolean =
+    dragDyPx > thresholdPx
+
+/**
+ * v1.9.2 dismiss veil: the pager dims toward 45% as it slides down a full
+ * screen height. Pure so unit tests pin it without Compose.
+ */
+internal fun dismissScrimAlpha(offsetYPx: Float, heightPx: Float): Float =
+    1f - (offsetYPx / heightPx.coerceAtLeast(1f)).coerceIn(0f, 1f) * 0.55f
+
 @Composable
 fun ImageWithOcrOverlay(
     uri: Uri,
@@ -520,7 +618,11 @@ fun ImageWithOcrOverlay(
     recognizedText: Text?,
     imageSize: IntSize,
     context: Context,
-    onTap: () -> Unit
+    onTap: () -> Unit,
+    dismissThresholdPx: Float,
+    onDismissDrag: (Float) -> Unit,
+    onDismissEngage: (Boolean) -> Unit,
+    onDismissSettle: (Float) -> Unit,
 ) {
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
@@ -554,6 +656,40 @@ fun ImageWithOcrOverlay(
             }
             .pointerInput(Unit) {
                 detectTapGestures(onTap = { onTap() })
+            }
+            // v1.9.2: downward dismiss. Keyed on rest state so a pinch in
+            // progress never arms it; disabled in OCR mode (vertical drags
+            // select text there) and while zoomed (they pan instead).
+            .pointerInput(isOcrMode, scale == 1f, dismissThresholdPx) {
+                if (isOcrMode || scale != 1f) return@pointerInput
+                val engageSlop = dismissThresholdPx * 0.2f
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                    var total = Offset.Zero
+                    var armed = false
+                    var aborted = false
+                    do {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        if (event.changes.size != 1) {
+                            if (armed) aborted = true
+                        } else {
+                            val change = event.changes[0]
+                            total += change.positionChange()
+                            if (!armed && !aborted &&
+                                total.y > engageSlop &&
+                                total.y > kotlin.math.abs(total.x) * 1.2f
+                            ) {
+                                armed = true
+                                onDismissEngage(true)
+                            }
+                            if (armed && !aborted) {
+                                onDismissDrag(max(0f, total.y))
+                                change.consume()
+                            }
+                        }
+                    } while (event.changes.any { it.pressed })
+                    if (armed) onDismissSettle(if (aborted) 0f else max(0f, total.y))
+                }
             }
             .pointerInput(isOcrMode) {
                 // Only claim the gesture for a pinch (2+ pointers) or while already

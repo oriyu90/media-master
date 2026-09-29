@@ -1,4 +1,4 @@
-# Media Master v1.9.1 実装・保守メモ
+# Media Master v1.9.2 実装・保守メモ
 
 最終更新: 2026-09-29
 
@@ -6,21 +6,38 @@
 
 | 項目 | 内容 |
 | --- | --- |
-| バージョン | `1.9.1` (`versionCode 15`) |
+| バージョン | `1.9.2` (`versionCode 16`) |
 | アプリケーションID | `com.yukiorita.mediamaster` |
 | 最小 SDK / target SDK | 24 / 36 |
 | ライセンス | MIT |
 | 著作者 | Yuki_Orita |
 | release APK | `app/build/outputs/apk/release/app-release.apk`（R8 + resource shrink 有効） |
-| APK SHA-256 | `1883e8d144877af852be76d94e9a3d5feb42f94e839da35bd2e0440317bc4a3b` |
-| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.9.0 と同一鍵） |
-| GitHub Release | `v1.9.1` (GitHub Releases) |
+| APK SHA-256 | `0d41403ece4d59eb94e62a5a4cb5e385f239d22614b16dd727c0d5154e4bc20a` |
+| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.9.1 と同一鍵） |
+| GitHub Release | `v1.9.2` (GitHub Releases) |
 
 release APK は RSA 4096 ビット鍵・APK Signature Scheme v2 署名（`apksigner verify` で確認済み）。署名鍵は `common-rules-document/keystores/media-master-upload-key.jks`（alias `upload`）。
 
-v1.9.1 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitTest`(105件)/`:app:lintDebug`(0エラー)/`verifyRoborazziDebug`(6件参照一致)/`:app:jacocoTestReport`を確認。**実機（エミュレータ）デバッグ実施済み**——本番署名済みAPKをクリーンインストールし起動・Home表示でクラッシュ0件（`logcat -b crash` FATAL 0件）。証明書は v0.1.0〜v1.9.0 と同一 `332ce386…eba6`（v2のみ）。
+v1.9.2 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitTest`(108件)/`:app:lintDebug`(0エラー)/`verifyRoborazziDebug`(6件参照一致)/`:app:jacocoTestReport`を確認。**実機（エミュレータ）デバッグ実施済み**——本番署名済みAPKをクリーンインストールし起動・Home表示でクラッシュ0件（`logcat -b crash` FATAL 0件）。証明書は v0.1.0〜v1.9.1 と同一 `332ce386…eba6`（v2のみ）。
 
-旧リリースの APK SHA-256: v1.9.0 `74994a9d1313cb0b2acdec9b15b329b1d3b85b110e9901ef542855b4b33ee85b`、v1.8.0 `e7c07575bbbc6675672d2cf64a30a093fd5b3df1c8fd875eec9d8bfd71caf6c4`、 v1.7.1 `4f79abcc32747a6889787c22d051ff831d55aca27330f81923760fcc63fcc1ee`、v1.7.0 `08236934c0cbf522ce0432595933e03976368ec3b0ee000ad4ced962b2fa9fd5`、v1.6.0 `f922b2b2d797f69fe4b1c9a7aca366e9f1664f8b47c8cfbeeb9aaeb02235b615`。
+旧リリースの APK SHA-256: v1.9.1 `1883e8d144877af852be76d94e9a3d5feb42f94e839da35bd2e0440317bc4a3b`、v1.9.0 `74994a9d1313cb0b2acdec9b15b329b1d3b85b110e9901ef542855b4b33ee85b`、v1.8.0 `e7c07575bbbc6675672d2cf64a30a093fd5b3df1c8fd875eec9d8bfd71caf6c4`、 v1.7.1 `4f79abcc32747a6889787c22d051ff831d55aca27330f81923760fcc63fcc1ee`、v1.7.0 `08236934c0cbf522ce0432595933e03976368ec3b0ee000ad4ced962b2fa9fd5`、v1.6.0 `f922b2b2d797f69fe4b1c9a7aca366e9f1664f8b47c8cfbeeb9aaeb02235b615`。
+
+## v1.9.2 実装内容（ビューア下スワイプ・フェード継ぎ目・Manage実名）
+
+### 1. 下スワイプで一覧に戻る
+- 画像はオーバーレイ内・動画は既存Initialパス検出器に下方向分岐を追加。単指・非ズーム（画像scale==1/動画!isZoomedIn）・非OCR・下優勢（|y|>|x|*1.2）・係留28dpで係合。係合後は全changeをconsumeしページ遷移を抑止、複指検出でabort→復帰。水平分岐とは排他（両優勢条件は両立不能）。
+- 指追従はplain state直書き（制限スコープで`Animatable.snapTo`不可のためコンパイルエラーで発覚・修正）、解放のみ`settleDismiss`でアニメ化（140dp超＋高さ確定で画面外tween220ms＋popBackStack、未満はtween180ms復帰）。音声ページは対象外。ページ遷移時にoffset/係合をリセット。
+- `shouldConfirmDismiss`/`dismissScrimAlpha`をpure関数化し`ViewerDismissTest`3件で固定。
+
+### 2. フェードの隙間
+- slide+fade複合（遷移中の継ぎ目の原因）→fade単独、`AnimatedVisibility`に`fillMaxWidth`明示。バー下に96dpグラデーションスクリム（黒45%→透明）を同一Visibility内に統合し、明るい写真上でボタン間に透け隙間が出ない連続ベール化。dismiss中は`dismissEngaged`でクローム非表示。TopAppBar自体・statusBarsPaddingは不変。
+
+### 3. Manageフォルダ名
+- ストレージデバイスカードの見出しを実ボリューム名化（`volumeDisplayName()` pure、末尾セグメント、空は従来文言）、補足をフルパス化（従来の"Brows all folders"から変更）。SD/USBの判別が可能に。新規文言なし。
+
+### 検証
+- `:app:testDebugUnitTest` 108件全通過（既存105＋新規3）/`:app:lintDebug` 0エラー。
+- 実機（Medium_Phone_API_36.1）: 本番署名済みAPKをクリーンインストール→テスト画像配置→Libraryタップでビューア表示（ツールバー継ぎ目なしを確認）→下スワイプで一覧復帰、FATAL 0件。Manage表示（実名＋パス）も目視確認。
 
 ## v1.9.1 実装内容（デスクトップ区切り線コントラスト修正）
 

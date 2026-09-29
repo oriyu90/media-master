@@ -1,7 +1,13 @@
 # 設計書兼仕様書 (Media Master)
 
 ## バージョン情報
-- **Version:** 1.9.1
+- **Version:** 1.9.2
+
+## v1.9.2 の設計変更（要約）
+- **ドラッグ dismiss**: 画像は`ImageWithOcrOverlay`内・動画は既存Initialパス検出器に下方向分岐を追加。単指・非ズーム・非OCR・下優勢（1.2倍）・28dp係留で係合、係合後は全 pointer を consume（ページ遷移抑止）、複指で abort→復帰。指は plain state直書き（制限スコープでsnapTo不可のため）、解放のみアニメ化（140dp超で画面外＋pop、未満は復帰）。音声ページ対象外。
+- **継ぎ目なしフェード**: slide+fade→fade単独、`fillMaxWidth`明示、バー下96dpグラデーションスクリムを同一Visibilityで連動。dismiss中はクローム非表示。
+- **Manage実名**: `volumeDisplayName()`（pure、単体テスト）で末尾セグメントを見出し化、フルパスを補足化。内部は既存文言維持。
+- 新規文言なし（5言語パリティ維持）。
 
 ## v1.9.1 の設計変更（要約）
 - **デスクトップ区切り線**: 3箇所の構造線（サイドバー/本文境界・タブストリップ下辺・タブ間）を`outlineVariant`→`outline`へ。ダークで約1.9:1→5.4〜5.8:1、ライトで4.0:1。M3の重要境界用途に合致。`ThemeContrastTest`に非テキスト3:1＋デスクトップ文字4.5:1の回帰を追加。

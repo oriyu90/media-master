@@ -1,7 +1,10 @@
 # 設計書兼仕様書 (Media Master)
 
 ## バージョン情報
-- **Version:** 1.9.0
+- **Version:** 1.9.1
+
+## v1.9.1 の設計変更（要約）
+- **デスクトップ区切り線**: 3箇所の構造線（サイドバー/本文境界・タブストリップ下辺・タブ間）を`outlineVariant`→`outline`へ。ダークで約1.9:1→5.4〜5.8:1、ライトで4.0:1。M3の重要境界用途に合致。`ThemeContrastTest`に非テキスト3:1＋デスクトップ文字4.5:1の回帰を追加。
 
 ## v1.9.0 の設計変更（要約）
 - **スキル同梱**: `hamen/material-3-skill`（MIT）と`android/skills/testing-setup`（Apache-2.0）を`.agent/skills/`へ同梱（LICENSE同梱・出典明記）。監査はスキル手順の10分類で実施（総合約68/100）。

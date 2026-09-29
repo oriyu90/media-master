@@ -1,4 +1,4 @@
-# Media Master v1.9.0 実装・保守メモ
+# Media Master v1.9.1 実装・保守メモ
 
 最終更新: 2026-09-29
 
@@ -6,21 +6,32 @@
 
 | 項目 | 内容 |
 | --- | --- |
-| バージョン | `1.9.0` (`versionCode 14`) |
+| バージョン | `1.9.1` (`versionCode 15`) |
 | アプリケーションID | `com.yukiorita.mediamaster` |
 | 最小 SDK / target SDK | 24 / 36 |
 | ライセンス | MIT |
 | 著作者 | Yuki_Orita |
 | release APK | `app/build/outputs/apk/release/app-release.apk`（R8 + resource shrink 有効） |
-| APK SHA-256 | `74994a9d1313cb0b2acdec9b15b329b1d3b85b110e9901ef542855b4b33ee85b` |
-| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.8.0 と同一鍵） |
-| GitHub Release | `v1.9.0` (GitHub Releases) |
+| APK SHA-256 | `1883e8d144877af852be76d94e9a3d5feb42f94e839da35bd2e0440317bc4a3b` |
+| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.9.0 と同一鍵） |
+| GitHub Release | `v1.9.1` (GitHub Releases) |
 
 release APK は RSA 4096 ビット鍵・APK Signature Scheme v2 署名（`apksigner verify` で確認済み）。署名鍵は `common-rules-document/keystores/media-master-upload-key.jks`（alias `upload`）。
 
-v1.9.0 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitTest`(104件)/`:app:lintDebug`(0エラー)/`verifyRoborazziDebug`(6件参照一致)/`:app:jacocoTestReport`を確認。**実機（エミュレータ）デバッグ実施済み**——本番署名済みAPKをクリーンインストールし起動・Home表示でクラッシュ0件（`logcat -b crash` FATAL 0件）。証明書は v0.1.0〜v1.8.0 と同一 `332ce386…eba6`（v2のみ）。
+v1.9.1 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitTest`(105件)/`:app:lintDebug`(0エラー)/`verifyRoborazziDebug`(6件参照一致)/`:app:jacocoTestReport`を確認。**実機（エミュレータ）デバッグ実施済み**——本番署名済みAPKをクリーンインストールし起動・Home表示でクラッシュ0件（`logcat -b crash` FATAL 0件）。証明書は v0.1.0〜v1.9.0 と同一 `332ce386…eba6`（v2のみ）。
 
-旧リリースの APK SHA-256: v1.8.0 `e7c07575bbbc6675672d2cf64a30a093fd5b3df1c8fd875eec9d8bfd71caf6c4`、 v1.7.1 `4f79abcc32747a6889787c22d051ff831d55aca27330f81923760fcc63fcc1ee`、v1.7.0 `08236934c0cbf522ce0432595933e03976368ec3b0ee000ad4ced962b2fa9fd5`、v1.6.0 `f922b2b2d797f69fe4b1c9a7aca366e9f1664f8b47c8cfbeeb9aaeb02235b615`。
+旧リリースの APK SHA-256: v1.9.0 `74994a9d1313cb0b2acdec9b15b329b1d3b85b110e9901ef542855b4b33ee85b`、v1.8.0 `e7c07575bbbc6675672d2cf64a30a093fd5b3df1c8fd875eec9d8bfd71caf6c4`、 v1.7.1 `4f79abcc32747a6889787c22d051ff831d55aca27330f81923760fcc63fcc1ee`、v1.7.0 `08236934c0cbf522ce0432595933e03976368ec3b0ee000ad4ced962b2fa9fd5`、v1.6.0 `f922b2b2d797f69fe4b1c9a7aca366e9f1664f8b47c8cfbeeb9aaeb02235b615`。
+
+## v1.9.1 実装内容（デスクトップ区切り線コントラスト修正）
+
+ユーザー報告「デスクトップモードの項目の3本線が黒背景に濃い灰色」への対応。計測でダークの`outlineVariant`（`4D4639`）が近黒背景に対し約1.9:1しかないことを確認（ライトでも1.54:1）。
+- `DesktopNavigation`の3箇所（サイドバー/本文境界のVerticalDivider・タブストリップ下辺のHorizontalDivider・タブ間セパレータ）を`outlineVariant`→`outline`へ変更。ダーク5.4〜5.8:1・ライト4.0:1の可視ヘアラインに。M3の重要境界用途に合致し、装飾ディバイダの一括変更（トークン変更）より安全な標的修正。
+- デスクトップ文字ペア（非選択/選択・両テーマ）を再計測し全AAを確認。`ThemeContrastTest`に構造線3:1＋デスクトップ文字4.5:1の回帰テストを追加。
+- 変更ファイル: `ui/DesktopNavigation.kt`、`ui/theme/ThemeContrastTest.kt`、`app/build.gradle.kts`（1.9.1/15）。
+
+### 検証
+- `:app:testDebugUnitTest` 105件全通過/`:app:lintDebug` 0エラー。
+- 実機（Medium_Phone_API_36.1）: 本番署名済みAPKをクリーンインストール→権限付与→Home表示でFATAL 0件。デスクトップシェル自体は幅ゲートのため当該幅では目視不可（従来と同一制約）。
 
 ## v1.9.0 実装内容（MD3 UIリメイク＋テスト戦略）
 

@@ -241,7 +241,10 @@ fun DesktopNavigation(
             onNewTab = ::openInNewTab,
             onRemovePin = settingsViewModel::removePinnedFolder
         )
-        VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        // v1.9.1: structural separators use outline, not outlineVariant —
+        // outlineVariant is ~1.9:1 on near-black dark surfaces (invisible
+        // hairlines); outline stays ≥3:1 in both themes.
+        VerticalDivider(color = MaterialTheme.colorScheme.outline)
         Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
             DesktopTabStrip(
                 tabs = tabs,
@@ -261,7 +264,7 @@ fun DesktopNavigation(
                     }
                 }
             )
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
             // v1.9.0 (MD3 remake): reserve the overlay MiniPlayer's height so
             // content grids never end up underneath it while audio plays.
             // Detection/layout logic above is untouched (DeX freeze).
@@ -345,7 +348,7 @@ private fun DesktopTabStrip(
                         }
                     }
                 }
-                VerticalDivider(modifier = Modifier.height(24.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                VerticalDivider(modifier = Modifier.height(24.dp), color = MaterialTheme.colorScheme.outline)
             }
         }
     }

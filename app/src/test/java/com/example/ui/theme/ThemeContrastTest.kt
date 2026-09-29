@@ -33,6 +33,10 @@ class ThemeContrastTest {
         assertTrue("$name: ${ratio(fg, bg)}:1 below 4.5:1", ratio(fg, bg) >= 4.5)
     }
 
+    private fun assertNonTextContrast(name: String, fg: String, bg: String) {
+        assertTrue("$name: ${ratio(fg, bg)}:1 below 3:1", ratio(fg, bg) >= 3.0)
+    }
+
     @Test
     fun `dark theme text pairings meet AA`() {
         assertTextContrast("dark onSurface/surface", "EBE1D0", "17130B")
@@ -51,6 +55,22 @@ class ThemeContrastTest {
         assertTextContrast("light onSurfaceVariant/surfaceVariant", "4D4639", "EDE1CF")
         assertTextContrast("light onPrimaryContainer/primaryContainer", "5B4300", "FFE08B")
         assertTextContrast("light selected row", "5B4300", "FFE08B")
+    }
+
+    @Test
+    fun `desktop structural separators stay visible in both themes`() {
+        // v1.9.1 regression: outlineVariant was ~1.9:1 on near-black dark
+        // surfaces (invisible hairlines), so DesktopNavigation uses outline.
+        // Structural lines need 3:1 minimum (non-text).
+        assertNonTextContrast("dark outline/surface", "998F80", "17130B")
+        assertNonTextContrast("dark outline/surfaceContainerLow", "998F80", "1F1B13")
+        assertNonTextContrast("light outline/surface", "7F7767", "FFF9EE")
+        assertNonTextContrast("light outline/surfaceContainerLow", "7F7767", "FDF2E1")
+        // Desktop text pairings on the sidebar ground (body-text bar is 4.5).
+        assertTextContrast("dark desktop unselected text", "D0C5B4", "1F1B13")
+        assertTextContrast("dark desktop selected text", "F5E0BB", "52452A")
+        assertTextContrast("light desktop unselected text", "4D4639", "FDF2E1")
+        assertTextContrast("light desktop selected text", "241A04", "F5E0BB")
     }
 
     @Test

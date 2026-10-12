@@ -241,7 +241,7 @@ private fun MediaNavHost(
             })
         ) { backStackEntry ->
             val path = backStackEntry.arguments?.getString("path")?.let { Uri.decode(it) }
-            FilesScreen(fileViewModel, navController, path, onPinFolder, onOpenFolderInNewTab)
+            FilesScreen(fileViewModel, navController, path, onPinFolder, onOpenFolderInNewTab, desktop)
         }
         composable("clean") { CleanScreen(fileViewModel, navController) }
         composable("network") { NetworkScreen(navController) }
@@ -255,7 +255,7 @@ private fun MediaNavHost(
             backStackEntry.arguments?.getString("playlistName")?.let(Uri::decode)?.let { PlaylistScreen(it, fileViewModel, navController) }
         }
         composable("category/{categoryName}") { backStackEntry ->
-            backStackEntry.arguments?.getString("categoryName")?.let(Uri::decode)?.let { CategoryScreen(it, fileViewModel, navController) }
+            backStackEntry.arguments?.getString("categoryName")?.let(Uri::decode)?.let { CategoryScreen(it, fileViewModel, navController, desktop) }
         }
         composable("viewer/{path}") { backStackEntry ->
             val path = backStackEntry.arguments?.getString("path")?.let(Uri::decode)

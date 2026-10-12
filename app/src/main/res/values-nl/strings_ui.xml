@@ -35,4 +35,14 @@
     <string name="video_error">Deze video kan niet worden afgespeeld.</string>
     <string name="image_load_error">Deze afbeelding kan niet worden geladen.</string>
     <string name="navigate_to">Navigeren naar %1$s</string>
+    <string name="list_header_name">Naam</string>
+    <string name="list_header_size">Grootte</string>
+    <string name="list_header_modified">Gewijzigd op</string>
+    <string name="list_header_created">Gemaakt op</string>
+    <string name="list_header_type">Type</string>
+    <string name="show_size">Bestandsgrootte tonen</string>
+    <string name="show_date_modified">Wijzigingsdatum tonen</string>
+    <string name="show_date_created">Aanmaakdatum tonen</string>
+    <string name="show_type">Bestandstype tonen</string>
+    <string name="columns">Kolommen</string>
 </resources>

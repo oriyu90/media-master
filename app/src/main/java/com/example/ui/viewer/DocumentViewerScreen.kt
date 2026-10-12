@@ -25,16 +25,19 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -225,6 +228,8 @@ fun DocumentViewerScreen(
                 ViewerKind.PDF -> PdfViewerBody(context, uri)
                 ViewerKind.DOCX -> if (viewMode == DocViewMode.AS_IS) AsIsDocxBody(context, uri) else DocxViewerBody(context, uri)
                 ViewerKind.PPTX -> if (viewMode == DocViewMode.AS_IS) AsIsPptxBody(context, uri) else PptxViewerBody(context, uri)
+                // v1.10.0 (#1): ZIP contents + safe extract (external API parity).
+                ViewerKind.ZIP -> ZipViewerBody(context, uri, viewModel)
                 ViewerKind.EXTERNAL_ONLY -> ExternalOnlyBody(onOpenExternally = openExternally)
                 ViewerKind.HEX -> HexViewerBody(context, uri)
             }
@@ -1154,6 +1159,141 @@ private fun AsIsPptxBody(context: Context, uri: Uri) {
             }
             AsIsHtmlView(html = html)
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ZIP archive (v1.10.0 #1): contents list + safe extract
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun ZipViewerBody(context: Context, uri: Uri, viewModel: FileViewModel?) {
+    val coroutineScope = rememberCoroutineScope()
+    var entries by remember(uri) { mutableStateOf<List<com.example.zip.ZipEntryInfo>?>(null) }
+    var loadFailed by remember(uri) { mutableStateOf(false) }
+    var extracting by remember(uri) { mutableStateOf(false) }
+    var showPicker by remember { mutableStateOf(false) }
+    var pickerRoots by remember { mutableStateOf<List<String>>(emptyList()) }
+
+    LaunchedEffect(uri) {
+        entries = null
+        loadFailed = false
+        val result = withContext(Dispatchers.IO) {
+            runCatching {
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    com.example.zip.ZipListing.listEntries(input)
+                }
+            }.getOrNull()
+        }
+        if (result == null) {
+            loadFailed = true
+        } else {
+            entries = result
+        }
+    }
+
+    LaunchedEffect(showPicker) {
+        if (showPicker && pickerRoots.isEmpty()) {
+            pickerRoots = withContext(Dispatchers.IO) {
+                runCatching {
+                    viewModel?.storageRoots()
+                        ?: context.getExternalFilesDirs(null).mapNotNull {
+                            it?.absolutePath?.substringBefore("/Android/data/")
+                        }.distinct()
+                }.getOrDefault(emptyList())
+            }
+        }
+    }
+
+    val current = entries
+    when {
+        loadFailed -> ErrorState(message = stringResource(R.string.zip_empty), modifier = Modifier.fillMaxSize())
+        current == null -> CenteredProgress()
+        current.isEmpty() -> EmptyState(
+            icon = Icons.Default.Description,
+            title = stringResource(R.string.zip_empty),
+            modifier = Modifier.fillMaxSize(),
+        )
+        else -> Column(Modifier.fillMaxSize()) {
+            // Header: count + extract-all (destructive action stays in-app with
+            // explicit picker confirmation; never reachable blindly from intent).
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Hallmark.ContentEdge, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.zip_entries, current.size),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                if (viewModel != null) {
+                    TextButton(onClick = { showPicker = true }, enabled = !extracting) {
+                        Text(if (extracting) "…" else stringResource(R.string.zip_extract_all))
+                    }
+                }
+            }
+            HorizontalDivider()
+            LazyColumn(Modifier.fillMaxSize()) {
+                items(current.size, key = { i -> current[i].name }) { i ->
+                    val e = current[i]
+                    val isDir = e.isDirectory
+                    val safe = com.example.zip.ZipListing.isSafeEntryName(e.name)
+                    ListItem(
+                        headlineContent = {
+                            Text(
+                                e.name,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                fontFamily = if (isDir) null else FontFamily.Monospace,
+                            )
+                        },
+                        supportingContent = {
+                            val sizeText = if (isDir) null else {
+                                runCatching {
+                                    android.text.format.Formatter.formatFileSize(context, e.size.coerceAtLeast(0L))
+                                }.getOrNull()
+                            }
+                            val parts = buildList {
+                                if (sizeText != null) add(sizeText)
+                                if (!safe) add("!")
+                            }
+                            if (parts.isNotEmpty()) Text(parts.joinToString(" • "))
+                        },
+                        leadingContent = {
+                            Icon(
+                                if (isDir) Icons.Default.Folder else Icons.AutoMirrored.Filled.InsertDriveFile,
+                                contentDescription = null,
+                            )
+                        },
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
+            }
+        }
+    }
+
+    if (showPicker && viewModel != null) {
+        val start = pickerRoots.firstOrNull() ?: "/"
+        com.example.ui.components.FolderPickerDialog(
+            startPath = start,
+            isMove = false,
+            onDismiss = { if (!extracting) showPicker = false },
+            onConfirm = { destDir ->
+                showPicker = false
+                extracting = true
+                viewModel.extractZip(uri, destDir) { ok, failed ->
+                    extracting = false
+                    val msg = if (failed == 0) {
+                        context.getString(R.string.zip_extract_success, ok)
+                    } else {
+                        context.getString(R.string.zip_extract_failed)
+                    }
+                    android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
+                    coroutineScope.launch { }
+                }
+            },
+        )
     }
 }
 

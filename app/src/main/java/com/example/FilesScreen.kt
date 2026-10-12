@@ -62,10 +62,18 @@ fun FilesScreen(
     navController: NavHostController,
     initialPath: String? = null,
     onPinFolder: (String) -> Unit = {},
-    onOpenFolderInNewTab: (String) -> Unit = {}
+    onOpenFolderInNewTab: (String) -> Unit = {},
+    // v1.10.0: desktop shell passes true so the list defaults to LIST
+    // (Explorer Details parity) without clobbering explicit user choices.
+    desktop: Boolean = false,
 ) {
     val viewState by viewModel.fileTreeState.collectAsStateWithLifecycle()
     val viewMode by viewModel.viewMode.collectAsStateWithLifecycle()
+    // v1.10.0: Explorer column visibility.
+    val showSize by viewModel.listShowSize.collectAsStateWithLifecycle()
+    val showModified by viewModel.listShowDateModified.collectAsStateWithLifecycle()
+    val showCreated by viewModel.listShowDateCreated.collectAsStateWithLifecycle()
+    val showType by viewModel.listShowType.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
 
@@ -83,6 +91,12 @@ fun FilesScreen(
 
     LaunchedEffect(Unit) {
         storageRoots = withContext(kotlinx.coroutines.Dispatchers.IO) { viewModel.storageRoots() }
+    }
+
+    // v1.10.0 (#3): desktop defaults to LIST; guarded inside ViewModel so a
+    // manual GRID choice is never reset on recompose.
+    LaunchedEffect(desktop) {
+        viewModel.applyDesktopDefault(desktop)
     }
 
     LaunchedEffect(initialPath) {
@@ -254,14 +268,20 @@ fun FilesScreen(
                     }
                 )
             } else {
+                // v1.10.0 (#2): storage roots show the real volume name
+                // (e.g. "ABCD-1234"), not the generic external label; other
+                // folders show the accurate last segment via FolderNames.
+                val internalLabel = stringResource(R.string.internal_storage)
+                val externalFallback = stringResource(R.string.external_storage)
                 TopAppBar(
                     title = { 
                         val title = if (viewState is ViewState.Success) {
                             val path = (viewState as ViewState.Success).currentPath
                             if (viewModel.isStorageRoot(path)) {
-                                stringResource(if (path.contains("emulated")) R.string.internal_storage else R.string.external_storage)
+                                val isInternal = path.contains("emulated")
+                                com.example.ui.FolderNames.storageRootTitle(path, isInternal, internalLabel, externalFallback)
                             } else {
-                                path.substringAfterLast("/")
+                                com.example.ui.FolderNames.folderDisplayName(path)
                             }
                         } else stringResource(R.string.manage_files)
                         Text(text = title, maxLines = 1, overflow = TextOverflow.Ellipsis) 
@@ -302,9 +322,15 @@ fun FilesScreen(
                 val root = storageRoots.firstOrNull { currentSuccess.currentPath.startsWith(it) } ?: storageRoots.firstOrNull()
                 if (root != null) {
                     val isInternal = root.contains("emulated")
+                    // v1.10.0 (#2): breadcrumb root uses the real volume name.
+                    val rootLabel = com.example.ui.FolderNames.storageRootTitle(
+                        root, isInternal,
+                        stringResource(R.string.internal_storage),
+                        stringResource(R.string.external_storage),
+                    )
                     BreadcrumbBar(
                         rootPath = root,
-                        rootLabel = stringResource(if (isInternal) R.string.internal_storage else R.string.external_storage),
+                        rootLabel = rootLabel,
                         currentPath = currentSuccess.currentPath,
                         onNavigate = { viewModel.loadFiles(it) },
                     )
@@ -337,6 +363,16 @@ fun FilesScreen(
                         else state.files.filter { it.name.contains(searchQuery, ignoreCase = true) }
                     }
                     if (viewMode == ViewMode.LIST) {
+                        // v1.10.0 (#4): Win11 Details header on desktop lists.
+                        if (desktop) {
+                            FileListHeader(
+                                viewModel = viewModel,
+                                showSize = showSize,
+                                showModified = showModified,
+                                showCreated = showCreated,
+                                showType = showType,
+                            )
+                        }
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(
@@ -350,7 +386,13 @@ fun FilesScreen(
                                 contentType = { _, file -> if (file.isDirectory) "dir" else "file" },
                             ) { _, file ->
                                 val isSelected = selectedFiles.contains(file.path)
-                                FileItemRow(file, isSelected, isSelectionMode, onToggleSelect = {
+                                FileItemRow(
+                                    file, isSelected, isSelectionMode,
+                                    showSize = showSize,
+                                    showModified = showModified,
+                                    showCreated = showCreated,
+                                    showType = showType,
+                                    onToggleSelect = {
                                     if (isSelected) selectedFiles.remove(file.path) else selectedFiles.add(file.path)
                                 }, onPinFolder = onPinFolder, onOpenFolderInNewTab = onOpenFolderInNewTab) {
                                     if (isSelectionMode) {
@@ -405,6 +447,89 @@ fun FilesScreen(
     }
 }
 
+/**
+ * v1.10.0 (#4): Windows 11 Explorer Details header for desktop lists.
+ * Column taps sort (Name/Size/Type/Modified/Created); hidden columns stay
+ * hidden per the column-chooser toggles in SortViewMenu.
+ */
+@Composable
+private fun FileListHeader(
+    viewModel: FileViewModel,
+    showSize: Boolean,
+    showModified: Boolean,
+    showCreated: Boolean,
+    showType: Boolean,
+) {
+    val currentSort by viewModel.sortOption.collectAsStateWithLifecycle()
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Hallmark.ContentEdge, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            HeaderCell(
+                label = stringResource(R.string.list_header_name),
+                selected = currentSort == SortOption.NAME,
+                modifier = Modifier.weight(2f),
+                onClick = { viewModel.setSortOption(SortOption.NAME) },
+            )
+            if (showSize) {
+                HeaderCell(
+                    label = stringResource(R.string.list_header_size),
+                    selected = currentSort == SortOption.SIZE,
+                    modifier = Modifier.weight(1f),
+                    onClick = { viewModel.setSortOption(SortOption.SIZE) },
+                )
+            }
+            if (showModified) {
+                HeaderCell(
+                    label = stringResource(R.string.list_header_modified),
+                    selected = currentSort == SortOption.DATE_CREATED,
+                    modifier = Modifier.weight(1.4f),
+                    onClick = { viewModel.setSortOption(SortOption.DATE_CREATED) },
+                )
+            }
+            if (showCreated) {
+                HeaderCell(
+                    label = stringResource(R.string.list_header_created),
+                    selected = false,
+                    modifier = Modifier.weight(1.4f),
+                    onClick = { viewModel.setSortOption(SortOption.DATE_CREATED) },
+                )
+            }
+            if (showType) {
+                HeaderCell(
+                    label = stringResource(R.string.list_header_type),
+                    selected = currentSort == SortOption.TYPE,
+                    modifier = Modifier.weight(1f),
+                    onClick = { viewModel.setSortOption(SortOption.TYPE) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeaderCell(
+    label: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    TextButton(onClick = onClick, modifier = modifier, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)) {
+        Text(
+            text = if (selected) "▲ $label" else label,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FileItemRow(
@@ -415,6 +540,12 @@ fun FileItemRow(
     onPinFolder: (String) -> Unit = {},
     onOpenFolderInNewTab: (String) -> Unit = {},
     modifier: Modifier = Modifier,
+    // v1.10.0 (#4): Explorer Details visibility (defaults preserve old behaviour
+    // for previews/tests that omit them: size+modified shown, created hidden).
+    showSize: Boolean = true,
+    showModified: Boolean = true,
+    showCreated: Boolean = false,
+    showType: Boolean = true,
     onClick: () -> Unit
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
@@ -437,8 +568,25 @@ fun FileItemRow(
                 fontWeight = if (file.isDirectory) androidx.compose.ui.text.font.FontWeight.Medium else androidx.compose.ui.text.font.FontWeight.Normal
             ) 
         },
+        // v1.10.0 (#4): Explorer Details — Size / Modified / Created / Type
+        // with per-column show/hide. Created falls back to Modified when
+        // unknown (dateAdded==0) and is hidden when identical to Modified.
         supportingContent = if (!file.isDirectory && file.name != "..") {
-            { Text("${formatSize(file.size)} • ${formatDate(file.dateModified)}") }
+            {
+                val createdMs = file.dateAdded.takeIf { it > 0 } ?: file.dateModified
+                val parts = com.example.ui.FileDetails.detailParts(
+                    sizeText = formatSize(file.size),
+                    modifiedText = formatDate(file.dateModified),
+                    createdText = formatDate(createdMs),
+                    typeText = com.example.ui.FileDetails.typeLabel(file.name, file.mimeType),
+                    showSize = showSize,
+                    showModified = showModified,
+                    showCreated = showCreated,
+                    showType = showType,
+                    isDirectory = false,
+                )
+                if (parts.isNotEmpty()) Text(com.example.ui.FileDetails.joinParts(parts))
+            }
         } else null,
         leadingContent = {
             if (file.isDirectory) {

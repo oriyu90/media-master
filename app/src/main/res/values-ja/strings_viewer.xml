@@ -17,4 +17,11 @@
     <string name="doc_chart_title">グラフ</string>
     <string name="doc_chart_empty">表示できるグラフデータがありません。</string>
     <string name="doc_mermaid_note">図は「そのまま表示」で描画されます。</string>
+    <string name="zip_contents">ZIPの内容</string>
+    <string name="zip_empty">このZIPは空か、読み取れませんでした。</string>
+    <string name="zip_extract_all">すべて解凍</string>
+    <string name="zip_choose_folder">解凍先フォルダを選択</string>
+    <string name="zip_entries">%1$d件</string>
+    <string name="zip_extract_success">%1$d件を解凍しました</string>
+    <string name="zip_extract_failed">一部のファイルは解凍できませんでした</string>
 </resources>

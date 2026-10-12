@@ -11,7 +11,13 @@ data class MediaFile(
     val mimeType: String,
     val dateModified: Long,
     val isDirectory: Boolean = false,
-    val contentUri: Uri? = null
+    val contentUri: Uri? = null,
+    /**
+     * Creation-time proxy (v1.10.0, Explorer Details parity).
+     * MediaStore DATE_ADDED when indexed, else filesystem creation time when
+     * available, else 0 (unknown — callers fall back to dateModified).
+     */
+    val dateAdded: Long = 0L,
 )
 
 enum class SortOption { NAME, DATE_CREATED, TYPE, SIZE }

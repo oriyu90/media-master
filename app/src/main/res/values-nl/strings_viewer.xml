@@ -17,4 +17,11 @@
     <string name="doc_chart_title">Grafiek</string>
     <string name="doc_chart_empty">Geen grafiekgegevens om weer te geven.</string>
     <string name="doc_mermaid_note">Diagram wordt weergegeven in de Zoals-is-modus.</string>
+    <string name="zip_contents">ZIP-inhoud</string>
+    <string name="zip_empty">Deze ZIP is leeg of kon niet worden gelezen.</string>
+    <string name="zip_extract_all">Alles uitpakken</string>
+    <string name="zip_choose_folder">Uitpakmap kiezen</string>
+    <string name="zip_entries">%1$d items</string>
+    <string name="zip_extract_success">%1$d bestanden uitgepakt</string>
+    <string name="zip_extract_failed">Sommige bestanden konden niet worden uitgepakt</string>
 </resources>

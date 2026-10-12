@@ -35,4 +35,14 @@
     <string name="video_error">تعذر تشغيل هذا الفيديو.</string>
     <string name="image_load_error">تعذر تحميل هذه الصورة.</string>
     <string name="navigate_to">انتقل إلى %1$s</string>
+    <string name="list_header_name">الاسم</string>
+    <string name="list_header_size">الحجم</string>
+    <string name="list_header_modified">تاريخ التعديل</string>
+    <string name="list_header_created">تاريخ الإنشاء</string>
+    <string name="list_header_type">النوع</string>
+    <string name="show_size">إظهار حجم الملف</string>
+    <string name="show_date_modified">إظهار تاريخ التعديل</string>
+    <string name="show_date_created">إظهار تاريخ الإنشاء</string>
+    <string name="show_type">إظهار نوع الملف</string>
+    <string name="columns">الأعمدة</string>
 </resources>

@@ -80,7 +80,9 @@ class MediaRepository(private val context: Context) {
                 MediaStore.Files.FileColumns.RELATIVE_PATH,
                 MediaStore.Files.FileColumns.SIZE,
                 MediaStore.Files.FileColumns.MIME_TYPE,
-                MediaStore.Files.FileColumns.DATE_MODIFIED
+                MediaStore.Files.FileColumns.DATE_MODIFIED,
+                // v1.10.0: DATE_ADDED as creation-time proxy for Explorer Details.
+                MediaStore.Files.FileColumns.DATE_ADDED,
             )
         } else {
             arrayOf(
@@ -89,7 +91,8 @@ class MediaRepository(private val context: Context) {
                 MediaStore.Files.FileColumns.DATA,
                 MediaStore.Files.FileColumns.SIZE,
                 MediaStore.Files.FileColumns.MIME_TYPE,
-                MediaStore.Files.FileColumns.DATE_MODIFIED
+                MediaStore.Files.FileColumns.DATE_MODIFIED,
+                MediaStore.Files.FileColumns.DATE_ADDED,
             )
         }
 
@@ -125,6 +128,8 @@ class MediaRepository(private val context: Context) {
                 val sizeCol = it.getColumnIndexOrThrow(MediaStore.Files.FileColumns.SIZE)
                 val mimeCol = it.getColumnIndexOrThrow(MediaStore.Files.FileColumns.MIME_TYPE)
                 val dateCol = it.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATE_MODIFIED)
+                // DATE_ADDED may be absent on some providers — fall back to modified.
+                val addedCol = it.getColumnIndex(MediaStore.Files.FileColumns.DATE_ADDED)
 
                 val pathCol = if (useRelativePath) {
                     it.getColumnIndexOrThrow(MediaStore.Files.FileColumns.RELATIVE_PATH)
@@ -154,6 +159,10 @@ class MediaRepository(private val context: Context) {
                     if (mimeType.isNotBlank() || displayName.endsWith(".apk", ignoreCase = true)) {
                         val finalMimeType = if (mimeType.isNotBlank()) mimeType else if (displayName.endsWith(".apk", true)) "application/vnd.android.package-archive" else ""
                         val itemUri = ContentUris.withAppendedId(contentUri, id)
+                        val modifiedMs = it.getLong(dateCol) * 1000
+                        val addedMs = if (addedCol >= 0) {
+                            runCatching { it.getLong(addedCol) * 1000 }.getOrDefault(0L)
+                        } else 0L
                         mediaList[path] =
                             MediaFile(
                                 id = id,
@@ -161,9 +170,10 @@ class MediaRepository(private val context: Context) {
                                 path = path,
                                 size = it.getLong(sizeCol),
                                 mimeType = finalMimeType,
-                                dateModified = it.getLong(dateCol) * 1000,
+                                dateModified = modifiedMs,
                                 isDirectory = false,
-                                contentUri = itemUri
+                                contentUri = itemUri,
+                                dateAdded = if (addedMs > 0) addedMs else modifiedMs,
                             )
                     }
                 }
@@ -218,15 +228,24 @@ class MediaRepository(private val context: Context) {
 
     fun File.isDocument(): Boolean = isFile && isDocumentName(name)
 
-    fun File.toMediaFile(): MediaFile = MediaFile(
-        id = -1,
-        name = name,
-        path = absolutePath,
-        size = length(),
-        mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension.lowercase()) ?: getMimeType(extension),
-        dateModified = lastModified(),
-        contentUri = null
-    )
+    fun File.toMediaFile(): MediaFile {
+        val modified = lastModified()
+        // v1.10.0: creation-time proxy. True filesystem creation time would
+        // need java.nio.file (API 26+, minSdk 24 incompatible — same reason
+        // Apache POI was rejected), so non-indexed files reuse lastModified
+        // here; MediaStore-indexed files already carry DATE_ADDED above.
+        // detailParts hides Created when identical to Modified.
+        return MediaFile(
+            id = -1,
+            name = name,
+            path = absolutePath,
+            size = length(),
+            mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension.lowercase()) ?: getMimeType(extension),
+            dateModified = modified,
+            contentUri = null,
+            dateAdded = modified,
+        )
+    }
 
     fun isDocumentName(name: String): Boolean = name.substringAfterLast('.', "").lowercase() in setOf(
         "pdf", "doc", "docx", "odt", "rtf", "txt", "md", "markdown", "log", "csv", "tsv", "json", "html", "htm",

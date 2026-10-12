@@ -61,7 +61,8 @@ fun ExcludeFoldersScreen(viewModel: FileViewModel, navController: NavHostControl
             } else {
                 items(excludedFolders.toList(), key = { it }) { path ->
                     ListItem(
-                        headlineContent = { Text(File(path).name) },
+                        // v1.10.0 (#2): accurate last-segment name.
+                        headlineContent = { Text(com.example.ui.FolderNames.folderDisplayName(path)) },
                         supportingContent = { Text(path) },
                         leadingContent = { Icon(Icons.Default.Folder, contentDescription = null) },
                         trailingContent = {
@@ -121,14 +122,21 @@ fun FolderPickerDialog(
         text = {
             Column {
                 // Volume selector
+                // v1.10.0 (#2): show real volume names for external roots.
                 if (storageRoots.size > 1) {
                     var expanded by remember { mutableStateOf(false) }
+                    val internalLabel = stringResource(R.string.internal_storage)
+                    val externalFallback = stringResource(R.string.external_storage)
+                    fun rootTitle(root: String): String {
+                        val isInternal = root.contains("emulated")
+                        return com.example.ui.FolderNames.storageRootTitle(root, isInternal, internalLabel, externalFallback)
+                    }
                     ExposedDropdownMenuBox(
                         expanded = expanded,
                         onExpandedChange = { expanded = !expanded }
                     ) {
                         OutlinedTextField(
-                            value = if (currentPath.contains("emulated")) stringResource(R.string.internal_storage) else stringResource(R.string.external_storage),
+                            value = rootTitle(currentPath),
                             onValueChange = {},
                             readOnly = true,
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
@@ -139,9 +147,8 @@ fun FolderPickerDialog(
                             onDismissRequest = { expanded = false }
                         ) {
                             storageRoots.forEach { root ->
-                                val isInternal = root.contains("emulated")
                                 DropdownMenuItem(
-                                    text = { Text(if (isInternal) stringResource(R.string.internal_storage) else stringResource(R.string.external_storage)) },
+                                    text = { Text(rootTitle(root)) },
                                     onClick = {
                                         currentPath = root
                                         expanded = false

@@ -41,11 +41,22 @@ import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun CategoryScreen(categoryName: String, viewModel: FileViewModel, navController: NavHostController) {
+fun CategoryScreen(
+    categoryName: String,
+    viewModel: FileViewModel,
+    navController: NavHostController,
+    // v1.10.0 (#3): desktop shell passes true → LIST default (Explorer parity).
+    desktop: Boolean = false,
+) {
     val viewState by viewModel.mediaState.collectAsStateWithLifecycle()
     val categoryViewMode by viewModel.categoryViewMode.collectAsStateWithLifecycle()
     val excludedFolders by viewModel.excludedFolders.collectAsStateWithLifecycle()
     val showExcluded by viewModel.showExcludedInManage.collectAsStateWithLifecycle()
+    // v1.10.0 (#4): same Explorer columns as the file browser.
+    val showSize by viewModel.listShowSize.collectAsStateWithLifecycle()
+    val showModified by viewModel.listShowDateModified.collectAsStateWithLifecycle()
+    val showCreated by viewModel.listShowDateCreated.collectAsStateWithLifecycle()
+    val showType by viewModel.listShowType.collectAsStateWithLifecycle()
     
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -79,14 +90,13 @@ fun CategoryScreen(categoryName: String, viewModel: FileViewModel, navController
         viewModel.loadAllMedia()
     }
 
-    LaunchedEffect(categoryName) {
+    // v1.10.0 (#2/#3): group by full parent *path* (never merge same-named
+    // folders), desktop defaults to LIST. Guarded in ViewModel so explicit
+    // user toggles survive recompose.
+    LaunchedEffect(categoryName, desktop) {
         val category = MediaCategory.fromKey(categoryName)
-        val defaultMode = if (category == MediaCategory.IMAGES || category == MediaCategory.VIDEOS) {
-            ViewMode.GRID
-        } else {
-            ViewMode.LIST
-        }
-        viewModel.setCategoryViewMode(defaultMode)
+        val isGallery = category == MediaCategory.IMAGES || category == MediaCategory.VIDEOS
+        viewModel.applyCategoryDesktopDefault(desktop, isGallery)
     }
 
     Scaffold(
@@ -170,8 +180,20 @@ fun CategoryScreen(categoryName: String, viewModel: FileViewModel, navController
                     shouldShow && (MediaCategory.fromKey(categoryName)?.matches(file) == true)
                 }
                 
-                val groupedFiles = categoryFiles.groupBy { File(it.path).parentFile?.name ?: context.getString(R.string.unknown) }
-                val tabs = listOf(context.getString(R.string.all)) + groupedFiles.keys.toList().sorted()
+                // v1.10.0 (#2): key by full parent *path* so same-named folders
+                // never merge; display labels disambiguated via FolderNames.
+                val groupedByParentPath = categoryFiles.groupBy {
+                    File(it.path).parent ?: context.getString(R.string.unknown)
+                }
+                val parentLabels = remember(groupedByParentPath.keys) {
+                    FolderNames.disambiguateParentLabels(groupedByParentPath.keys.toList())
+                }
+                val sortedParents = groupedByParentPath.keys.sorted()
+                val allLabel = context.getString(R.string.all)
+                val tabs = listOf(allLabel) + sortedParents.map { parentLabels[it].orEmpty() }
+                // Map displayed tab label back to parent path (labels are unique
+                // after disambiguation, except "All" at index 0).
+                val labelToParent = sortedParents.associateBy { parentLabels[it].orEmpty() }
                 val pagerState = rememberPagerState(pageCount = { tabs.size })
 
                 Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
@@ -194,7 +216,8 @@ fun CategoryScreen(categoryName: String, viewModel: FileViewModel, navController
                         val filesToShow = if (page == 0) {
                             categoryFiles
                         } else {
-                            groupedFiles[tabs[page]] ?: emptyList()
+                            val parent = labelToParent[tabs[page]]
+                            if (parent != null) groupedByParentPath[parent].orEmpty() else emptyList()
                         }
 
                         if (filesToShow.isEmpty()) {
@@ -209,7 +232,11 @@ fun CategoryScreen(categoryName: String, viewModel: FileViewModel, navController
                                             file = file,
                                             selectedFiles = selectedFiles,
                                             isSelectionMode = isSelectionMode,
-                                            navController = navController
+                                            navController = navController,
+                                            showSize = showSize,
+                                            showModified = showModified,
+                                            showCreated = showCreated,
+                                            showType = showType,
                                         )
                                     }
                                 }
@@ -249,12 +276,34 @@ fun CategoryFileRow(
     file: MediaFile,
     selectedFiles: MutableList<String>,
     isSelectionMode: Boolean,
-    navController: NavHostController
+    navController: NavHostController,
+    // v1.10.0 (#4): Explorer Details visibility (same defaults as FilesScreen).
+    showSize: Boolean = true,
+    showModified: Boolean = true,
+    showCreated: Boolean = false,
+    showType: Boolean = true,
 ) {
     val isSelected = selectedFiles.contains(file.path)
     Column {
     ListItem(
         headlineContent = { Text(file.name) },
+        // v1.10.0 (#4): category lists show the same Size/Dates/Type details
+        // as the file browser (Win11 parity), honouring column toggles.
+        supportingContent = {
+            val createdMs = file.dateAdded.takeIf { it > 0 } ?: file.dateModified
+            val parts = FileDetails.detailParts(
+                sizeText = com.example.formatSize(file.size),
+                modifiedText = com.example.formatDate(file.dateModified),
+                createdText = com.example.formatDate(createdMs),
+                typeText = FileDetails.typeLabel(file.name, file.mimeType),
+                showSize = showSize,
+                showModified = showModified,
+                showCreated = showCreated,
+                showType = showType,
+                isDirectory = file.isDirectory,
+            )
+            if (parts.isNotEmpty()) Text(FileDetails.joinParts(parts))
+        },
         leadingContent = { 
             if (file.mimeType.startsWith("image/") || file.mimeType.startsWith("video/")) {
                 AsyncImage(

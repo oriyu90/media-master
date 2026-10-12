@@ -1,7 +1,14 @@
 # 設計書兼仕様書 (Media Master)
 
 ## バージョン情報
-- **Version:** 1.9.2
+- **Version:** 1.10.0
+
+## v1.10.0 の設計変更（要約）
+- **ZIP外部API対応(#1)**: `ViewerKind.ZIP`新設＋分類器（拡張子/mimeの3種）＋`DeepLinks`（明示mime＋拡張子フォールバック）＋Manifest（3 mime）で外部`ACTION_VIEW`をdocViewerへ。表示は`ZipViewerBody`（一覧＋件数＋安全マーク、破損時は空表示で非クラッシュ）、解凍は`FileViewModel.extractZip`（`BackupPaths.safeResolve`＋2000件/100MB毎/500MB総量＋32KB streaming、失敗は件数化）。新規依存・権限なし、minSdk24維持。
+- **フォルダ名正確化(#2)**: 新規pure `FolderNames`（volume/folder/storageRootTitle/重複親の完全パス展開）に統一。Manage/ブラウザ标题/パンくず/DeX sidebar/除外ピッカー/ピン留め/新規タブが同一名。Categoryタブは親フルパスでグルーピング（同名結合の解消）＋重複時のみ完全パス表示。
+- **デスクトップはリスト既定(#3)**: 新規pure `DesktopViewModes`（browser/category既定）＋ViewModelのuserSetガード（手動切替を再合成で潰さない）。`MainNavigation`がdesktop旗をFiles/Categoryへ 전달。電話既定は不変（browser GRID、画像/動画 GRID）。
+- **Win11風Details(#4)**: `MediaFile.dateAdded`（MediaStore DATE_ADDED、非索引はmodified proxy。NIO不使用でminSdk24維持）＋DataStore 4列（Size/Modified既定表示、Type既定表示、Created既定非表示）＋`FileDetails` pure（typeLabel/detailParts/join）＋行2行化（Files/Category）＋DeXのみヘッダ行（タップでSortOption、非表示列は非表示）＋`SortViewMenu`にColumns区画。5言語17キー追加（parity検証）。
+- 安全性：全IOはDispatchers.IO、`runCatching`＋空フォールバック、`!!`なし、新規`rememberLoadable`流用、破壊的操作は外部から到達不可を維持。
 
 ## v1.9.2 の設計変更（要約）
 - **ドラッグ dismiss**: 画像は`ImageWithOcrOverlay`内・動画は既存Initialパス検出器に下方向分岐を追加。単指・非ズーム・非OCR・下優勢（1.2倍）・28dp係留で係合、係合後は全 pointer を consume（ページ遷移抑止）、複指で abort→復帰。指は plain state直書き（制限スコープでsnapTo不可のため）、解放のみアニメ化（140dp超で画面外＋pop、未満は復帰）。音声ページ対象外。

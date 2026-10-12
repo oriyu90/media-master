@@ -1,26 +1,50 @@
-# Media Master v1.9.2 実装・保守メモ
+# Media Master v1.10.0 実装・保守メモ
 
-最終更新: 2026-09-29
+最終更新: 2026-10-13
 
 ## リリース情報
 
 | 項目 | 内容 |
 | --- | --- |
-| バージョン | `1.9.2` (`versionCode 16`) |
+| バージョン | `1.10.0` (`versionCode 17`) |
 | アプリケーションID | `com.yukiorita.mediamaster` |
 | 最小 SDK / target SDK | 24 / 36 |
 | ライセンス | MIT |
 | 著作者 | Yuki_Orita |
 | release APK | `app/build/outputs/apk/release/app-release.apk`（R8 + resource shrink 有効） |
-| APK SHA-256 | `0d41403ece4d59eb94e62a5a4cb5e385f239d22614b16dd727c0d5154e4bc20a` |
-| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.9.1 と同一鍵） |
-| GitHub Release | `v1.9.2` (GitHub Releases) |
+| APK SHA-256 | `3663e54015d1495cdd32931412f1c7322a53f195aef0bdb9899fce0e9b07b585` |
+| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.9.2 と同一鍵） |
+| GitHub Release | `v1.10.0` (GitHub Releases) |
 
 release APK は RSA 4096 ビット鍵・APK Signature Scheme v2 署名（`apksigner verify` で確認済み）。署名鍵は `common-rules-document/keystores/media-master-upload-key.jks`（alias `upload`）。
 
-v1.9.2 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitTest`(108件)/`:app:lintDebug`(0エラー)/`verifyRoborazziDebug`(6件参照一致)/`:app:jacocoTestReport`を確認。**実機（エミュレータ）デバッグ実施済み**——本番署名済みAPKをクリーンインストールし起動・Home表示でクラッシュ0件（`logcat -b crash` FATAL 0件）。証明書は v0.1.0〜v1.9.1 と同一 `332ce386…eba6`（v2のみ）。
+v1.10.0 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitTest`(129件)/`:app:lintDebug`(0エラー)を確認（`verifyRoborazziDebug`は当環境のフォント差でclean mainでも6件不一致となる既知の環境要因のため、対象部品に触れていない本版では参照更新せず維持）。**実機（エミュレータ）デバッグ実施予定**——本番署名済みAPKをクリーンインストールし4件（ZIP表示/解凍・フォルダ名・デスクトップLIST既定・Details列切替）を目視＋FATAL 0件を確認後に公開。証明書は v0.1.0〜v1.9.2 と同一 `332ce386…eba6`（v2のみ）。
 
-旧リリースの APK SHA-256: v1.9.1 `1883e8d144877af852be76d94e9a3d5feb42f94e839da35bd2e0440317bc4a3b`、v1.9.0 `74994a9d1313cb0b2acdec9b15b329b1d3b85b110e9901ef542855b4b33ee85b`、v1.8.0 `e7c07575bbbc6675672d2cf64a30a093fd5b3df1c8fd875eec9d8bfd71caf6c4`、 v1.7.1 `4f79abcc32747a6889787c22d051ff831d55aca27330f81923760fcc63fcc1ee`、v1.7.0 `08236934c0cbf522ce0432595933e03976368ec3b0ee000ad4ced962b2fa9fd5`、v1.6.0 `f922b2b2d797f69fe4b1c9a7aca366e9f1664f8b47c8cfbeeb9aaeb02235b615`。
+旧リリースの APK SHA-256: v1.9.2 `0d41403ece4d59eb94e62a5a4cb5e385f239d22614b16dd727c0d5154e4bc20a`、v1.9.1 `1883e8d144877af852be76d94e9a3d5feb42f94e839da35bd2e0440317bc4a3b`、v1.9.0 `74994a9d1313cb0b2acdec9b15b329b1d3b85b110e9901ef542855b4b33ee85b`、v1.8.0 `e7c07575bbbc6675672d2cf64a30a093fd5b3df1c8fd875eec9d8bfd71caf6c4`、 v1.7.1 `4f79abcc32747a6889787c22d051ff831d55aca27330f81923760fcc63fcc1ee`、v1.7.0 `08236934c0cbf522ce0432595933e03976368ec3b0ee000ad4ced962b2fa9fd5`、v1.6.0 `f922b2b2d797f69fe4b1c9a7aca366e9f1664f8b47c8cfbeeb9aaeb02235b615`。
+
+## v1.10.0 実装内容（ZIP外部API・フォルダ名・デスクトップLIST既定・Details列）
+
+### 1. ZIP表示＋解凍（外部API）
+- `ViewerKind.ZIP`＋分類器（zip拡張子/mime 3種）＋`DeepLinks`（明示mime＋null/`*/*`/octet-stream時の.zipフォールバック）＋Manifest（3 mime）で外部ACTION_VIEWをdocViewerへ。内部ZIPもhexダンプから切替。
+- `ZipListing` pure（streaming、2000件/100MB毎/500MB総量/512文字名、上限超過は打切り、破損は空で非クラッシュ）＋`isSafeEntryName`（`..`/絶対/ドライブ/NUL拒否）。抽出は`FileViewModel.extractZip`（ContentResolver＋`BackupPaths.safeResolve`＋32KB streaming＋上限超過で当該破棄、件数報告、成功時のみ再読込）。
+- `ZipViewerBody`（件数＋すべて解凍＋FolderPicker＋Toast、安全でない名は`!`表示）。破壊的操作は外部から直到達不可（必ず picker 確認）を維持。新規依存・権限なし。
+- 新規文言7キー×5言語、テスト`ZipListingTest`5件＋分類1件＋DeepLinks 3件。
+
+### 2. フォルダ名正確化
+- 新規pure `FolderNames`（volume/folder/storageRootTitle/重複親の完全パス展開）。Manage/ブラウザ标题/パンくず/DeX sidebar/除外ピッカー/ピン/新規タブが同一ロジック。Categoryは親フルパスでグルーピング（同名結合の解消）＋重複時のみ完全パス表示。`volumeDisplayName`は互換エイリアス化。
+- 新規文言なし、テスト`FolderNamesTest`5件。
+
+### 3. デスクトップLIST既定
+- 新規pure `DesktopViewModes`（browser/category既定＋header→sort対応）＋ViewModelのuserSetガード（`setViewMode/setCategoryViewMode`で真、手動切替を再合成で潰さない）。`MainNavigation`がdesktop旗をFiles/Categoryへ。電話既定不変。
+- 新規文言なし、テストは`FileDetailsTest`内の既定3件＋sort対応1件。
+
+### 4. Win11風Details列＋表示切替
+- `MediaFile.dateAdded`（MediaStore DATE_ADDED、非索引はmodified proxy。NIO不使用でminSdk24維持、同一時は非表示）＋DataStore 4列（Size/Modified/Type既定表示、Created既定非表示）＋`FileDetails` pure（typeLabel/detailParts/join）＋行2行化（Files/Category、既定引数で旧呼出互換）＋DeXのみヘッダ行（タップでSortOption、非表示列は非表示）＋`SortViewMenu`にColumns区画（check維持）。
+- 新規文言10キー×5言語（parity検証）、テスト`FileDetailsTest`5件。
+
+### 検証
+- `:app:testDebugUnitTest` 129件全通過（既存108＋新規21）/`:app:lintDebug` 0エラー。
+- 実機は署名後に実施（ZIPの外部VIEW＋解凍、実ボリューム名、デスクトップLIST既定、列切替＋ヘッダソート、FATAL 0件）。
 
 ## v1.9.2 実装内容（ビューア下スワイプ・フェード継ぎ目・Manage実名）
 

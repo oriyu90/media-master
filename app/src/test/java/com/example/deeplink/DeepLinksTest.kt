@@ -77,11 +77,30 @@ class DeepLinksTest {
             "text/plain", "text/csv", "text/markdown", "application/json", "application/pdf",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "application/zip", "application/x-zip-compressed", "application/x-zip",
         )
         for (type in types) {
             val i = Intent(Intent.ACTION_VIEW).apply { setDataAndType(Uri.parse("content://x/doc"), type) }
             assertEquals("docViewer/${Uri.encode("content://x/doc")}", DeepLinks.resolve(i))
         }
+    }
+
+    @Test
+    fun actionView_zipExtensionFallback_routesWhenMimeMissing() {
+        val nullType = Intent(Intent.ACTION_VIEW).apply { data = Uri.parse("content://x/archive.zip") }
+        assertEquals("docViewer/${Uri.encode("content://x/archive.zip")}", DeepLinks.resolve(nullType))
+        val octet = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(Uri.parse("content://x/archive.zip"), "application/octet-stream")
+        }
+        assertEquals("docViewer/${Uri.encode("content://x/archive.zip")}", DeepLinks.resolve(octet))
+    }
+
+    @Test
+    fun actionView_zipFallback_doesNotHijackNonZip() {
+        val i = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(Uri.parse("content://x/photo.png"), "application/octet-stream")
+        }
+        assertNull(DeepLinks.resolve(i))
     }
 
     @Test

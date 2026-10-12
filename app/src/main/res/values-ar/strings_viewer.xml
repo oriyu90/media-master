@@ -17,4 +17,11 @@
     <string name="doc_chart_title">رسم بياني</string>
     <string name="doc_chart_empty">لا توجد بيانات رسم لعرضها.</string>
     <string name="doc_mermaid_note">يتم عرض المخطط في وضع "عرض كما هو".</string>
+    <string name="zip_contents">محتويات ZIP</string>
+    <string name="zip_empty">هذا الملف مضغوط فارغ أو تعذّر قراءته.</string>
+    <string name="zip_extract_all">استخراج الكل</string>
+    <string name="zip_choose_folder">اختر مجلد الاستخراج</string>
+    <string name="zip_entries">%1$d عناصر</string>
+    <string name="zip_extract_success">تم استخراج %1$d ملفات</string>
+    <string name="zip_extract_failed">تعذّر استخراج بعض الملفات</string>
 </resources>

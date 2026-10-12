@@ -80,6 +80,8 @@ fun ManageDashboardScreen(navController: NavHostController, viewModel: FileViewM
             }
             item {
                 Text(stringResource(R.string.storage_devices), style = MaterialTheme.typography.titleMedium)
+                val internalLabel = stringResource(R.string.internal_storage)
+                val externalFallback = stringResource(R.string.external_storage)
                 storageRoots.forEachIndexed { index, path ->
                     val isInternal = path.contains("emulated")
                     // v1.9.2: show the real volume name (e.g. "ABCD-1234" for
@@ -87,9 +89,9 @@ fun ManageDashboardScreen(navController: NavHostController, viewModel: FileViewM
                     // volumes are distinguishable; previously every external
                     // root rendered the same generic label. Full path stays as
                     // supporting text so nothing is hidden.
-                    val volumeName = volumeDisplayName(path)
-                    val title = if (isInternal) stringResource(R.string.internal_storage)
-                        else volumeName.ifBlank { stringResource(R.string.external_storage) }
+                    // v1.10.0: unified via FolderNames (same logic as browser).
+                    val volumeName = FolderNames.volumeDisplayName(path)
+                    val title = FolderNames.storageRootTitle(path, isInternal, internalLabel, externalFallback)
                     val icon = if (isInternal) Icons.Default.Smartphone else Icons.Default.SdStorage
                     
                     Card(
@@ -242,9 +244,9 @@ private fun categoryIconFor(file: MediaFile): androidx.compose.ui.graphics.vecto
 /**
  * v1.9.2: last path segment for volume labels ("/storage/ABCD-1234" ->
  * "ABCD-1234"). Pure (java.io only) so unit tests pin it without Android.
+ * v1.10.0: unified into [FolderNames]; kept as a thin alias for compat.
  */
-internal fun volumeDisplayName(path: String): String =
-    runCatching { File(path.trimEnd('/')).name }.getOrDefault("")
+internal fun volumeDisplayName(path: String): String = FolderNames.volumeDisplayName(path)
 
 @Composable
 fun CategoryGrid(onCategoryClick: (MediaCategory) -> Unit) {

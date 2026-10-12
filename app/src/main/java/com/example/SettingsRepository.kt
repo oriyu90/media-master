@@ -27,6 +27,11 @@ class SettingsRepository(private val context: Context) {
         val BACKUP_TARGET_PATH = stringPreferencesKey("backup_target_path")
         val BACKUP_DELETE_PREVIOUS = booleanPreferencesKey("backup_delete_previous")
         val DESKTOP_MODE_OVERRIDE = intPreferencesKey("desktop_mode_override")
+        // v1.10.0: Explorer Details columns (Name always shown).
+        val LIST_SHOW_SIZE = booleanPreferencesKey("list_show_size")
+        val LIST_SHOW_DATE_MODIFIED = booleanPreferencesKey("list_show_date_modified")
+        val LIST_SHOW_DATE_CREATED = booleanPreferencesKey("list_show_date_created")
+        val LIST_SHOW_TYPE = booleanPreferencesKey("list_show_type")
     }
 
     val themeModeFlow: Flow<Int> = context.dataStore.data.map { preferences ->
@@ -59,6 +64,11 @@ class SettingsRepository(private val context: Context) {
     val backupTargetPathFlow: Flow<String> = context.dataStore.data.map { it[BACKUP_TARGET_PATH] ?: "" }
     val backupDeletePreviousFlow: Flow<Boolean> = context.dataStore.data.map { it[BACKUP_DELETE_PREVIOUS] ?: false }
     val desktopModeOverrideFlow: Flow<Int> = context.dataStore.data.map { it[DESKTOP_MODE_OVERRIDE] ?: 0 }
+    // Win11 parity defaults: Size/Modified/Type shown, Created hidden (column chooser reveals it).
+    val listShowSizeFlow: Flow<Boolean> = context.dataStore.data.map { it[LIST_SHOW_SIZE] ?: true }
+    val listShowDateModifiedFlow: Flow<Boolean> = context.dataStore.data.map { it[LIST_SHOW_DATE_MODIFIED] ?: true }
+    val listShowDateCreatedFlow: Flow<Boolean> = context.dataStore.data.map { it[LIST_SHOW_DATE_CREATED] ?: false }
+    val listShowTypeFlow: Flow<Boolean> = context.dataStore.data.map { it[LIST_SHOW_TYPE] ?: true }
 
     suspend fun setThemeMode(mode: Int) {
         context.dataStore.edit { preferences ->
@@ -127,4 +137,8 @@ class SettingsRepository(private val context: Context) {
     suspend fun setDesktopModeOverride(value: Int) {
         context.dataStore.edit { it[DESKTOP_MODE_OVERRIDE] = value.coerceIn(0, 2) }
     }
+    suspend fun setListShowSize(value: Boolean) { context.dataStore.edit { it[LIST_SHOW_SIZE] = value } }
+    suspend fun setListShowDateModified(value: Boolean) { context.dataStore.edit { it[LIST_SHOW_DATE_MODIFIED] = value } }
+    suspend fun setListShowDateCreated(value: Boolean) { context.dataStore.edit { it[LIST_SHOW_DATE_CREATED] = value } }
+    suspend fun setListShowType(value: Boolean) { context.dataStore.edit { it[LIST_SHOW_TYPE] = value } }
 }

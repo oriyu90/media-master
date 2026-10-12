@@ -4,6 +4,18 @@ Media Master is an open-source Android media and file manager built with Kotlin 
 
 Media Master は、Kotlin と Jetpack Compose で開発されたオープンソースのAndroid向けメディア・ファイル管理アプリです。写真・動画、音楽、書類、ストレージ、アプリ／APK、編集、バックアップを1つのアプリで扱えます。
 
+## v1.10.0
+
+- **ZIP display + safe extract from external apps:** ZIP files from other apps (`ACTION_VIEW` with `application/zip` / `x-zip-compressed` / `x-zip`, plus `.zip` fallback) now open in the universal viewer with a contents list and **Extract all** to a picked folder (zip-slip + 2,000-entry / 100MB-per-file / 500MB-total guards, corrupt archives never crash). In-app ZIPs open the same way instead of a hex dump.
+- **Accurate folder names everywhere:** browser title, breadcrumb root, desktop sidebar, exclude picker, pins, new-tab titles, and category tabs all show the real volume/folder name (`ABCD-1234`, …); same-named folders no longer merge (grouped by full path, disambiguated display).
+- **Desktop lists default to list view:** DeX / PC-mode browser and category screens start in LIST (Windows 11 Details parity); phone defaults unchanged and explicit toggles are respected.
+- **Explorer Details columns with show/hide:** list rows show Size / Date modified / Date created / Type (Name always), each togglable from the options menu (⋮ → Columns) and persisted; desktop lists add a tappable header row that sorts. Created uses MediaStore date-added (filesystem fallback on minSdk 24).
+- **外部アプリからのZIP表示・解凍:** 他アプリのZIP (`ACTION_VIEW`) がアプリ内で一覧表示＋**すべて解凍**（zip-slip・展開爆弾ガード付き、破損時は空表示で非クラッシュ）。アプリ内ZIPも同様に開きます。
+- **フォルダ名の正確化:** タイトル・パンくず・DeX sidebar・除外ピッカー・ピン・タブが実ボリューム名を表示し、同名フォルダの誤結合を解消。
+- **デスクトップはリスト既定:** DeX/PCモードのブラウザ・カテゴリはLIST既定（電話は従来通り、手動切替を尊重）。
+- **Win11風Details列の表示切替:** サイズ/更新日時/作成日時/種類を⋮→表示項目で切替（永続化）。デスクトップはタップでソート可能なヘッダ行付き。
+- Version `1.10.0` (`versionCode 17`), signed with the same upload key as v0.1.0–v1.9.2 (APK Signature Scheme v2 verified). **APK SHA-256: `3663e54015d1495cdd32931412f1c7322a53f195aef0bdb9899fce0e9b07b585`.**
+
 ## v1.9.2
 
 - **Swipe down to go back in the viewer:** dragging a photo/video downward (single finger, not zoomed, OCR off) now follows the finger with a dimming veil; past 140dp it flings off-screen and returns to the list, otherwise it springs back. Horizontal paging, pinch zoom, and OCR text selection are never stolen (mutually exclusive gesture arbitration, multi-touch aborts). Audio pages unchanged.

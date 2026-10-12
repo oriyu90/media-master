@@ -17,4 +17,11 @@
     <string name="doc_chart_title">图表</string>
     <string name="doc_chart_empty">没有可显示的图表数据。</string>
     <string name="doc_mermaid_note">图表将在“按原样显示”模式下渲染。</string>
+    <string name="zip_contents">ZIP 内容</string>
+    <string name="zip_empty">此 ZIP 为空或无法读取。</string>
+    <string name="zip_extract_all">全部解压</string>
+    <string name="zip_choose_folder">选择解压文件夹</string>
+    <string name="zip_entries">%1$d 项</string>
+    <string name="zip_extract_success">已解压 %1$d 个文件</string>
+    <string name="zip_extract_failed">部分文件无法解压</string>
 </resources>

@@ -31,6 +31,15 @@ class ViewerKindClassifierTest {
     }
 
     @Test
+    fun `zip classifies to ZIP by extension and mime`() {
+        assertEquals(ViewerKind.ZIP, ViewerKindClassifier.classify("archive.zip", null))
+        assertEquals(ViewerKind.ZIP, ViewerKindClassifier.classify("ARCHIVE.ZIP", "application/octet-stream"))
+        assertEquals(ViewerKind.ZIP, ViewerKindClassifier.classify("blob", "application/zip"))
+        assertEquals(ViewerKind.ZIP, ViewerKindClassifier.classify("blob", "application/x-zip-compressed"))
+        assertEquals(ViewerKind.ZIP, ViewerKindClassifier.classify("blob", "application/x-zip"))
+    }
+
+    @Test
     fun `unknown binary falls back to hex instead of being refused`() {
         assertEquals(ViewerKind.HEX, ViewerKindClassifier.classify("firmware.bin", "application/octet-stream"))
         assertEquals(ViewerKind.HEX, ViewerKindClassifier.classify("noext", null))

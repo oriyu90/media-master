@@ -2,7 +2,7 @@ package com.example.viewer
 
 /** Which built-in renderer [com.example.ui.viewer.DocumentViewerScreen] should use for a file. */
 enum class ViewerKind {
-    TEXT, CSV, JSON, MARKDOWN, LATEX_SOURCE, PDF, DOCX, PPTX, HEX, EXTERNAL_ONLY
+    TEXT, CSV, JSON, MARKDOWN, LATEX_SOURCE, PDF, DOCX, PPTX, HEX, ZIP, EXTERNAL_ONLY
 }
 
 /**
@@ -27,6 +27,8 @@ object ViewerKindClassifier {
         val ext = name.substringAfterLast('.', "").lowercase()
         val mime = mimeType.orEmpty()
         return when {
+            ext == "zip" || mime == "application/zip" ||
+                mime == "application/x-zip-compressed" || mime == "application/x-zip" -> ViewerKind.ZIP
             ext == "csv" || ext == "tsv" || mime == "text/csv" -> ViewerKind.CSV
             ext == "json" || mime == "application/json" -> ViewerKind.JSON
             ext == "md" || ext == "markdown" || mime == "text/markdown" -> ViewerKind.MARKDOWN

@@ -115,4 +115,14 @@
     <string name="video_error">Could not play this video.</string>
     <string name="image_load_error">Could not load this image.</string>
     <string name="navigate_to">Navigate to %1$s</string>
+    <string name="list_header_name">Name</string>
+    <string name="list_header_size">Size</string>
+    <string name="list_header_modified">Date modified</string>
+    <string name="list_header_created">Date created</string>
+    <string name="list_header_type">Type</string>
+    <string name="show_size">Show file size</string>
+    <string name="show_date_modified">Show date modified</string>
+    <string name="show_date_created">Show date created</string>
+    <string name="show_type">Show file type</string>
+    <string name="columns">Columns</string>
 </resources>

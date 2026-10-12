@@ -15,8 +15,8 @@ android {
     applicationId = "com.yukiorita.mediamaster"
     minSdk = 24
     targetSdk = 36
-    versionCode = 16
-    versionName = "1.9.2"
+    versionCode = 17
+    versionName = "1.10.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

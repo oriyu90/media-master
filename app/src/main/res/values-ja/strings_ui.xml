@@ -39,4 +39,14 @@
     <string name="video_error">この動画を再生できませんでした。</string>
     <string name="image_load_error">この画像を読み込めませんでした。</string>
     <string name="navigate_to">%1$s に移動</string>
+    <string name="list_header_name">名前</string>
+    <string name="list_header_size">サイズ</string>
+    <string name="list_header_modified">更新日時</string>
+    <string name="list_header_created">作成日時</string>
+    <string name="list_header_type">種類</string>
+    <string name="show_size">サイズを表示</string>
+    <string name="show_date_modified">更新日時を表示</string>
+    <string name="show_date_created">作成日時を表示</string>
+    <string name="show_type">種類を表示</string>
+    <string name="columns">表示項目</string>
 </resources>

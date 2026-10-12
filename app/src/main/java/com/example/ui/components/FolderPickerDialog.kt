@@ -32,7 +32,9 @@ fun FolderPickerDialog(
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
-    var currentDir by remember { mutableStateOf(File(startPath).takeIf { it.isDirectory } ?: File(startPath).parentFile ?: File(startPath)) }
+    // v1.10.0: key on startPath so callers that resolve roots async (ZIP
+    // extract) land on the real root once loaded, not a "/" fallback.
+    var currentDir by remember(startPath) { mutableStateOf(File(startPath).takeIf { it.isDirectory } ?: File(startPath).parentFile ?: File(startPath)) }
     var refreshTrigger by remember { mutableIntStateOf(0) }
     var showNewFolderDialog by remember { mutableStateOf(false) }
     val subDirs = remember(currentDir, refreshTrigger) {
@@ -82,8 +84,16 @@ fun FolderPickerDialog(
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(modifier = Modifier.fillMaxWidth(0.92f).fillMaxHeight(0.8f), shape = MaterialTheme.shapes.large) {
             Column(modifier = Modifier.fillMaxSize()) {
+                // v1.10.0 (#2): accurate title — "/storage/emulated/0" shows
+                // "Internal Storage", not bare "0".
+                val pickerTitle = when {
+                    currentDir.name.isBlank() -> "/"
+                    currentDir.name == "0" && currentDir.path.contains("emulated") ->
+                        stringResource(R.string.internal_storage)
+                    else -> currentDir.name
+                }
                 TopAppBar(
-                    title = { Text(currentDir.name.ifBlank { "/" }, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    title = { Text(pickerTitle, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     navigationIcon = {
                         currentDir.parentFile?.let { parent ->
                             IconButton(onClick = { currentDir = parent }) {

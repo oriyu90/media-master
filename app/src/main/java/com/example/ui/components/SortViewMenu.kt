@@ -18,12 +18,18 @@ fun SortViewMenu(
     viewModel: FileViewModel, 
     onSelectAll: (() -> Unit)? = null,
     isCategory: Boolean = false,
-    showExcludedToggle: Boolean = false
+    showExcludedToggle: Boolean = false,
+    showColumnToggles: Boolean = true,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val currentSort by viewModel.sortOption.collectAsStateWithLifecycle()
     val currentViewMode by (if (isCategory) viewModel.categoryViewMode else viewModel.viewMode).collectAsStateWithLifecycle()
     val showExcluded by viewModel.showExcludedInManage.collectAsStateWithLifecycle()
+    // v1.10.0: Explorer Details column visibility (Win11 column-chooser parity).
+    val showSize by viewModel.listShowSize.collectAsStateWithLifecycle()
+    val showModified by viewModel.listShowDateModified.collectAsStateWithLifecycle()
+    val showCreated by viewModel.listShowDateCreated.collectAsStateWithLifecycle()
+    val showType by viewModel.listShowType.collectAsStateWithLifecycle()
 
     Box {
         IconButton(onClick = { expanded = true }) {
@@ -74,6 +80,37 @@ fun SortViewMenu(
                     expanded = false
                 }
             )
+            if (showColumnToggles) {
+                // v1.10.0: Win11 Explorer "column chooser" parity — Name is
+                // always shown; Size/Dates/Type toggle the list-row details
+                // (and desktop header columns). Persisted via DataStore.
+                HorizontalDivider()
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.columns)) },
+                    enabled = false,
+                    onClick = {},
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.show_size)) },
+                    trailingIcon = checkMark(showSize),
+                    onClick = { viewModel.setListShowSize(!showSize) }
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.show_date_modified)) },
+                    trailingIcon = checkMark(showModified),
+                    onClick = { viewModel.setListShowDateModified(!showModified) }
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.show_date_created)) },
+                    trailingIcon = checkMark(showCreated),
+                    onClick = { viewModel.setListShowDateCreated(!showCreated) }
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.show_type)) },
+                    trailingIcon = checkMark(showType),
+                    onClick = { viewModel.setListShowType(!showType) }
+                )
+            }
             if (showExcludedToggle) {
                 HorizontalDivider()
                 DropdownMenuItem(

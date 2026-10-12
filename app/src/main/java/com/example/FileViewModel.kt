@@ -11,8 +11,10 @@ import com.example.files.MediaRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -53,6 +55,20 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _categoryViewMode = MutableStateFlow(ViewMode.LIST)
     val categoryViewMode: StateFlow<ViewMode> = _categoryViewMode.asStateFlow()
+
+    // v1.10.0: desktop LIST default must not clobber an explicit user choice.
+    private var viewModeUserSet = false
+    private var categoryViewModeUserSet = false
+
+    // v1.10.0: Explorer Details column visibility (persisted, Win11 defaults).
+    val listShowSize: StateFlow<Boolean> =
+        settingsRepository.listShowSizeFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val listShowDateModified: StateFlow<Boolean> =
+        settingsRepository.listShowDateModifiedFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val listShowDateCreated: StateFlow<Boolean> =
+        settingsRepository.listShowDateCreatedFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val listShowType: StateFlow<Boolean> =
+        settingsRepository.listShowTypeFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
     private val _excludedFolders = MutableStateFlow<Set<String>>(emptySet())
     val excludedFolders: StateFlow<Set<String>> = _excludedFolders.asStateFlow()
@@ -118,7 +134,26 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setCategoryViewMode(mode: ViewMode) {
+        categoryViewModeUserSet = true
         _categoryViewMode.update { mode }
+    }
+
+    /**
+     * v1.10.0: desktop LIST default (Explorer Details parity). Applies only
+     * when the user has not explicitly chosen a mode yet, so manual toggles
+     * are never clobbered on recompose / return navigation.
+     */
+    fun applyDesktopDefault(isDesktop: Boolean) {
+        if (isDesktop && !viewModeUserSet) {
+            _viewMode.update { ViewMode.LIST }
+        }
+    }
+
+    /** Same guard for category screens (gallery GRID on phone, LIST on desktop). */
+    fun applyCategoryDesktopDefault(isDesktop: Boolean, isMediaGallery: Boolean) {
+        if (categoryViewModeUserSet) return
+        val def = com.example.ui.DesktopViewModes.categoryDefault(isDesktop, isMediaGallery)
+        _categoryViewMode.update { def }
     }
 
     fun addExcludedFolder(path: String) {
@@ -135,8 +170,15 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setViewMode(mode: ViewMode) {
+        viewModeUserSet = true
         _viewMode.update { mode }
     }
+
+    /** v1.10.0: Explorer column toggles (persisted via DataStore). */
+    fun setListShowSize(v: Boolean) { viewModelScope.launch { settingsRepository.setListShowSize(v) } }
+    fun setListShowDateModified(v: Boolean) { viewModelScope.launch { settingsRepository.setListShowDateModified(v) } }
+    fun setListShowDateCreated(v: Boolean) { viewModelScope.launch { settingsRepository.setListShowDateCreated(v) } }
+    fun setListShowType(v: Boolean) { viewModelScope.launch { settingsRepository.setListShowType(v) } }
 
     private fun sortFiles(files: List<MediaFile>): List<MediaFile> = sortMediaFiles(files, _sortOption.value)
 
@@ -170,7 +212,8 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
                 val visibleItems = directory.listFiles()
                     ?.map { file ->
                         if (file.isDirectory) {
-                            MediaFile(-1, file.name, file.absolutePath, 0, "folder", file.lastModified(), true)
+                            val lm = file.lastModified()
+                            MediaFile(-1, file.name, file.absolutePath, 0, "folder", lm, true, null, lm)
                         } else {
                             indexedFiles[file.absolutePath] ?: with(mediaRepository) { file.toMediaFile() }
                         }
@@ -404,6 +447,82 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
     fun moveFile(path: String, contentUri: Uri?, destDir: String) {
         copyFile(path, contentUri, destDir) { destPath ->
             if (destPath != null) deleteFile(path, contentUri)
+        }
+    }
+
+    /**
+     * v1.10.0: safe ZIP extraction for the universal viewer.
+     *
+     * Reads [zipUri] via ContentResolver (works for both in-app files and
+     * external content:// URIs), writes under [destDir] only through
+     * [com.example.backup.BackupPaths.safeResolve] (zip-slip guard), with
+     * decompression-bomb caps matching [com.example.zip.ZipListing].
+     * Runs off the main thread; [onDone] receives (extractedCount, failedCount).
+     * Never throws — failures are counted, never crash.
+     */
+    fun extractZip(zipUri: Uri, destDir: String, onDone: (Int, Int) -> Unit = { _, _ -> }) {
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    var ok = 0
+                    var failed = 0
+                    var totalBytes = 0L
+                    val app = getApplication<Application>()
+                    app.contentResolver.openInputStream(zipUri)?.use { raw ->
+                        java.util.zip.ZipInputStream(java.io.BufferedInputStream(raw)).use { zis ->
+                            var entry = zis.nextEntry
+                            var count = 0
+                            while (entry != null) {
+                                if (count >= com.example.zip.ZipListing.MAX_ENTRIES) break
+                                count++
+                                val name = entry.name.orEmpty()
+                                val isDir = entry.isDirectory || name.endsWith("/")
+                                if (!isDir && com.example.zip.ZipListing.isSafeEntryName(name)) {
+                                    val dest = com.example.backup.BackupPaths.safeResolve(File(destDir), name)
+                                    if (dest == null) {
+                                        failed++
+                                    } else {
+                                        val writeOk = runCatching {
+                                            dest.parentFile?.mkdirs()
+                                            var written = 0L
+                                            java.io.FileOutputStream(dest).use { fos ->
+                                                val buf = ByteArray(32 * 1024)
+                                                while (true) {
+                                                    val n = zis.read(buf)
+                                                    if (n < 0) break
+                                                    written += n
+                                                    totalBytes += n
+                                                    // Bomb guard: per-entry + total caps.
+                                                    if (written > com.example.zip.ZipListing.MAX_ENTRY_BYTES ||
+                                                        totalBytes > com.example.zip.ZipListing.MAX_TOTAL_BYTES
+                                                    ) {
+                                                        throw java.io.IOException("zip cap exceeded")
+                                                    }
+                                                    fos.write(buf, 0, n)
+                                                }
+                                            }
+                                        }.isSuccess
+                                        if (writeOk) ok++ else {
+                                            failed++
+                                            runCatching { dest.delete() }
+                                        }
+                                    }
+                                } else if (!isDir) {
+                                    failed++
+                                }
+                                runCatching { zis.closeEntry() }
+                                entry = runCatching { zis.nextEntry }.getOrNull()
+                            }
+                        }
+                    } ?: run { failed++ }
+                    ok to failed
+                }.getOrDefault(0 to 1)
+            }
+            if (result.first > 0) {
+                loadFiles(destDir)
+                loadAllMedia()
+            }
+            onDone(result.first, result.second)
         }
     }
 

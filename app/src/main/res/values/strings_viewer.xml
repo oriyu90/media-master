@@ -17,4 +17,11 @@
     <string name="doc_chart_title">Chart</string>
     <string name="doc_chart_empty">No chart data to display.</string>
     <string name="doc_mermaid_note">Diagram renders in Show as-is mode.</string>
+    <string name="zip_contents">ZIP contents</string>
+    <string name="zip_empty">This ZIP is empty or couldn\'t be read.</string>
+    <string name="zip_extract_all">Extract all</string>
+    <string name="zip_choose_folder">Choose extraction folder</string>
+    <string name="zip_entries">%1$d items</string>
+    <string name="zip_extract_success">Extracted %1$d files</string>
+    <string name="zip_extract_failed">Some files couldn\'t be extracted</string>
 </resources>

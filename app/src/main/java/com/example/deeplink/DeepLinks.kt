@@ -33,7 +33,7 @@ import android.net.Uri
  *                                          a later phase once the viewer accepts
  *                                          a stand-alone URI)
  *       ACTION_VIEW  of a directory    -> file browser at that path
- *       ACTION_VIEW  of text/csv/json/markdown/pdf/word/powerpoint
+ *       ACTION_VIEW  of text/csv/json/markdown/pdf/word/powerpoint/zip
  *                                      -> the universal document viewer, opened
  *                                         directly on the incoming URI (Media
  *                                         Master does not need to already know
@@ -84,6 +84,11 @@ object DeepLinks {
                     type?.startsWith("video/") == true ||
                     type?.startsWith("audio/") == true -> "library"
                 data != null && isDocumentViewerType(type) -> route("docViewer", data.toString())
+                // v1.10.0: ZIP from external apps. Some senders omit the MIME
+                // type (null / */* / octet-stream) and only carry a .zip URI,
+                // so fall back to the extension in that case. Explicit ZIP
+                // MIMEs are covered by isDocumentViewerType above.
+                data != null && isZipFallback(type, data) -> route("docViewer", data.toString())
                 else -> null
             }
             else -> null
@@ -120,12 +125,27 @@ object DeepLinks {
     /**
      * MIME types the universal document viewer (`docViewer`) can open.
      * Legacy `.doc`/`.ppt` are intentionally excluded — see [com.example.viewer.ViewerKind.EXTERNAL_ONLY].
+     * v1.10.0 adds ZIP (display + safe extract).
      */
     private val DOCUMENT_VIEWER_TYPES = setOf(
         "text/plain", "text/csv", "text/markdown", "text/x-tex", "application/json", "application/pdf",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "application/zip", "application/x-zip-compressed", "application/x-zip",
     )
 
     private fun isDocumentViewerType(type: String?): Boolean = type != null && type in DOCUMENT_VIEWER_TYPES
+
+    /**
+     * Extension fallback for ZIP senders that omit the MIME type.
+     * Only fires for null/generic types to avoid hijacking unrelated files.
+     */
+    internal fun isZipFallback(type: String?, data: Uri): Boolean {
+        val generic = type == null || type == "*/*" || type == "application/octet-stream"
+        if (!generic) return false
+        val name = runCatching {
+            data.lastPathSegment.orEmpty()
+        }.getOrDefault("")
+        return name.lowercase().endsWith(".zip")
+    }
 }

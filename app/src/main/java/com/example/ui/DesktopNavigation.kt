@@ -200,7 +200,8 @@ fun DesktopNavigation(
     }
 
     fun openInNewTab(path: String) {
-        val title = File(path).name.ifBlank { context.getString(R.string.files) }
+        val raw = FolderNames.folderDisplayName(path)
+        val title = raw.ifBlank { context.getString(R.string.files) }
         val route = "file_browser?path=${Uri.encode(path)}"
         val tab = DesktopTab(nextTabId++, title, route)
         tabs.add(tab)
@@ -370,6 +371,10 @@ private fun DesktopSidebar(
     val context = LocalContext.current
     // Reuses the caller-resolved roots: identical volume set to the normal UI.
     val externalRoots = storageRoots
+    // v1.10.0 (#2): sidebar shows the real volume name (same as Manage).
+    // Hoisted before LazyColumn: stringResource cannot run inside LazyListScope.
+    val internalLabel = stringResource(R.string.internal_storage)
+    val externalFallback = stringResource(R.string.external_storage)
     LazyColumn(
         modifier = modifier.background(MaterialTheme.colorScheme.surfaceContainerLow),
         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 12.dp),
@@ -394,7 +399,7 @@ private fun DesktopSidebar(
         items(externalRoots.size) { index ->
             val path = externalRoots[index]
             val internal = path.contains("emulated")
-            val title = stringResource(if (internal) R.string.internal_storage else R.string.external_storage)
+            val title = FolderNames.storageRootTitle(path, internal, internalLabel, externalFallback)
             SidebarDestination(title, if (internal) Icons.Default.PhoneAndroid else Icons.Default.SdStorage, false) {
                 onNavigate("file_browser?path=${Uri.encode(path)}", title)
             }
@@ -459,7 +464,8 @@ private fun PinnedFolderItem(
     onRemovePin: (String) -> Unit
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
-    val title = File(path).name.ifBlank { path }
+    // v1.10.0 (#2): accurate last-segment name (trailing-slash safe).
+    val title = FolderNames.folderDisplayName(path)
     // v1.8.0 (#1): explicit onSurface text on the sidebar surfaceContainerLow
     // background so DeX shells never render stale/inherited colors.
     val textColor = MaterialTheme.colorScheme.onSurface

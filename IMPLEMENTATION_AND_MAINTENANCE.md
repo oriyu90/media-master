@@ -1,4 +1,4 @@
-# Media Master v1.12.0 実装・保守メモ
+# Media Master v1.12.1 実装・保守メモ
 
 最終更新: 2026-10-15
 
@@ -6,21 +6,30 @@
 
 | 項目 | 内容 |
 | --- | --- |
-| バージョン | `1.12.0` (`versionCode 19`) |
+| バージョン | `1.12.1` (`versionCode 20`) |
 | アプリケーションID | `com.yukiorita.mediamaster` |
 | 最小 SDK / target SDK | 24 / 36 |
 | ライセンス | MIT |
 | 著作者 | Yuki_Orita |
 | release APK | `app/build/outputs/apk/release/app-release.apk`（R8 + resource shrink 有効） |
-| APK SHA-256 | `3d9ac550b7404af05c41a8178ec71eae2b0dab8d25db5472a5dc3ceb058c6cbd` |
-| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.11.0 と同一鍵） |
-| GitHub Release | `v1.12.0` (GitHub Releases) |
+| APK SHA-256 | `847d1aad80da47eb519ea1b695878162e7f9bb48c133ee202cafa2b809b82112` |
+| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.12.0 と同一鍵） |
+| GitHub Release | `v1.12.1` (GitHub Releases) |
 
 release APK は RSA 4096 ビット鍵・APK Signature Scheme v2 署名（`apksigner verify` で確認予定）。署名鍵は `common-rules-document/keystores/media-master-upload-key.jks`（alias `upload`）。
 
-v1.12.0 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitTest`(146件)/`:app:lintDebug`(0エラー)を確認。**実機（エミュレータ）デバッグ実施予定**——本番署名済みAPKをクリーンインストールし2件（資料タブ＋全画面/ESC・戻る、フォルダVIEW・ファイル選択ピッカー）を目視＋FATAL 0件を確認後に公開。証明書は v0.1.0〜v1.11.0 と同一 `332ce386…eba6`（v2のみ）。
+v1.12.1 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitTest`(146件)/`:app:lintDebug`(0エラー)を確認。**実機（エミュレータ）デバッグ実施予定**——本番署名済みAPKをクリーンインストールし2件（資料タブ＋全画面/ESC・戻る、フォルダVIEW・ファイル選択ピッカー）を目視＋FATAL 0件を確認後に公開。証明書は v0.1.0〜v1.11.0 と同一 `332ce386…eba6`（v2のみ）。
 
-旧リリースの APK SHA-256: v1.11.0 `69da38c9a7ccbffab663c0043120ec930e3f0559d358fd739df1e082e5922a5c`、v1.10.0 `3663e54015d1495cdd32931412f1c7322a53f195aef0bdb9899fce0e9b07b585`、v1.9.2 `0d41403ece4d59eb94e62a5a4cb5e385f239d22614b16dd727c0d5154e4bc20a`、v1.9.1 `1883e8d144877af852be76d94e9a3d5feb42f94e839da35bd2e0440317bc4a3b`、v1.9.0 `74994a9d1313cb0b2acdec9b15b329b1d3b85b110e9901ef542855b4b33ee85b`、v1.8.0 `e7c07575bbbc6675672d2cf64a30a093fd5b3df1c8fd875eec9d8bfd71caf6c4`、 v1.7.1 `4f79abcc32747a6889787c22d051ff831d55aca27330f81923760fcc63fcc1ee`、v1.7.0 `08236934c0cbf522ce0432595933e03976368ec3b0ee000ad4ced962b2fa9fd5`、v1.6.0 `f922b2b2d797f69fe4b1c9a7aca366e9f1664f8b47c8cfbeeb9aaeb02235b615`。
+旧リリースの APK SHA-256: v1.12.0 `3d9ac550b7404af05c41a8178ec71eae2b0dab8d25db5472a5dc3ceb058c6cbd`、v1.11.0 `69da38c9a7ccbffab663c0043120ec930e3f0559d358fd739df1e082e5922a5c`、v1.10.0 `3663e54015d1495cdd32931412f1c7322a53f195aef0bdb9899fce0e9b07b585`、v1.9.2 `0d41403ece4d59eb94e62a5a4cb5e385f239d22614b16dd727c0d5154e4bc20a`、v1.9.1 `1883e8d144877af852be76d94e9a3d5feb42f94e839da35bd2e0440317bc4a3b`、v1.9.0 `74994a9d1313cb0b2acdec9b15b329b1d3b85b110e9901ef542855b4b33ee85b`、v1.8.0 `e7c07575bbbc6675672d2cf64a30a093fd5b3df1c8fd875eec9d8bfd71caf6c4`、 v1.7.1 `4f79abcc32747a6889787c22d051ff831d55aca27330f81923760fcc63fcc1ee`、v1.7.0 `08236934c0cbf522ce0432595933e03976368ec3b0ee000ad4ced962b2fa9fd5`、v1.6.0 `f922b2b2d797f69fe4b1c9a7aca366e9f1664f8b47c8cfbeeb9aaeb02235b615`。
+
+## v1.12.1 実機監査パッチ（ライブラリ日付ヘッダspan復活）
+
+- 実機（Lenovo TB710FU / Android 16 / Lenovo PC Mode）精査で発見した回帰のみ修正：`LibraryScreen`日付ヘッダの`span = { GridItemSpan(maxLineSpan) }`復活（key＋contentType維持）。他は実機で要修正なし。
+- 実機監査の範囲（いずれもFATAL 0件）：Home/Library（グリッド＋スクロール）/オーディオ再生＋MiniPlayer/Documentsタブ＋ページ数/ドキュメント新規タブ＋全画面＋戻る/画像ビューア＋ページスワイプ/長押しメニュー＋チューザー（実アプリ列挙）/選択＋リネームダイアログ＋削除/設定テーマ明暗＋日英切替/ランチャーアイコン（ダーク）。端末設定（テーマ/言語/音量）は全て復元、テストファイルはアプリ内削除で除去、監査スクリーンショットは端末・ローカル双方から削除済み。スリープ防止は既設値（15）のまま維持。
+
+### 検証
+- `:app:testDebugUnitTest` 146件全通過（変更なし）/`:app:lintDebug` 0エラー。
+- 実機（監査と同一端末）でLibrary日付ヘッダの全幅表示を再確認予定。
 
 ## v1.12.0 実装内容（資料タブ＋全画面・標準ファイルマネージャー化）
 

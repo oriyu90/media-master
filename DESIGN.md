@@ -1,7 +1,10 @@
 # 設計書兼仕様書 (Media Master)
 
 ## バージョン情報
-- **Version:** 1.12.0
+- **Version:** 1.12.1
+
+## v1.12.1 の設計変更（要約）
+- **実機監査の回帰修正**: Library日付ヘッダの`span = { GridItemSpan(maxLineSpan) }`を復活（v1.11.0のkey/contentType化で落としていた）。key＋contentTypeは維持しスクロール安定性を損なわない。実機（Lenovo TB710FU / Android 16 / PC Mode）での精査では他に要修正なし（%表示は実ファイル名、IMEかな変換は端末仕様）。監査で触れた端末設定（テーマ/言語/音量）は全て復元、テストファイルは削除済み。
 
 ## v1.12.0 の設計変更（要約）
 - **資料のタブ＋全画面(#A)**: `DesktopNavigation.openDocInNewTab(uri,path,title)`（pure `docTabRoute`＋単体テスト）で資料をファイル名タブへ。`MediaNavHost`第3コールバック→Files/Documents/Categoryへ配線（touchは既定=直接遷移で不変）。`DocumentViewerScreen(desktop)`にワンクリック全画面ボタン（TopAppBar＋全画面中のフローティング終了ボタン、`AnimatedVisibility` fade）。touchは初回ON・desktopはOFF。`BackHandler`（全画面→解除優先）＋ESC（`onPreviewKeyEvent`＋desktop全画面時のみ`FocusRequester`、touchはBackHandlerのみ依存）。Category文書行の空白バグを`openMediaFile`委譲で修正（メディア→viewer、APK→installer、文書→docViewer、旧Office→外部）。

@@ -368,7 +368,7 @@ private fun PhotosView(
                     contentPadding = PaddingValues(bottom = 16.dp),
                 ) {
                     grouped.forEach { (day, files) ->
-                        item(key = "day-$day", contentType = "day-header") {
+                        item(key = "day-$day", span = { GridItemSpan(maxLineSpan) }, contentType = "day-header") {
                             Text(
                                 text = formatDate(day),
                                 style = MaterialTheme.typography.titleSmall,

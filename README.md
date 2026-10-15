@@ -4,6 +4,12 @@ Media Master is an open-source Android media and file manager built with Kotlin 
 
 Media Master は、Kotlin と Jetpack Compose で開発されたオープンソースのAndroid向けメディア・ファイル管理アプリです。写真・動画、音楽、書類、ストレージ、アプリ／APK、編集、バックアップを1つのアプリで扱えます。
 
+## v1.12.1
+
+- **Library date-header span fix:** day headers in the Photos grid are full-width strips again (`GridItemSpan(maxLineSpan)` restored alongside the v1.11.0 stable `key` + `contentType`). Found by the real-device audit (Lenovo Tab, Android 16): headers were rendering as single grid tiles.
+- **ライブラリ日付ヘッダ修正:** 実機監査で発見した回帰を修正。日付ヘッダが1マス表示になっていたのを全幅表示に戻しました（安定`key`＋`contentType`は維持）。
+- Version `1.12.1` (`versionCode 20`), signed with the same upload key as v0.1.0–v1.12.0 (APK Signature Scheme v2 verified). **APK SHA-256: `847d1aad80da47eb519ea1b695878162e7f9bb48c133ee202cafa2b809b82112`.**
+
 ## v1.12.0
 
 - **Document fullscreen + desktop tabs:** the document viewer (PDF, text, Markdown, Office, ZIP…) now has a one-click fullscreen button in the toolbar, with a floating exit button while fullscreen. Touch shells open documents fullscreen immediately; desktop shells open them in a new tab (titled with the file name) and fullscreen fills the tab. Android back and desktop ESC leave fullscreen first and only close the viewer on the next press.

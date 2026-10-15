@@ -278,7 +278,7 @@ fun TracksView(viewState: ViewState, navController: NavHostController, selectedF
                 }
                 
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(audioFiles, key = { it.path }) { file ->
+                    items(audioFiles, key = { it.path }, contentType = { "audio" }) { file ->
                         val isSelected = selectedFiles.contains(file.path)
                         ListItem(
                             headlineContent = { Text(file.name) },
@@ -354,7 +354,7 @@ fun PlaylistsView(viewState: ViewState, navController: NavHostController, exclud
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(playlists.keys.toList(), key = { it }) { playlistName ->
+                items(playlists.keys.toList(), key = { it }, contentType = { "playlist" }) { playlistName ->
                     Card(
                         modifier = Modifier.fillMaxWidth().clickable { 
                             navController.navigate("playlist/${Uri.encode(playlistName)}") 

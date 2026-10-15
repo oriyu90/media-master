@@ -1,26 +1,51 @@
-# Media Master v1.10.0 実装・保守メモ
+# Media Master v1.11.0 実装・保守メモ
 
-最終更新: 2026-10-13
+最終更新: 2026-10-15
 
 ## リリース情報
 
 | 項目 | 内容 |
 | --- | --- |
-| バージョン | `1.10.0` (`versionCode 17`) |
+| バージョン | `1.11.0` (`versionCode 18`) |
 | アプリケーションID | `com.yukiorita.mediamaster` |
 | 最小 SDK / target SDK | 24 / 36 |
 | ライセンス | MIT |
 | 著作者 | Yuki_Orita |
 | release APK | `app/build/outputs/apk/release/app-release.apk`（R8 + resource shrink 有効） |
-| APK SHA-256 | `3663e54015d1495cdd32931412f1c7322a53f195aef0bdb9899fce0e9b07b585` |
-| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.9.2 と同一鍵） |
-| GitHub Release | `v1.10.0` (GitHub Releases) |
+| APK SHA-256 | `69da38c9a7ccbffab663c0043120ec930e3f0559d358fd739df1e082e5922a5c` |
+| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.10.0 と同一鍵） |
+| GitHub Release | `v1.11.0` (GitHub Releases) |
 
-release APK は RSA 4096 ビット鍵・APK Signature Scheme v2 署名（`apksigner verify` で確認済み）。署名鍵は `common-rules-document/keystores/media-master-upload-key.jks`（alias `upload`）。
+release APK は RSA 4096 ビット鍵・APK Signature Scheme v2 署名（`apksigner verify` で確認予定）。署名鍵は `common-rules-document/keystores/media-master-upload-key.jks`（alias `upload`）。
 
-v1.10.0 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitTest`(129件)/`:app:lintDebug`(0エラー)を確認（`verifyRoborazziDebug`は当環境のフォント差でclean mainでも6件不一致となる既知の環境要因のため、対象部品に触れていない本版では参照更新せず維持）。**実機（エミュレータ）デバッグ実施予定**——本番署名済みAPKをクリーンインストールし4件（ZIP表示/解凍・フォルダ名・デスクトップLIST既定・Details列切替）を目視＋FATAL 0件を確認後に公開。証明書は v0.1.0〜v1.9.2 と同一 `332ce386…eba6`（v2のみ）。
+v1.11.0 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitTest`(135件)/`:app:lintDebug`(0エラー)を確認。**実機（エミュレータ）デバッグ実施予定**——本番署名済みAPKをクリーンインストールし5件（アイコン・スクロール・他のアプリで開く・ズーム制限・UI回帰）を目視＋FATAL 0件を確認後に公開。証明書は v0.1.0〜v1.10.0 と同一 `332ce386…eba6`（v2のみ）。
 
-旧リリースの APK SHA-256: v1.9.2 `0d41403ece4d59eb94e62a5a4cb5e385f239d22614b16dd727c0d5154e4bc20a`、v1.9.1 `1883e8d144877af852be76d94e9a3d5feb42f94e839da35bd2e0440317bc4a3b`、v1.9.0 `74994a9d1313cb0b2acdec9b15b329b1d3b85b110e9901ef542855b4b33ee85b`、v1.8.0 `e7c07575bbbc6675672d2cf64a30a093fd5b3df1c8fd875eec9d8bfd71caf6c4`、 v1.7.1 `4f79abcc32747a6889787c22d051ff831d55aca27330f81923760fcc63fcc1ee`、v1.7.0 `08236934c0cbf522ce0432595933e03976368ec3b0ee000ad4ced962b2fa9fd5`、v1.6.0 `f922b2b2d797f69fe4b1c9a7aca366e9f1664f8b47c8cfbeeb9aaeb02235b615`。
+旧リリースの APK SHA-256: v1.10.0 `3663e54015d1495cdd32931412f1c7322a53f195aef0bdb9899fce0e9b07b585`、v1.9.2 `0d41403ece4d59eb94e62a5a4cb5e385f239d22614b16dd727c0d5154e4bc20a`、v1.9.1 `1883e8d144877af852be76d94e9a3d5feb42f94e839da35bd2e0440317bc4a3b`、v1.9.0 `74994a9d1313cb0b2acdec9b15b329b1d3b85b110e9901ef542855b4b33ee85b`、v1.8.0 `e7c07575bbbc6675672d2cf64a30a093fd5b3df1c8fd875eec9d8bfd71caf6c4`、 v1.7.1 `4f79abcc32747a6889787c22d051ff831d55aca27330f81923760fcc63fcc1ee`、v1.7.0 `08236934c0cbf522ce0432595933e03976368ec3b0ee000ad4ced962b2fa9fd5`、v1.6.0 `f922b2b2d797f69fe4b1c9a7aca366e9f1664f8b47c8cfbeeb9aaeb02235b615`。
+
+## v1.11.0 実装内容（アイコン・スクロール・他のアプリで開く・ズーム制限・UI精査）
+
+### 1. アイコン（添付画像）
+- `drawable/ic_launcher_background.xml` を白単色に置換（旧緑グリッドを撤去）。`drawable-night/` を新設し黒背景＋白フォルダ（`ic_launcher_background.xml`/`ic_launcher_foreground.xml`）を追加。昼用フォルダは黒単色。形状はタブ付き単一シルエット（`M30,32h20l6,8h22a8…`）で launcher マスク欠けを回避。`mipmap-anydpi-v26` の adaptive 定義は不変（night  qualifier が自動選択）、monochrome も同ペア。`mipmap-anydpi` legacy も同レイヤ参照のため自動追従。
+
+### 2. スクロール安定
+- `jetpack-compose-performance/references/lazy-layouts.md` に従い全 Lazy に `key`＋`contentType` を付与（`items(size)` 9箇所を含む27箇所。`FilesScreen` は既存のため対象外）。`DesktopNavigation` の count 系は `key = {"std-$i:${standardPins[i]}"}` 等の安定キー化。
+- `DocumentListRow` の行毎 `PdfRenderer` オープンを `PdfPageCountCache`（`ConcurrentHashMap<String,Int>`、Int のみ保持）で排除。`remember(file.path)` 初期値をキャッシュ読みにし、miss 時のみ IO（成功時のみ格納）。支持行は `maxLines=1`＋Ellipsis で1行固定し高さ変動を除去。
+- `CategoryScreen` はタブ再構成時に `LaunchedEffect(categoryName)` で先頭化＋`LaunchedEffect(tabs.size)` でクランプ（範囲外ページのジャンプ抑止）。`LibraryScreen` の日付ヘッダ `item(key = "day-$day")` 化。
+
+### 3. 他のアプリで開く（右クリック/長押し）
+- 新規 `openWithExternalApp()`（`FilesScreen.kt`、top-level）：`contentUri` 優先・FileProvider フォールバック、MIME は既知→resolver 推定→ワイルドカードの順、`createChooser`＋`FLAG_GRANT_READ_URI_PERMISSION`。`ActivityNotFoundException` は `no_app_to_open`、`uri` 解決失敗は `could_not_open_file` のトーストで非クラッシュ。`..` は無視。
+- 新規共有 `ui/components/OpenWithMenu.kt`（`OpenWithDropdownItem`/`SelectDropdownItem`/`rightClickMenu` modifier）。Files 行/グリッド・Category 行/グリッド・Documents 行・Library グリッドに右クリック（`isSecondaryPressed`）＋長押しメニューを追加。タップ既定（内部ビューア）は不変。5言語に `open_with`/`open_with_chooser`/`could_not_open_file`/`no_app_to_open`/`select` を追加（parity 検証）。
+
+### 4. ズーム制限（画像/動画）
+- 新規 pure `ui/components/ZoomBounds.kt`（`clampZoomScale`/`clampFillOffset`/`clampFitOffset`/`fitDrawSize`/`maxPanOffset`、-0.0 正規化で `Offset.Zero` 安定）。`ZoomableBox` は `onPlaced` 計測＋クランプ（静止時は `Offset.Zero` リセット）。`ImageWithOcrOverlay` は Fit 描画 rect 基準でクランプ（OCR 選択・pager/dismiss 調停は不変）。下限フィット等倍（`1f`–`5f`）・移動は画像端で停止。`ZoomBoundsTest` 6件で固定。
+
+### 5. UI 精査（android/skills 取込＋Hallmark）
+- `android/skills` から `jetpack-compose-performance`＋`jetpack-compose-adaptive` を `.agent/skills/` へ同梱（Apache-2.0、改変なし、`AGENTS.md` 更新）。lazy-layouts 監査を全画面に適用（上記2）。Hallmark/MD3 の軽微修正：Files 支持行・Category 支持行/見出し・Viewer タイトルの1行 ellipsis 化。
+- 互換性：minSdk24 維持、新規権限/依存なし。クラッシュ安全：全外部起動を toast 化、`!!` なし。メモリ安全：PDF キャッシュは Int のみ。日英中阿蘭の完全対応を維持。
+
+### 検証
+- `:app:testDebugUnitTest` 135件全通過（既存129＋新規6）/`:app:lintDebug` 0エラー。
+- **v1.11.0 実機デバッグ**: 本番署名済みAPKをMedium_Phone_API_36.1へクリーンインストール→権限付与→Home表示でクラッシュ0件（`logcat -b crash` FATAL 0件）。Libraryグリッド（日付グルーピング＋初期最下部スクロール＋高速上下スワイプ）→Documents→Manage（実サムネイル）→Downloadsカテゴリ（ZIP行1行ellipsis）→行長押しで「他のアプリで開く/選択」メニュー表示→「他のアプリで開く」でシステムチューザー発火（`logcat`で`ChooserActivity`＋`application/zip`確認、単一候補のため自アプリへ自動解決し内部ZIP一覧へ）→画像タップでビューア表示（ツールバータイトルellipsis）→BACK復帰。FATAL 0件。デスクトップシェル・夜間アイコンは幅ゲート/ランチャー制約のため当該環境では目視不可（従来と同一制約、適応XMLはaaptマージ検証済み）。
 
 ## v1.10.0 実装内容（ZIP外部API・フォルダ名・デスクトップLIST既定・Details列）
 

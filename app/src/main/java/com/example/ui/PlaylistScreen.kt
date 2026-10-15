@@ -81,7 +81,7 @@ fun PlaylistScreen(playlistName: String, viewModel: FileViewModel, navController
                                 }
                             }
                             LazyColumn(modifier = Modifier.fillMaxSize()) {
-                                items(playlistFiles, key = { it.path }) { file ->
+                                items(playlistFiles, key = { it.path }, contentType = { "playlist-file" }) { file ->
                                     val index = playlistFiles.indexOf(file)
                                     ListItem(
                                         headlineContent = { Text(file.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },

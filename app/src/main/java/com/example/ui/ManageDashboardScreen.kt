@@ -205,7 +205,7 @@ private fun RecentFilesRow(mediaViewState: ViewState, onOpen: (MediaFile) -> Uni
         Text(stringResource(R.string.recent_files), style = MaterialTheme.typography.titleMedium)
         Spacer(modifier = Modifier.height(8.dp))
         androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(recent.size) { i ->
+            items(count = recent.size, key = { i -> recent[i].path }, contentType = { "recent" }) { i ->
                 val file = recent[i]
                 Card(
                     modifier = Modifier.width(96.dp).clickable { onOpen(file) },

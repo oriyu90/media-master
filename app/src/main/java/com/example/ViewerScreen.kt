@@ -271,7 +271,7 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
                 ) {
                     Column(modifier = Modifier.fillMaxWidth()) {
                     TopAppBar(
-                        title = { Text(currentFile.name) },
+                        title = { Text(currentFile.name, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
                         navigationIcon = {
                             IconButton(onClick = { navController.popBackStack() }) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
@@ -702,8 +702,18 @@ fun ImageWithOcrOverlay(
                         if (event.changes.size >= 2 || scale > 1f) {
                             val zoom = event.calculateZoom()
                             val pan = event.calculatePan()
-                            scale = max(1f, scale * zoom)
-                            offset += pan
+                            // v1.11.0: bounded zoom — never shrink past fit
+                            // and never pan past the image edge (long-edge
+                            // gutter was the reported bug).
+                            val newScale = com.example.ui.components.clampZoomScale(scale * zoom, 1f, 5f)
+                            scale = newScale
+                            offset = if (newScale <= 1f || boxSize == IntSize.Zero) {
+                                Offset.Zero
+                            } else {
+                                val img = if (imageSize == IntSize.Zero) boxSize else imageSize
+                                val draw = com.example.ui.components.fitDrawSize(boxSize, img)
+                                com.example.ui.components.clampFitOffset(offset + pan, newScale, boxSize, draw)
+                            }
                             event.changes.forEach { it.consume() }
                         }
                     } while (event.changes.any { it.pressed })

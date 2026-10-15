@@ -333,7 +333,7 @@ fun HomeScreen(navController: NavHostController) {
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp)
         ) {
-            items(HOME_FEATURES, key = { it.route }) { feature ->
+            items(HOME_FEATURES, key = { it.route }, contentType = { "home-feature" }) { feature ->
                 HomeCard(
                     title = stringResource(feature.titleRes),
                     description = stringResource(feature.descRes),

@@ -36,6 +36,9 @@ import com.example.ViewState
 import com.example.ViewMode
 import com.example.R
 import com.example.ui.components.SortViewMenu
+import com.example.ui.components.OpenWithDropdownItem
+import com.example.ui.components.SelectDropdownItem
+import com.example.ui.components.rightClickMenu
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -195,6 +198,17 @@ fun CategoryScreen(
                 // after disambiguation, except "All" at index 0).
                 val labelToParent = sortedParents.associateBy { parentLabels[it].orEmpty() }
                 val pagerState = rememberPagerState(pageCount = { tabs.size })
+                // v1.11.0 (scroll stability): tabs rebuild when MediaStore
+                // rescans; clamp the settled page instead of jumping, and
+                // reset to All when the category itself changes.
+                LaunchedEffect(categoryName) {
+                    runCatching { pagerState.scrollToPage(0) }
+                }
+                LaunchedEffect(tabs.size) {
+                    if (pagerState.currentPage >= tabs.size) {
+                        runCatching { pagerState.scrollToPage(0) }
+                    }
+                }
 
                 Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
                     if (tabs.size > 1) {
@@ -227,7 +241,7 @@ fun CategoryScreen(
                         } else {
                             if (categoryViewMode == ViewMode.LIST) {
                                 LazyColumn(modifier = Modifier.fillMaxSize()) {
-                                    items(filesToShow, key = { it.path }) { file ->
+                                    items(filesToShow, key = { it.path }, contentType = { "cat-row" }) { file ->
                                         CategoryFileRow(
                                             file = file,
                                             selectedFiles = selectedFiles,
@@ -247,7 +261,7 @@ fun CategoryScreen(
                                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                                     verticalArrangement = Arrangement.spacedBy(2.dp)
                                 ) {
-                                    items(filesToShow, key = { it.path }) { file ->
+                                    items(filesToShow, key = { it.path }, contentType = { "cat-grid" }) { file ->
                                         CategoryFileGridItem(
                                             file = file,
                                             selectedFiles = selectedFiles,
@@ -284,9 +298,12 @@ fun CategoryFileRow(
     showType: Boolean = true,
 ) {
     val isSelected = selectedFiles.contains(file.path)
+    var menuExpanded by remember { mutableStateOf(false) }
+    // v1.11.0: right-click / long-press menu (Open with) for files.
+    Box {
     Column {
     ListItem(
-        headlineContent = { Text(file.name) },
+        headlineContent = { Text(file.name, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
         // v1.10.0 (#4): category lists show the same Size/Dates/Type details
         // as the file browser (Win11 parity), honouring column toggles.
         supportingContent = {
@@ -302,7 +319,11 @@ fun CategoryFileRow(
                 showType = showType,
                 isDirectory = file.isDirectory,
             )
-            if (parts.isNotEmpty()) Text(FileDetails.joinParts(parts))
+            if (parts.isNotEmpty()) Text(
+                FileDetails.joinParts(parts),
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
         },
         leadingContent = { 
             if (file.mimeType.startsWith("image/") || file.mimeType.startsWith("video/")) {
@@ -321,7 +342,9 @@ fun CategoryFileRow(
                 Icon(Icons.Default.CheckCircle, contentDescription = stringResource(R.string.selected), tint = MaterialTheme.colorScheme.primary)
             }
         },
-        modifier = Modifier.combinedClickable(
+        modifier = Modifier
+            .rightClickMenu(enabled = !isSelectionMode, menuKey = file.path) { menuExpanded = true }
+            .combinedClickable(
             onClick = {
                 if (isSelectionMode) {
                     if (isSelected) selectedFiles.remove(file.path) else selectedFiles.add(file.path)
@@ -345,12 +368,23 @@ fun CategoryFileRow(
             },
             onLongClick = {
                 if (!isSelectionMode) {
-                    selectedFiles.add(file.path)
+                    menuExpanded = true
                 }
             }
         )
     )
         HorizontalDivider(modifier = Modifier.padding(start = 64.dp), color = MaterialTheme.colorScheme.outlineVariant)
+    }
+        // v1.11.0: file context menu — Open with (system chooser) + Select.
+        // Tap keeps the previous internal-viewer behavior; only the menu
+        // hands the file to another app, so existing flows are unchanged.
+        DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+            OpenWithDropdownItem(file = file, onDone = { menuExpanded = false })
+            SelectDropdownItem(onSelect = {
+                menuExpanded = false
+                if (!selectedFiles.contains(file.path)) selectedFiles.add(file.path)
+            })
+        }
     }
 }
 
@@ -363,9 +397,11 @@ fun CategoryFileGridItem(
     navController: NavHostController
 ) {
     val isSelected = selectedFiles.contains(file.path)
+    var gridMenuExpanded by remember { mutableStateOf(false) }
     Box(
         modifier = Modifier
             .aspectRatio(1f)
+            .rightClickMenu(enabled = !isSelectionMode, menuKey = file.path) { gridMenuExpanded = true }
             .combinedClickable(
                 onClick = {
                     if (isSelectionMode) {
@@ -390,7 +426,7 @@ fun CategoryFileGridItem(
                 },
                 onLongClick = {
                     if (!isSelectionMode) {
-                        selectedFiles.add(file.path)
+                        gridMenuExpanded = true
                     }
                 }
             )
@@ -431,6 +467,13 @@ fun CategoryFileGridItem(
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(4.dp).align(Alignment.TopEnd)
             )
+        }
+        DropdownMenu(expanded = gridMenuExpanded, onDismissRequest = { gridMenuExpanded = false }) {
+            OpenWithDropdownItem(file = file, onDone = { gridMenuExpanded = false })
+            SelectDropdownItem(onSelect = {
+                gridMenuExpanded = false
+                if (!selectedFiles.contains(file.path)) selectedFiles.add(file.path)
+            })
         }
     }
 }

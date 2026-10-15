@@ -549,6 +549,7 @@ fun FileItemRow(
     onClick: () -> Unit
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     val dragModifier = if (file.isDirectory && file.name != "..") {
         Modifier.dragAndDropSource(transferData = {
             DragAndDropTransferData(
@@ -556,6 +557,20 @@ fun FileItemRow(
                 flags = View.DRAG_FLAG_GLOBAL
             )
         })
+    } else Modifier
+    // v1.11.0: desktop right-click opens the same context menu as long-press.
+    val rightClickModifier = if (file.name != "..") {
+        Modifier.pointerInput(file.path) {
+            awaitPointerEventScope {
+                while (true) {
+                    val event = awaitPointerEvent()
+                    if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed) {
+                        menuExpanded = true
+                        event.changes.forEach { it.consume() }
+                    }
+                }
+            }
+        }
     } else Modifier
     Box(modifier = dragModifier) {
     Column {
@@ -585,7 +600,11 @@ fun FileItemRow(
                     showType = showType,
                     isDirectory = false,
                 )
-                if (parts.isNotEmpty()) Text(com.example.ui.FileDetails.joinParts(parts))
+                if (parts.isNotEmpty()) Text(
+                    com.example.ui.FileDetails.joinParts(parts),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         } else null,
         leadingContent = {
@@ -626,14 +645,17 @@ fun FileItemRow(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = Hallmark.RowMinHeight)
+            .then(rightClickModifier)
             .semantics { selected = isSelected }
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = {
                     // ".." is the synthetic "go up" entry, not a real file: it must never enter
                     // multi-select (rename/move/copy/delete on it would target the parent dir).
+                    // v1.11.0: files also open the context menu (Open with)
+                    // on long-press; Select inside the menu preserves batch ops.
                     if (file.name != "..") {
-                        if (file.isDirectory) menuExpanded = true else onToggleSelect()
+                        menuExpanded = true
                     }
                 },
                 role = if (isSelectionMode) Role.Checkbox else null,
@@ -646,16 +668,47 @@ fun FileItemRow(
         )
     }
         DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.open_in_new_tab)) },
-                onClick = { menuExpanded = false; onOpenFolderInNewTab(file.path) },
-                leadingIcon = { Icon(Icons.Default.Tab, contentDescription = null) }
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.pin_to_sidebar)) },
-                onClick = { menuExpanded = false; onPinFolder(file.path) },
-                leadingIcon = { Icon(Icons.Default.PushPin, contentDescription = null) }
-            )
+            if (file.isDirectory) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.open_in_new_tab)) },
+                    onClick = { menuExpanded = false; onOpenFolderInNewTab(file.path) },
+                    leadingIcon = { Icon(Icons.Default.Tab, contentDescription = null) }
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.pin_to_sidebar)) },
+                    onClick = { menuExpanded = false; onPinFolder(file.path) },
+                    leadingIcon = { Icon(Icons.Default.PushPin, contentDescription = null) }
+                )
+            } else {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.open_with)) },
+                    onClick = { menuExpanded = false; openWithExternalApp(context, file) },
+                    leadingIcon = { Icon(Icons.Default.OpenInNew, contentDescription = null) }
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.share)) },
+                    onClick = {
+                        menuExpanded = false
+                        val uri = file.contentUri ?: runCatching {
+                            androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", File(file.path))
+                        }.getOrNull()
+                        if (uri != null) {
+                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = file.mimeType
+                                putExtra(Intent.EXTRA_STREAM, uri)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            runCatching { context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.share_files))) }
+                        }
+                    },
+                    leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) }
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.select)) },
+                    onClick = { menuExpanded = false; onToggleSelect() },
+                    leadingIcon = { Icon(Icons.Default.CheckCircle, contentDescription = null) }
+                )
+            }
         }
     }
 }
@@ -673,6 +726,7 @@ fun FileItemGrid(
     onClick: () -> Unit
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    val gridContext = LocalContext.current
     val dragModifier = if (file.isDirectory && file.name != "..") {
         Modifier.dragAndDropSource(transferData = {
             DragAndDropTransferData(
@@ -681,7 +735,20 @@ fun FileItemGrid(
             )
         })
     } else Modifier
-    Box(modifier = modifier.then(dragModifier).semantics { selected = isSelected }) {
+    val gridRightClick = if (file.name != "..") {
+        Modifier.pointerInput(file.path) {
+            awaitPointerEventScope {
+                while (true) {
+                    val event = awaitPointerEvent()
+                    if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed) {
+                        menuExpanded = true
+                        event.changes.forEach { it.consume() }
+                    }
+                }
+            }
+        }
+    } else Modifier
+    Box(modifier = modifier.then(dragModifier).then(gridRightClick).semantics { selected = isSelected }) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -691,7 +758,7 @@ fun FileItemGrid(
                 onClick = onClick,
                 onLongClick = {
                     if (file.name != "..") {
-                        if (file.isDirectory) menuExpanded = true else onToggleSelect()
+                        menuExpanded = true
                     }
                 }
             ),
@@ -749,22 +816,70 @@ fun FileItemGrid(
                 )
             }
             DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.open_in_new_tab)) },
-                    onClick = { menuExpanded = false; onOpenFolderInNewTab(file.path) }
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.pin_to_sidebar)) },
-                    onClick = { menuExpanded = false; onPinFolder(file.path) }
-                )
+                if (file.isDirectory) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.open_in_new_tab)) },
+                        onClick = { menuExpanded = false; onOpenFolderInNewTab(file.path) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.pin_to_sidebar)) },
+                        onClick = { menuExpanded = false; onPinFolder(file.path) }
+                    )
+                } else {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.open_with)) },
+                        onClick = { menuExpanded = false; openWithExternalApp(gridContext, file) },
+                        leadingIcon = { Icon(Icons.Default.OpenInNew, contentDescription = null) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.select)) },
+                        onClick = { menuExpanded = false; onToggleSelect() },
+                        leadingIcon = { Icon(Icons.Default.CheckCircle, contentDescription = null) }
+                    )
+                }
             }
         }
     }
     }
 }
 
-fun openMediaFile(context: android.content.Context, file: MediaFile, navController: NavHostController) {
-    if (file.mimeType.startsWith("image/") || file.mimeType.startsWith("video/") || file.mimeType.startsWith("audio/")) {
+/**
+ * v1.11.0: "Open with" — hand a file to the app the user picks from the
+ * system chooser (right-click / long-press menu). Crash-safe: unknown MIME
+ * falls back to content-resolver sniffing, then a wildcard type; a missing
+ * handler shows a toast instead of throwing. Directories resolve via FileProvider only
+ * when they back a real path; MediaStore content URIs are preferred.
+ */
+fun openWithExternalApp(context: android.content.Context, file: MediaFile) {
+    if (file.name == "..") return
+    val uri = file.contentUri ?: runCatching {
+        androidx.core.content.FileProvider.getUriForFile(
+            context, "${context.packageName}.fileprovider", File(file.path),
+        )
+    }.getOrNull()
+    if (uri == null) {
+        android.widget.Toast.makeText(context, context.getString(R.string.could_not_open_file), android.widget.Toast.LENGTH_SHORT).show()
+        return
+    }
+    var mime = file.mimeType.takeUnless { it.isBlank() || it == "application/octet-stream" }
+    if (mime == null) {
+        mime = runCatching { context.contentResolver.getType(uri) }.getOrNull()
+    }
+    val type = mime.takeUnless { it.isNullOrBlank() } ?: "*/*"
+    val intent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, type)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    try {
+        context.startActivity(Intent.createChooser(intent, context.getString(R.string.open_with_chooser)))
+    } catch (_: android.content.ActivityNotFoundException) {
+        android.widget.Toast.makeText(context, context.getString(R.string.no_app_to_open), android.widget.Toast.LENGTH_SHORT).show()
+    } catch (_: Exception) {
+        android.widget.Toast.makeText(context, context.getString(R.string.could_not_open_file), android.widget.Toast.LENGTH_SHORT).show()
+    }
+}
+
+fun openMediaFile(context: android.content.Context, file: MediaFile, navController: NavHostController) {    if (file.mimeType.startsWith("image/") || file.mimeType.startsWith("video/") || file.mimeType.startsWith("audio/")) {
         navController.navigate("viewer/${Uri.encode(file.path)}")
     } else if (file.mimeType == "application/vnd.android.package-archive" || file.path.endsWith(".apk", ignoreCase = true)) {
         val uri = runCatching {

@@ -387,16 +387,16 @@ private fun DesktopSidebar(
         item { SidebarDestination(stringResource(R.string.documents), Icons.Default.Description, currentRoute == "documents") { onNavigate("documents", context.getString(R.string.documents)) } }
 
         item { SidebarSectionTitle(stringResource(R.string.pinned_folders)) }
-        items(standardPins.size) { index ->
+        items(count = standardPins.size, key = { i -> "std-$i:${standardPins[i]}" }, contentType = { "pin" }) { index ->
             val path = standardPins[index]
             PinnedFolderItem(path, removable = false, onNavigate, onNewTab, onRemovePin)
         }
-        items(customPins.size) { index ->
+        items(count = customPins.size, key = { i -> "custom-$i:${customPins[i]}" }, contentType = { "pin" }) { index ->
             PinnedFolderItem(customPins[index], removable = true, onNavigate, onNewTab, onRemovePin)
         }
 
         item { SidebarSectionTitle(stringResource(R.string.devices)) }
-        items(externalRoots.size) { index ->
+        items(count = externalRoots.size, key = { i -> "root-$i:${externalRoots[i]}" }, contentType = { "root" }) { index ->
             val path = externalRoots[index]
             val internal = path.contains("emulated")
             val title = FolderNames.storageRootTitle(path, internal, internalLabel, externalFallback)
@@ -549,7 +549,7 @@ fun DesktopHomeScreen(navController: NavHostController) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            items(actions) { (titleRes, icon, route) ->
+            items(actions, key = { it.third }, contentType = { "action" }) { (titleRes, icon, route) ->
                 ElevatedCard(
                     onClick = { navController.navigate(route) { launchSingleTop = true } },
                     modifier = Modifier.fillMaxWidth().heightIn(min = 148.dp)

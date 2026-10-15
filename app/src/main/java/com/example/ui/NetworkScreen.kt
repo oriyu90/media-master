@@ -129,7 +129,7 @@ fun NetworkScreen(navController: NavHostController, viewModel: NetworkViewModel 
                         }
                     } else {
                         LazyColumn(Modifier.fillMaxSize()) {
-                            items(s.entries, key = { it.relativePath }) { entry ->
+                            items(s.entries, key = { it.relativePath }, contentType = { "net-entry" }) { entry ->
                                 ListItem(
                                     headlineContent = { Text(entry.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                                     leadingContent = {
@@ -195,7 +195,7 @@ private fun LocationList(
             }
             return@LazyColumn
         }
-        items(locations, key = { it.id }) { loc ->
+        items(locations, key = { it.id }, contentType = { "net-loc" }) { loc ->
             ListItem(
                 headlineContent = { Text(loc.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 supportingContent = {

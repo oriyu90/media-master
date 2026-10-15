@@ -77,7 +77,7 @@ fun AlbumScreen(albumName: String, viewModel: FileViewModel, navController: NavH
                             horizontalArrangement = Arrangement.spacedBy(2.dp),
                             verticalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
-                            items(albumFiles, key = { it.path }) { file ->
+                            items(albumFiles, key = { it.path }, contentType = { "album-file" }) { file ->
                                 MediaGridItem(
                                     file = file,
                                     isSelected = false,

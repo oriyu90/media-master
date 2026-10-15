@@ -108,7 +108,7 @@ fun FolderPickerDialog(
                     },
                 )
                 LazyColumn(modifier = Modifier.weight(1f)) {
-                    items(subDirs, key = { it.absolutePath }) { dir ->
+                    items(subDirs, key = { it.absolutePath }, contentType = { "subdir" }) { dir ->
                         ListItem(
                             headlineContent = { Text(dir.name) },
                             leadingContent = { Icon(Icons.Default.Folder, contentDescription = null) },

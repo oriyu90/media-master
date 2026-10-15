@@ -4,6 +4,19 @@ Media Master is an open-source Android media and file manager built with Kotlin 
 
 Media Master は、Kotlin と Jetpack Compose で開発されたオープンソースのAndroid向けメディア・ファイル管理アプリです。写真・動画、音楽、書類、ストレージ、アプリ／APK、編集、バックアップを1つのアプリで扱えます。
 
+## v1.11.0
+
+- **New folder icon (light/dark):** launcher icon is now the attached folder mark — black folder on white in light mode, white folder on black in dark mode (adaptive icon with `drawable-night` background + foreground, monochrome layer follows the same pair). Legacy round icons reuse the same layers.
+- **Stable scrolling:** every lazy list now carries stable `key` + `contentType` (markdown/TeX/DOCX/PPTX/ZIP/PDF bodies, desktop sidebar, recent row, all media grids/lists); document rows cache PDF page counts process-wide so scrolling never re-opens `PdfRenderer` per row; category tabs clamp/reset the pager on rescan instead of jumping.
+- **Open with your chosen app:** right-click (desktop) or long-press a file in Files / Category / Documents / Library to open a context menu with **Open with** — the system chooser (`ACTION_VIEW` + FileProvider URI + read grant, MIME sniffing fallback to `*/*`, missing-handler toast instead of crash). Tap behavior is unchanged (internal viewer still default); **Select** in the same menu preserves batch operations.
+- **Bounded viewer zoom:** photos, videos, and document pages can zoom within the image but can no longer shrink past the long edge or drift into empty gutters — scale clamps at fit (`1×`–`5×`) and panning stops at the image edge (`ZoomBounds` pure helpers + `ZoomBoundsTest` 6 cases).
+- **UI audit (android/skills + Hallmark):** vendored `jetpack-compose-performance` + `jetpack-compose-adaptive` from `android/skills` into `.agent/skills/` (Apache-2.0, unmodified) and applied its lazy-layout rules plus Hallmark/MD3 fixes (single-line ellipsis on file rows/titles, pager guards, 5-locale parity for 5 new keys).
+- **新しいフォルダアイコン（ライト/ダーク）:** ランチャーアイコンを添付のフォルダマークに変更。ライトは白背景＋黒フォルダ、ダークは黒背景＋白フォルダ（`drawable-night`対応アダプティブアイコン、モノクロも同ペア）。
+- **スクロールの安定化:** 全リストに安定`key`＋`contentType`を付与。ドキュメント行はPDFページ数をプロセス内キャッシュしスクロール中の再オープンと行高変動を解消。カテゴリタブは再スキャンでページずれしないようクランプ/リセット。
+- **開くアプリの指定:** ファイル/カテゴリ/ドキュメント/ライブラリで右クリック（デスクトップ）・長押しから**他のアプリで開く**を選択可能（システムチューザー＋FileProvider＋MIME推定、対応アプリなしはトーストで非クラッシュ）。タップ時の内部ビューア既定は不変。同一メニューの**選択**で一括操作も維持。
+- **ビューアのズーム制限:** 画像・動画・文書は範囲内ズームのみ。長辺をはみ出す縮小や余白への移動を禁止（下限フィット等倍・パンは画像端で停止、`ZoomBoundsTest` 6件で固定）。
+- Version `1.11.0` (`versionCode 18`), signed with the same upload key as v0.1.0–v1.10.0 (APK Signature Scheme v2 verified). **APK SHA-256: `TODO`.**
+
 ## v1.10.0
 
 - **ZIP display + safe extract from external apps:** ZIP files from other apps (`ACTION_VIEW` with `application/zip` / `x-zip-compressed` / `x-zip`, plus `.zip` fallback) now open in the universal viewer with a contents list and **Extract all** to a picked folder (zip-slip + 2,000-entry / 100MB-per-file / 500MB-total guards, corrupt archives never crash). In-app ZIPs open the same way instead of a hex dump.

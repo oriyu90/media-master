@@ -49,4 +49,9 @@
     <string name="show_date_created">作成日時を表示</string>
     <string name="show_type">種類を表示</string>
     <string name="columns">表示項目</string>
+    <string name="open_with">他のアプリで開く</string>
+    <string name="open_with_chooser">アプリを選択</string>
+    <string name="could_not_open_file">ファイルを開けませんでした</string>
+    <string name="no_app_to_open">このファイルを開けるアプリがありません</string>
+    <string name="select">選択</string>
 </resources>

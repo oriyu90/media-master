@@ -17,6 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.unit.IntSize
 
 /**
  * Pinch-to-zoom + pan container for content that has no zoom of its own
@@ -41,6 +43,9 @@ fun ZoomableBox(
 ) {
     var scale by remember { mutableFloatStateOf(minScale) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    // v1.11.0: container size for bounded pan (onPlaced, not
+    // onGloballyPositioned, so no extra composition pass per frame).
+    var containerPx by remember { mutableStateOf(IntSize.Zero) }
 
     fun reset() {
         scale = minScale
@@ -50,6 +55,7 @@ fun ZoomableBox(
 
     Box(
         modifier = modifier
+            .onPlaced { containerPx = it.size }
             .pointerInput(enabled) {
                 if (!enabled) return@pointerInput
                 detectTapGestures(onDoubleTap = { reset() })
@@ -66,9 +72,12 @@ fun ZoomableBox(
                         if (event.changes.size >= 2 || scale > minScale) {
                             val zoom = event.calculateZoom()
                             val pan = event.calculatePan()
-                            val newScale = (scale * zoom).coerceIn(minScale, maxScale)
+                            val newScale = clampZoomScale(scale * zoom, minScale, maxScale)
                             scale = newScale
-                            offset = if (newScale <= minScale) Offset.Zero else offset + pan
+                            // v1.11.0: bounded pan — reset at rest, clamp while
+                            // zoomed so the content never leaves a gutter.
+                            offset = if (newScale <= minScale) Offset.Zero
+                            else clampFillOffset(offset + pan, newScale, containerPx)
                             onZoomChanged(newScale > minScale)
                             event.changes.forEach { it.consume() }
                         }

@@ -1,7 +1,15 @@
 # 設計書兼仕様書 (Media Master)
 
 ## バージョン情報
-- **Version:** 1.10.0
+- **Version:** 1.11.0
+
+## v1.11.0 の設計変更（要約）
+- **アイコン(#1)**: 添付フォルダマークへ置換。`drawable/ic_launcher_background.xml`を白単色化、夜間用`drawable-night/`に黒背景＋白フォルダを追加（`drawable-night/ic_launcher_foreground.xml`）。形状はタブ付き単一シルエット（マスクで欠けないよう細い渡しは持たせない）。monochromeはforegroundと同ペア。
+- **スクロール安定(#2)**: `android/skills`の`jetpack-compose-performance`（lazy-layouts: key＋contentType必須）に従い全Lazyへ付与（9箇所の`items(size)`を含む）。`DocumentListRow`は`PdfPageCountCache`（プロセス内ConcurrentHashMap）でスクロール中の`PdfRenderer`再オープンを排除し支持行を1行固定。`CategoryScreen`はタブ再構成時にページをクランプ/先頭化。`LibraryScreen`の日付ヘッダにkey付与。
+- **他のアプリで開く(#3)**: 新規`openWithExternalApp()`（FileProvider優先・MIME推定・`ActivityNotFound`時は`no_app_to_open`トーストで非クラッシュ）＋共有`OpenWithMenu.kt`（`OpenWithDropdownItem`/`SelectDropdownItem`/`rightClickMenu`）。Files行/グリッド・Category行/グリッド・Documents行・Libraryグリッドに右クリック/長押しメニューを追加。タップ既定（内部ビューア）は不変、メニュー内**選択**で一括操作を維持。
+- **ズーム制限(#4)**: 新規pure `ZoomBounds`（`clampZoomScale`/`clampFillOffset`/`clampFitOffset`/`fitDrawSize`/`maxPanOffset`）を`ZoomableBox`（`onPlaced`計測）と`ImageWithOcrOverlay`（Fit描画 rect 基準）の両パンに適用。下限フィット等倍・移動は画像端で停止（-0.0正規化で`Offset.Zero`安定）。OCR選択・pager/ dismiss arbitration は不変。
+- **UI精査(#5)**: `jetpack-compose-performance`＋`jetpack-compose-adaptive`を`.agent/skills/`へ同梱（Apache-2.0・改変なし、`AGENTS.md`更新）。Hallmark/MD3の軽微修正（行・タイトルの1行ellipsis、5言語5キー追加＋parity検証）。
+- 安全性：互換（minSdk24・新規権限/依存なし）・クラッシュ安全（全外部起動を`runCatching`/トースト化、`!!`なし）・メモリ安全（PDFキャッシュはIntのみ、サムネイル/プレイヤー経路不変）・日英中阿蘭完全対応。
 
 ## v1.10.0 の設計変更（要約）
 - **ZIP外部API対応(#1)**: `ViewerKind.ZIP`新設＋分類器（拡張子/mimeの3種）＋`DeepLinks`（明示mime＋拡張子フォールバック）＋Manifest（3 mime）で外部`ACTION_VIEW`をdocViewerへ。表示は`ZipViewerBody`（一覧＋件数＋安全マーク、破損時は空表示で非クラッシュ）、解凍は`FileViewModel.extractZip`（`BackupPaths.safeResolve`＋2000件/100MB毎/500MB総量＋32KB streaming、失敗は件数化）。新規依存・権限なし、minSdk24維持。

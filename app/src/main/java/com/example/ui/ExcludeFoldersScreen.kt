@@ -59,7 +59,7 @@ fun ExcludeFoldersScreen(viewModel: FileViewModel, navController: NavHostControl
                     )
                 }
             } else {
-                items(excludedFolders.toList(), key = { it }) { path ->
+                items(excludedFolders.toList(), key = { it }, contentType = { "excluded" }) { path ->
                     ListItem(
                         // v1.10.0 (#2): accurate last-segment name.
                         headlineContent = { Text(com.example.ui.FolderNames.folderDisplayName(path)) },
@@ -176,7 +176,7 @@ fun FolderPickerDialog(
                             )
                         }
                     }
-                    items(files, key = { it.path }) { file ->
+                    items(files, key = { it.path }, contentType = { "fs-file" }) { file ->
                         ListItem(
                             headlineContent = { Text(file.name) },
                             leadingContent = { Icon(Icons.Default.Folder, contentDescription = null) },

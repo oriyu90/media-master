@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- v1.11.0: dark-mode foreground — white folder on black (attached image). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,32h20l6,8h22a8,8 0 0,1 8,8v22a8,8 0 0,1 -8,8H30a8,8 0 0,1 -8,-8V40a8,8 0 0,1 8,-8z" />
+</vector>

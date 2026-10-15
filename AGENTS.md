@@ -17,6 +17,10 @@ export ANDROID_HOME=~/Library/Android/sdk
   (MIT, source: https://github.com/hamen/material-3-skill).
 - `.agent/skills/testing-setup/` — Android testing strategy
   (Apache-2.0, source: https://github.com/android/skills).
+- `.agent/skills/jetpack-compose-performance/` — Compose performance audit
+  (Apache-2.0, source: https://github.com/android/skills).
+- `.agent/skills/jetpack-compose-adaptive/` — adaptive layouts + Navigation3
+  (Apache-2.0, source: https://github.com/android/skills).
   License texts kept alongside each skill.
 
 ## UI remake rules (v1.9.0)

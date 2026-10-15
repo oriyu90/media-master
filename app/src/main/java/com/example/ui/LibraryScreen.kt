@@ -48,6 +48,9 @@ import com.example.sortMediaFiles
 import com.example.ui.components.ConfirmDeleteDialog
 import com.example.ui.components.EmptyState
 import com.example.ui.components.ErrorState
+import com.example.ui.components.OpenWithDropdownItem
+import com.example.ui.components.SelectDropdownItem
+import com.example.ui.components.rightClickMenu
 import kotlinx.coroutines.launch
 import java.io.File
 import java.util.Calendar
@@ -365,14 +368,14 @@ private fun PhotosView(
                     contentPadding = PaddingValues(bottom = 16.dp),
                 ) {
                     grouped.forEach { (day, files) ->
-                        item(span = { GridItemSpan(maxLineSpan) }) {
+                        item(key = "day-$day", contentType = "day-header") {
                             Text(
                                 text = formatDate(day),
                                 style = MaterialTheme.typography.titleSmall,
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                             )
                         }
-                        items(files, key = { it.path }) { file ->
+                        items(files, key = { it.path }, contentType = { "photo" }) { file ->
                             val isSelected = selectedFiles.contains(file.path)
                             MediaGridItem(
                                 file = file,
@@ -401,7 +404,7 @@ private fun PhotosView(
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    items(sorted, key = { it.path }) { file ->
+                    items(sorted, key = { it.path }, contentType = { "photo-compact" }) { file ->
                         val isSelected = selectedFiles.contains(file.path)
                         MediaGridItem(
                             file = file,
@@ -461,7 +464,7 @@ fun AlbumsView(viewState: ViewState, navController: NavHostController, excludedF
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(albums.keys.toList(), key = { it }) { albumName ->
+                items(albums.keys.toList(), key = { it }, contentType = { "album" }) { albumName ->
                     val files = albums[albumName] ?: emptyList()
                     val firstFile = files.firstOrNull()
 
@@ -514,6 +517,9 @@ fun AlbumsView(viewState: ViewState, navController: NavHostController, excludedF
 @Composable
 fun MediaGridItem(file: MediaFile, isSelected: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
     val selectedText = stringResource(R.string.selected)
+    // v1.11.0: right-click / long-press menu (Open with). Tap and selection
+    // behavior stay caller-driven; the menu only adds the system chooser.
+    var libMenuExpanded by remember { mutableStateOf(false) }
     // v1.9.0 (MD3 remake): checkbox role + state description so selection is
     // conveyed by semantics, not only by the border tint. Visuals unchanged.
     Box(
@@ -524,9 +530,14 @@ fun MediaGridItem(file: MediaFile, isSelected: Boolean, onClick: () -> Unit, onL
                 role = Role.Checkbox
                 stateDescription = if (isSelected) selectedText else ""
             }
+            .rightClickMenu(enabled = true, menuKey = file.path) { libMenuExpanded = true }
             .combinedClickable(
                 onClick = onClick,
-                onLongClick = onLongClick
+                onLongClick = {
+                    // Selection-mode long-press keeps toggling (batch ops);
+                    // outside selection the menu offers Open with + Select.
+                    if (isSelected) onLongClick() else libMenuExpanded = true
+                }
             )
             .border(
                 if (isSelected) 3.dp else 0.5.dp,
@@ -546,6 +557,10 @@ fun MediaGridItem(file: MediaFile, isSelected: Boolean, onClick: () -> Unit, onL
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(4.dp).align(Alignment.TopEnd)
             )
+        }
+        DropdownMenu(expanded = libMenuExpanded, onDismissRequest = { libMenuExpanded = false }) {
+            OpenWithDropdownItem(file = file, onDone = { libMenuExpanded = false })
+            SelectDropdownItem(onSelect = { libMenuExpanded = false; onLongClick() })
         }
     }
 }

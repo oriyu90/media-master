@@ -233,7 +233,7 @@ fun InstalledAppsView(installedApps: List<AppInfo>, isLoadingApps: Boolean, sele
         }
     } else {
         LazyColumn(modifier = Modifier.fillMaxSize()) {
-            items(installedApps, key = { it.packageName }) { app ->
+            items(installedApps, key = { it.packageName }, contentType = { "app" }) { app ->
                 val isSelected = selectedApps.contains(app.packageName)
                 var expanded by remember { mutableStateOf(false) }
                 // Rasterise the launcher icon once per package, not every recomposition.
@@ -326,7 +326,7 @@ fun ApksView(viewState: ViewState, selectedApks: MutableList<String>, isSelectio
                 }
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(apkFiles, key = { it.path }) { file ->
+                items(apkFiles, key = { it.path }, contentType = { "apk" }) { file ->
                     val isSelected = selectedApks.contains(file.path)
                     ListItem(
                         headlineContent = { Text(file.name) },

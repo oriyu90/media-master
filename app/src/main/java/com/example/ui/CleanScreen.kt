@@ -79,7 +79,7 @@ fun CleanScreen(viewModel: FileViewModel, navController: NavHostController) {
                 }
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(duplicates, key = { group -> group.firstOrNull()?.path ?: group.hashCode().toString() }) { group ->
+                    items(duplicates, key = { group -> group.firstOrNull()?.path ?: group.hashCode().toString() }, contentType = { "dup-group" }) { group ->
                         Card(
                             modifier = Modifier.fillMaxWidth().padding(8.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)

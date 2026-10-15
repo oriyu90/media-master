@@ -359,7 +359,7 @@ private fun CsvViewerBody(context: Context, uri: Uri) {
                     }
                     HorizontalDivider()
                     LazyColumn(Modifier.fillMaxSize()) {
-                        items(table.rows.size, key = { it }) { rowIndex ->
+                        items(table.rows.size, key = { it }, contentType = { "table-row" }) { rowIndex ->
                             Row(
                                 Modifier.fillMaxWidth().horizontalScroll(horizontalScrollState)
                                     .padding(horizontal = Hallmark.ContentEdge, vertical = 6.dp),
@@ -466,7 +466,7 @@ private fun MarkdownViewerBody(context: Context, uri: Uri) {
                         val linkColor = MaterialTheme.colorScheme.primary
                         val mathSizeCache = remember(uri) { androidx.compose.runtime.mutableStateMapOf<String, androidx.compose.ui.unit.IntSize>() }
                         LazyColumn(Modifier.fillMaxSize().padding(horizontal = Hallmark.ContentEdge)) {
-                            items(blocks.size) { i -> MarkdownBlockView(blocks[i], linkColor, mathSizeCache) }
+                            items(count = blocks.size, key = { it }, contentType = { "md-block" }) { i -> MarkdownBlockView(blocks[i], linkColor, mathSizeCache) }
                         }
                     }
                 }
@@ -826,7 +826,7 @@ private fun LatexSourceBody(context: Context, uri: Uri) {
                 EmptyState(icon = Icons.Default.Description, title = stringResource(R.string.doc_empty), modifier = Modifier.fillMaxSize())
             } else {
                 LazyColumn(Modifier.fillMaxSize().padding(horizontal = Hallmark.ContentEdge)) {
-                    items(segments.size) { i ->
+                    items(count = segments.size, key = { it }, contentType = { "tex-segment" }) { i ->
                         when (val segment = segments[i]) {
                             // v1.8.0 (#2): \section/\subsection/\subsubsection lines
                             // render as real headings; \textbf/\textit get bold/italic;
@@ -1003,7 +1003,7 @@ private fun DocxViewerBody(context: Context, uri: Uri) {
                 EmptyState(icon = Icons.Default.Description, title = stringResource(R.string.doc_empty), modifier = Modifier.fillMaxSize())
             } else {
                 LazyColumn(Modifier.fillMaxSize().padding(Hallmark.ContentEdge)) {
-                    items(doc.blocks.size) { i ->
+                    items(count = doc.blocks.size, key = { it }, contentType = { "docx-block" }) { i ->
                         when (val block = doc.blocks[i]) {
                             is DocBlock.Paragraph -> Text(
                                 text = docRunsToAnnotatedString(block.runs),
@@ -1068,8 +1068,8 @@ private fun PptxViewerBody(context: Context, uri: Uri) {
                     HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
                         val slide = deck.slides[page]
                         LazyColumn(Modifier.fillMaxSize().padding(Hallmark.ContentEdge)) {
-                            items(slide.images.size) { i -> InlineDecodedImage(deck.imageBytesByPath[slide.images[i]]) }
-                            items(slide.paragraphs.size) { i ->
+                            items(count = slide.images.size, key = { i -> "img-$i" }, contentType = { "slide-img" }) { i -> InlineDecodedImage(deck.imageBytesByPath[slide.images[i]]) }
+                            items(count = slide.paragraphs.size, key = { i -> "p-$i" }, contentType = { "slide-p" }) { i ->
                                 Text(
                                     text = slideRunsToAnnotatedString(slide.paragraphs[i]),
                                     style = MaterialTheme.typography.bodyLarge,
@@ -1235,7 +1235,7 @@ private fun ZipViewerBody(context: Context, uri: Uri, viewModel: FileViewModel?)
             }
             HorizontalDivider()
             LazyColumn(Modifier.fillMaxSize()) {
-                items(current.size, key = { i -> current[i].name }) { i ->
+                items(current.size, key = { i -> current[i].name }, contentType = { "zip-entry" }) { i ->
                     val e = current[i]
                     val isDir = e.isDirectory
                     val safe = com.example.zip.ZipListing.isSafeEntryName(e.name)
@@ -1328,7 +1328,7 @@ private fun HexViewerBody(context: Context, uri: Uri) {
             val pageCount = ((reader.size + HexPageReader.PAGE_SIZE - 1) / HexPageReader.PAGE_SIZE)
                 .toInt().coerceAtLeast(1)
             LazyColumn(Modifier.fillMaxSize().padding(horizontal = Hallmark.ContentEdge)) {
-                items(pageCount, key = { it }) { pageIndex ->
+                items(pageCount, key = { it }, contentType = { "pdf-page" }) { pageIndex ->
                     var lines by remember(pageIndex) { mutableStateOf<List<String>?>(null) }
                     LaunchedEffect(pageIndex) {
                         lines = withContext(Dispatchers.IO) {

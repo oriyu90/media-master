@@ -44,5 +44,5 @@
     <string name="show_date_modified">Wijzigingsdatum tonen</string>
     <string name="show_date_created">Aanmaakdatum tonen</string>
     <string name="show_type">Bestandstype tonen</string>
-    <string name="columns">Kolommen</string>
+    <string name="open_with">Openen met</string><string name="open_with_chooser">App kiezen</string><string name="could_not_open_file">Kan bestand niet openen</string><string name="select">Selecteren</string><string name="no_app_to_open">Geen app kan dit bestand openen</string><string name="columns">Kolommen</string>
 </resources>

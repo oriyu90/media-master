@@ -125,4 +125,9 @@
     <string name="show_date_created">Show date created</string>
     <string name="show_type">Show file type</string>
     <string name="columns">Columns</string>
+    <string name="open_with">Open with</string>
+    <string name="open_with_chooser">Choose an app</string>
+    <string name="could_not_open_file">Could not open file</string>
+    <string name="no_app_to_open">No app can open this file</string>
+    <string name="select">Select</string>
 </resources>

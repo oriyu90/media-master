@@ -50,7 +50,7 @@ fun AdjustmentControls(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(horizontal = 16.dp)
         ) {
-            items(AdjustmentType.entries.toList(), key = { it.name }) { adjustment ->
+            items(AdjustmentType.entries.toList(), key = { it.name }, contentType = { "adjustment" }) { adjustment ->
                 val isSelected = selectedAdjustment == adjustment
                 val label = stringResource(adjustment.labelRes)
                 val tint = if (isSelected) MaterialTheme.colorScheme.primary else LocalContentColor.current

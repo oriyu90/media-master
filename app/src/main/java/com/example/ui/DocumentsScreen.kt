@@ -48,6 +48,9 @@ import com.example.R
 import com.example.ViewMode
 import com.example.ViewState
 import com.example.openMediaFile
+import com.example.ui.components.OpenWithDropdownItem
+import com.example.ui.components.SelectDropdownItem
+import com.example.ui.components.rightClickMenu
 import com.example.ui.components.SortViewMenu
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
@@ -58,6 +61,20 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.util.*
+import java.util.concurrent.ConcurrentHashMap
+
+/**
+ * v1.11.0 (scroll stability): process-wide PDF page-count cache. Rows read
+ * synchronously during composition; only a cache miss does IO once.
+ */
+internal object PdfPageCountCache {
+    private val map = ConcurrentHashMap<String, Int>()
+    fun get(path: String): Int = map[path] ?: -1
+    fun put(path: String, count: Int) {
+        if (count > 0) map[path] = count
+    }
+    fun clear() = map.clear()
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -446,7 +463,7 @@ fun DocumentListView(viewState: ViewState, navController: NavHostController, sel
                 }
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    itemsIndexed(documentFiles, key = { _, file -> file.path }) { index, file ->
+                    itemsIndexed(documentFiles, key = { _, file -> file.path }, contentType = { _, _ -> "doc" }) { index, file ->
                         val isSelected = selectedFiles.contains(file.path)
                         DocumentListRow(
                             file = file,
@@ -480,24 +497,28 @@ fun DocumentListView(viewState: ViewState, navController: NavHostController, sel
 @Composable
 fun DocumentListRow(file: MediaFile, isSelected: Boolean, isSelectionMode: Boolean, onToggleSelect: () -> Unit, onClick: () -> Unit) {
     val context = LocalContext.current
-    var pageCount by remember { mutableIntStateOf(-1) }
-    
+    // v1.11.0 (scroll stability): cache PDF page counts process-wide so
+    // scrolling a long list never re-opens PdfRenderer per row per pass
+    // (was: heavy IO + supporting-line change mid-scroll = visible jump).
+    var pageCount by remember(file.path) { mutableIntStateOf(PdfPageCountCache.get(file.path)) }
+
     LaunchedEffect(file.path) {
+        if (pageCount >= 0) return@LaunchedEffect
         if (file.mimeType != "application/pdf" && !file.name.endsWith(".pdf", ignoreCase = true)) return@LaunchedEffect
         withContext(Dispatchers.IO) {
             runCatching {
-                if (file.contentUri != null) {
+                val count = if (file.contentUri != null) {
                     context.contentResolver.openFileDescriptor(file.contentUri, "r")?.use { pfd ->
-                        PdfRenderer(pfd).use { renderer ->
-                            pageCount = renderer.pageCount
-                        }
+                        PdfRenderer(pfd).use { renderer -> renderer.pageCount }
                     }
                 } else {
                     android.os.ParcelFileDescriptor.open(File(file.path), android.os.ParcelFileDescriptor.MODE_READ_ONLY)?.use { pfd ->
-                        PdfRenderer(pfd).use { renderer ->
-                            pageCount = renderer.pageCount
-                        }
+                        PdfRenderer(pfd).use { renderer -> renderer.pageCount }
                     }
+                } ?: -1
+                if (count > 0) {
+                    PdfPageCountCache.put(file.path, count)
+                    pageCount = count
                 }
             }
         }
@@ -509,6 +530,9 @@ fun DocumentListRow(file: MediaFile, isSelected: Boolean, isSelectionMode: Boole
     val container = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
     val onContainer = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
     val onContainerVariant = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+    // v1.11.0: right-click / long-press menu (Open with) for documents.
+    var docMenuExpanded by remember { mutableStateOf(false) }
+    androidx.compose.foundation.layout.Box {
     ListItem(
         headlineContent = { Text(file.name, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
         supportingContent = {
@@ -521,7 +545,7 @@ fun DocumentListRow(file: MediaFile, isSelected: Boolean, isSelectionMode: Boole
                 else -> file.name.substringAfterLast('.', "").uppercase()
                     .ifBlank { file.mimeType.substringAfterLast('/').uppercase() }
             }
-            Text("$dateString · $typeLabel")
+            Text("$dateString · $typeLabel", maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
         },
         leadingContent = { 
             Icon(
@@ -544,9 +568,17 @@ fun DocumentListRow(file: MediaFile, isSelected: Boolean, isSelectionMode: Boole
             trailingIconColor = onContainer,
         ),
         modifier = Modifier
+            .rightClickMenu(enabled = !isSelectionMode, menuKey = file.path) { docMenuExpanded = true }
             .combinedClickable(
                 onClick = onClick,
-                onLongClick = { onToggleSelect() }
+                onLongClick = {
+                    if (isSelectionMode) onToggleSelect() else docMenuExpanded = true
+                }
             )
     )
+        DropdownMenu(expanded = docMenuExpanded, onDismissRequest = { docMenuExpanded = false }) {
+            OpenWithDropdownItem(file = file, onDone = { docMenuExpanded = false })
+            SelectDropdownItem(onSelect = { docMenuExpanded = false; onToggleSelect() })
+        }
+    }
 }

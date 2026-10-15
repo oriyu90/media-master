@@ -120,6 +120,68 @@ class DeepLinksTest {
     }
 
     @Test
+    fun actionView_resourceFolder_opensFileBrowser() {
+        // v1.12.0: third-party "open folder" senders using resource/folder.
+        val i = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(Uri.parse("file:///storage/emulated/0/Download"), "resource/folder")
+        }
+        assertEquals("file_browser?path=${Uri.encode("/storage/emulated/0/Download")}", DeepLinks.resolve(i))
+    }
+
+    @Test
+    fun actionView_directory_nonFilesystemPath_fallsBackToManage() {
+        // v1.12.0: a content:// provider path is not a raw path — never
+        // navigate to a bogus browser location.
+        val i = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(Uri.parse("content://com.other.provider/tree/12"), "vnd.android.document/directory")
+        }
+        assertEquals("manage", DeepLinks.resolve(i))
+    }
+
+    @Test
+    fun pickRequest_getContent_parsesType() {
+        val i = Intent(Intent.ACTION_GET_CONTENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "image/*"
+        }
+        assertEquals(PickRequest("image/*", false, false), PickRequest.parse(i))
+    }
+
+    @Test
+    fun pickRequest_openDocument_parsesPersistableAndMultiple() {
+        val i = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "application/pdf"
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        }
+        assertEquals(PickRequest("application/pdf", true, true), PickRequest.parse(i))
+    }
+
+    @Test
+    fun pickRequest_missingType_defaultsToWildcard() {
+        val i = Intent(Intent.ACTION_GET_CONTENT)
+        assertEquals(PickRequest("*/*", false, false), PickRequest.parse(i))
+    }
+
+    @Test
+    fun pickRequest_nonPickerIntents_areNull() {
+        assertNull(PickRequest.parse(null))
+        assertNull(PickRequest.parse(Intent(Intent.ACTION_MAIN)))
+        assertNull(PickRequest.parse(Intent(Intent.ACTION_VIEW).apply { type = "image/png" }))
+        // Picker launches must not become normal deep links either.
+        assertNull(DeepLinks.resolve(Intent(Intent.ACTION_GET_CONTENT).apply { type = "*/*" }))
+    }
+
+    @Test
+    fun docTabRoute_buildsViewerRoute() {
+        assertEquals(
+            "docViewer/${Uri.encode("content://x/a")}?path=${Uri.encode("/s/a.pdf")}",
+            docTabRoute("content://x/a", "/s/a.pdf"),
+        )
+        assertEquals("docViewer/${Uri.encode("content://x/a")}", docTabRoute("content://x/a", null))
+    }
+
+    @Test
     fun unrelatedIntent_isNull() {
         assertNull(DeepLinks.resolve(Intent(Intent.ACTION_MAIN)))
         assertNull(DeepLinks.resolve(null))

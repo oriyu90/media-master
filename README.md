@@ -4,6 +4,15 @@ Media Master is an open-source Android media and file manager built with Kotlin 
 
 Media Master は、Kotlin と Jetpack Compose で開発されたオープンソースのAndroid向けメディア・ファイル管理アプリです。写真・動画、音楽、書類、ストレージ、アプリ／APK、編集、バックアップを1つのアプリで扱えます。
 
+## v1.12.0
+
+- **Document fullscreen + desktop tabs:** the document viewer (PDF, text, Markdown, Office, ZIP…) now has a one-click fullscreen button in the toolbar, with a floating exit button while fullscreen. Touch shells open documents fullscreen immediately; desktop shells open them in a new tab (titled with the file name) and fullscreen fills the tab. Android back and desktop ESC leave fullscreen first and only close the viewer on the next press.
+- **デスクトップのタブ表示＋全画面:** 資料ビューアにツールバーのワンクリック全画面ボタンを追加（全画面中はフローティング終了ボタン付き）。通常モードは開いてすぐに全画面、デスクトップはファイル名タブで開き全画面はタブ内表示。戻る・ESCで全画面解除（タブに戻る）、もう一度で閉じる。
+- **Behaves as a standard file manager:** Media Master now answers the system file picker (`ACTION_GET_CONTENT` / `ACTION_OPEN_DOCUMENT`, any type) — pick one file and it is returned to the requesting app. Directory "open folder" intents (`vnd.android.document/directory`, `resource/folder`) open the in-app browser at that folder.
+- **標準ファイルマネージャー化:** システムのファイル選択 (`GET_CONTENT`/`OPEN_DOCUMENT`) に応答し、選んだ1件をリクエスト元へ返します。他アプリの「フォルダを開く」もアプリ内ブラウザで開きます。
+- **Category documents fix:** document rows in category screens now open the universal viewer (previously landed on a blank image-viewer page); desktop opens them in a new tab like the file browser.
+- Version `1.12.0` (`versionCode 19`), signed with the same upload key as v0.1.0–v1.11.0 (APK Signature Scheme v2 verified). **APK SHA-256: `3d9ac550b7404af05c41a8178ec71eae2b0dab8d25db5472a5dc3ceb058c6cbd`.**
+
 ## v1.11.0
 
 - **New folder icon (light/dark):** launcher icon is now the attached folder mark — black folder on white in light mode, white folder on black in dark mode (adaptive icon with `drawable-night` background + foreground, monochrome layer follows the same pair). Legacy round icons reuse the same layers.

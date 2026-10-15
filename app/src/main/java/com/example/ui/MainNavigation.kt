@@ -31,6 +31,7 @@ import com.example.R
 import com.example.SettingsViewModel
 import com.example.FilesScreen
 import com.example.ViewerScreen
+import com.example.deeplink.PickRequest
 import com.example.ui.viewer.DocumentViewerScreen
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
@@ -45,7 +46,11 @@ fun MainNavigation(
     fileViewModel: FileViewModel,
     settingsViewModel: SettingsViewModel,
     deepLinkRoute: StateFlow<String?> = MutableStateFlow(null),
-    onDeepLinkHandled: () -> Unit = {}
+    onDeepLinkHandled: () -> Unit = {},
+    // v1.12.0 file-manager picking: non-null while serving another app's
+    // GET_CONTENT / OPEN_DOCUMENT. The picker replaces the normal shells.
+    pickRequest: StateFlow<PickRequest?> = MutableStateFlow(null),
+    onPickFinished: (uri: android.net.Uri?, mimeType: String?) -> Unit = { _, _ -> },
 ) {
     val navController = rememberNavController()
     val context = LocalContext.current
@@ -95,6 +100,19 @@ fun MainNavigation(
     }
 
     if (isGranted) {
+        // v1.12.0: while picking for another app, show only the picker —
+        // no home/nav shells, no deep-link consumption, no side effects.
+        val pick by pickRequest.collectAsStateWithLifecycle()
+        val activePick = pick
+        if (activePick != null) {
+            FilePickerScreen(
+                viewModel = fileViewModel,
+                mimeFilter = activePick.mimeType,
+                onPick = { uri, mime -> onPickFinished(uri, mime) },
+                onCancel = { onPickFinished(null, null) },
+            )
+            return
+        }
         // DeX (desk uiMode) gets the desktop shell only when the window is wide
         // enough: small DeX / pop-up windows keep the normal touch UI readable.
         // v1.7.0: manual override (Auto/Force desktop/Force touch) from Settings
@@ -105,8 +123,8 @@ fun MainNavigation(
             val desktop = isDesktopLayout(desktopOverride) && maxWidth >= 600.dp
             if (desktop) {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    DesktopNavigation(navController, fileViewModel, settingsViewModel) { onPinFolder, onOpenFolderInNewTab ->
-                        MediaNavHost(navController, fileViewModel, settingsViewModel, true, onPinFolder, onOpenFolderInNewTab)
+                    DesktopNavigation(navController, fileViewModel, settingsViewModel) { onPinFolder, onOpenFolderInNewTab, onOpenDocInNewTab ->
+                        MediaNavHost(navController, fileViewModel, settingsViewModel, true, onPinFolder, onOpenFolderInNewTab, onOpenDocInNewTab)
                     }
                     com.example.playback.MiniPlayer(
                         onNavigateToAudio = { navController.navigate("nowPlaying") { launchSingleTop = true } },
@@ -222,7 +240,10 @@ private fun MediaNavHost(
     settingsViewModel: SettingsViewModel,
     desktop: Boolean,
     onPinFolder: (String) -> Unit = {},
-    onOpenFolderInNewTab: (String) -> Unit = {}
+    onOpenFolderInNewTab: (String) -> Unit = {},
+    // v1.12.0: desktop opens documents in a new tab (tab title = file name);
+    // phone keeps direct navigation (this default = old behavior).
+    onOpenDocInNewTab: (uriString: String, path: String?, title: String) -> Unit = { _, _, _ -> },
 ) {
     NavHost(navController = navController, startDestination = "home", modifier = Modifier.fillMaxSize()) {
         composable("home") { if (desktop) DesktopHomeScreen(navController) else HomeScreen(navController) }
@@ -230,7 +251,7 @@ private fun MediaNavHost(
         composable("audio") { AudioScreen(fileViewModel, navController) }
         composable("nowPlaying") { NowPlayingScreen(navController) }
         composable("equalizer") { EqualizerScreen(navController) }
-        composable("documents") { DocumentsScreen(fileViewModel, navController) }
+        composable("documents") { DocumentsScreen(fileViewModel, navController, desktop, onOpenDocInNewTab) }
         composable("manage") { ManageDashboardScreen(navController, fileViewModel) }
         composable(
             route = "file_browser?path={path}",
@@ -241,7 +262,7 @@ private fun MediaNavHost(
             })
         ) { backStackEntry ->
             val path = backStackEntry.arguments?.getString("path")?.let { Uri.decode(it) }
-            FilesScreen(fileViewModel, navController, path, onPinFolder, onOpenFolderInNewTab, desktop)
+            FilesScreen(fileViewModel, navController, path, onPinFolder, onOpenFolderInNewTab, desktop, onOpenDocInNewTab)
         }
         composable("clean") { CleanScreen(fileViewModel, navController) }
         composable("network") { NetworkScreen(navController) }
@@ -255,7 +276,7 @@ private fun MediaNavHost(
             backStackEntry.arguments?.getString("playlistName")?.let(Uri::decode)?.let { PlaylistScreen(it, fileViewModel, navController) }
         }
         composable("category/{categoryName}") { backStackEntry ->
-            backStackEntry.arguments?.getString("categoryName")?.let(Uri::decode)?.let { CategoryScreen(it, fileViewModel, navController, desktop) }
+            backStackEntry.arguments?.getString("categoryName")?.let(Uri::decode)?.let { CategoryScreen(it, fileViewModel, navController, desktop, onOpenDocInNewTab) }
         }
         composable("viewer/{path}") { backStackEntry ->
             val path = backStackEntry.arguments?.getString("path")?.let(Uri::decode)
@@ -271,7 +292,7 @@ private fun MediaNavHost(
         ) { backStackEntry ->
             val uriString = backStackEntry.arguments?.getString("uriString")?.let(Uri::decode)
             val path = backStackEntry.arguments?.getString("path")?.let(Uri::decode)
-            DocumentViewerScreen(uriString, path, fileViewModel, navController)
+            DocumentViewerScreen(uriString, path, fileViewModel, navController, desktop)
         }
         composable("imageEditor/{uriString}") { backStackEntry ->
             backStackEntry.arguments?.getString("uriString")?.let(Uri::decode)?.let { ImageEditorScreen(it, navController) }

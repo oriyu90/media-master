@@ -78,7 +78,13 @@ internal object PdfPageCountCache {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun DocumentsScreen(viewModel: FileViewModel, navController: NavHostController) {
+fun DocumentsScreen(
+    viewModel: FileViewModel,
+    navController: NavHostController,
+    // v1.12.0: desktop opens documents in a new tab (title = file name).
+    desktop: Boolean = false,
+    onOpenDocInNewTab: (uriString: String, path: String?, title: String) -> Unit = { _, _, _ -> },
+) {
     val context = LocalContext.current
     val viewState by viewModel.documentsState.collectAsStateWithLifecycle()
     val excludedFolders by viewModel.excludedFolders.collectAsStateWithLifecycle()
@@ -154,7 +160,14 @@ fun DocumentsScreen(viewModel: FileViewModel, navController: NavHostController) 
             HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
                 when (page) {
                     0 -> ScanView(navController, viewModel::loadDocuments)
-                    1 -> DocumentListView(viewState, navController, selectedFiles, isSelectionMode, excludedFolders)
+                    1 -> DocumentListView(
+                        viewState,
+                        navController,
+                        selectedFiles,
+                        isSelectionMode,
+                        excludedFolders,
+                        onOpenDocInTab = if (desktop) onOpenDocInNewTab else null,
+                    )
                 }
             }
         }
@@ -444,7 +457,14 @@ suspend fun appendImagesToPdf(context: Context, sourcePdfUri: Uri, imageUris: Li
 }
 
 @Composable
-fun DocumentListView(viewState: ViewState, navController: NavHostController, selectedFiles: MutableList<String>, isSelectionMode: Boolean, excludedFolders: Set<String>) {
+fun DocumentListView(
+    viewState: ViewState,
+    navController: NavHostController,
+    selectedFiles: MutableList<String>,
+    isSelectionMode: Boolean,
+    excludedFolders: Set<String>,
+    onOpenDocInTab: ((uriString: String, path: String?, title: String) -> Unit)? = null,
+) {
     val context = LocalContext.current
     when (viewState) {
         is ViewState.Loading -> {
@@ -474,7 +494,7 @@ fun DocumentListView(viewState: ViewState, navController: NavHostController, sel
                                 if (isSelectionMode) {
                                     if (isSelected) selectedFiles.remove(file.path) else selectedFiles.add(file.path)
                                 } else {
-                                    openMediaFile(context, file, navController)
+                                    openMediaFile(context, file, navController, onOpenDocInTab)
                                 }
                             }
                         )

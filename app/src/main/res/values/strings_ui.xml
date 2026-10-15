@@ -130,4 +130,8 @@
     <string name="could_not_open_file">Could not open file</string>
     <string name="no_app_to_open">No app can open this file</string>
     <string name="select">Select</string>
+    <string name="fullscreen">Enter fullscreen</string>
+    <string name="exit_fullscreen">Exit fullscreen</string>
+    <string name="select_file">Select file</string>
+    <string name="pick_file_hint">Tap a file to send it to the requesting app</string>
 </resources>

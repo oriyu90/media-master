@@ -6,6 +6,10 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.webkit.MimeTypeMap
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -31,6 +35,8 @@ import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -40,6 +46,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -51,6 +58,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
@@ -120,6 +135,9 @@ fun DocumentViewerScreen(
     path: String?,
     viewModel: FileViewModel?,
     navController: NavHostController,
+    // v1.12.0: desktop embeds the viewer in a tab (chrome visible, one-click
+    // fullscreen button); touch opens it fullscreen immediately.
+    desktop: Boolean = false,
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -159,8 +177,25 @@ fun DocumentViewerScreen(
         runCatching { context.startActivity(Intent.createChooser(intent, displayName)) }
     }
 
+    // v1.12.0 fullscreen: touch starts chrome-less (the destination itself is
+    // already fullscreen), desktop starts embedded in its tab. Either way one
+    // click toggles; Android back and desktop ESC leave fullscreen first and
+    // only pop the viewer on the next press.
+    var isFullScreen by remember(uri) { mutableStateOf(!desktop) }
+    BackHandler(enabled = isFullScreen) { isFullScreen = false }
+    val escFocus = remember { FocusRequester() }
+    LaunchedEffect(isFullScreen, desktop) {
+        if (isFullScreen && desktop) runCatching { escFocus.requestFocus() }
+    }
+
     Scaffold(
         topBar = {
+            AnimatedVisibility(
+                visible = !isFullScreen,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
             TopAppBar(
                 title = { Text(displayName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
@@ -169,6 +204,17 @@ fun DocumentViewerScreen(
                     }
                 },
                 actions = {
+                    // v1.12.0: one-click fullscreen in the toolbar (both
+                    // shells). While fullscreen a floating exit button stays
+                    // visible so chrome is never unreachable.
+                    IconButton(onClick = { isFullScreen = !isFullScreen }) {
+                        Icon(
+                            if (isFullScreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                            contentDescription = stringResource(
+                                if (isFullScreen) R.string.exit_fullscreen else R.string.fullscreen,
+                            ),
+                        )
+                    }
                     if (showAsIsToggle) {
                         TextButton(onClick = {
                             viewMode = if (viewMode == DocViewMode.NATIVE) DocViewMode.AS_IS else DocViewMode.NATIVE
@@ -200,6 +246,7 @@ fun DocumentViewerScreen(
                     }
                 },
             )
+            }
         },
     ) { innerPadding ->
         if (confirmDelete && path != null && viewModel != null) {
@@ -218,7 +265,24 @@ fun DocumentViewerScreen(
                 },
             )
         }
-        Box(Modifier.padding(innerPadding).fillMaxSize()) {
+        Box(
+            Modifier
+                .padding(innerPadding)
+                .fillMaxSize()
+                // v1.12.0: desktop ESC leaves fullscreen (back to the tab).
+                // Focus is requested on entering fullscreen in desktop mode;
+                // touch shells never depend on it (BackHandler covers back).
+                .focusRequester(escFocus)
+                .focusable()
+                .onPreviewKeyEvent { event ->
+                    if (isFullScreen && event.key == Key.Escape && event.type == KeyEventType.KeyUp) {
+                        isFullScreen = false
+                        true
+                    } else {
+                        false
+                    }
+                },
+        ) {
             when (kind) {
                 ViewerKind.TEXT -> TextViewerBody(context, uri)
                 ViewerKind.CSV -> CsvViewerBody(context, uri)
@@ -232,6 +296,26 @@ fun DocumentViewerScreen(
                 ViewerKind.ZIP -> ZipViewerBody(context, uri, viewModel)
                 ViewerKind.EXTERNAL_ONLY -> ExternalOnlyBody(onOpenExternally = openExternally)
                 ViewerKind.HEX -> HexViewerBody(context, uri)
+            }
+            // v1.12.0: floating exit so fullscreen is one click away from
+            // the tab view even with the toolbar hidden (ESC/back also exit).
+            if (isFullScreen) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 48.dp, end = 12.dp),
+                    shape = androidx.compose.foundation.shape.CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f),
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    tonalElevation = 3.dp,
+                ) {
+                    IconButton(onClick = { isFullScreen = false }) {
+                        Icon(
+                            Icons.Default.FullscreenExit,
+                            contentDescription = stringResource(R.string.exit_fullscreen),
+                        )
+                    }
+                }
             }
         }
     }

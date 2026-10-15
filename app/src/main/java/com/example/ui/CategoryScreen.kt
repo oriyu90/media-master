@@ -50,6 +50,8 @@ fun CategoryScreen(
     navController: NavHostController,
     // v1.10.0 (#3): desktop shell passes true → LIST default (Explorer parity).
     desktop: Boolean = false,
+    // v1.12.0: desktop opens documents in a new tab (title = file name).
+    onOpenDocInNewTab: (uriString: String, path: String?, title: String) -> Unit = { _, _, _ -> },
 ) {
     val viewState by viewModel.mediaState.collectAsStateWithLifecycle()
     val categoryViewMode by viewModel.categoryViewMode.collectAsStateWithLifecycle()
@@ -251,6 +253,7 @@ fun CategoryScreen(
                                             showModified = showModified,
                                             showCreated = showCreated,
                                             showType = showType,
+                                            onOpenDocInTab = if (desktop) onOpenDocInNewTab else null,
                                         )
                                     }
                                 }
@@ -266,7 +269,8 @@ fun CategoryScreen(
                                             file = file,
                                             selectedFiles = selectedFiles,
                                             isSelectionMode = isSelectionMode,
-                                            navController = navController
+                                            navController = navController,
+                                            onOpenDocInTab = if (desktop) onOpenDocInNewTab else null,
                                         )
                                     }
                                 }
@@ -296,7 +300,10 @@ fun CategoryFileRow(
     showModified: Boolean = true,
     showCreated: Boolean = false,
     showType: Boolean = true,
+    // v1.12.0: desktop opens documents in a new tab (title = file name).
+    onOpenDocInTab: ((uriString: String, path: String?, title: String) -> Unit)? = null,
 ) {
+    val context = LocalContext.current
     val isSelected = selectedFiles.contains(file.path)
     var menuExpanded by remember { mutableStateOf(false) }
     // v1.11.0: right-click / long-press menu (Open with) for files.
@@ -349,21 +356,11 @@ fun CategoryFileRow(
                 if (isSelectionMode) {
                     if (isSelected) selectedFiles.remove(file.path) else selectedFiles.add(file.path)
                 } else {
-                    if (file.mimeType == "application/vnd.android.package-archive") {
-                        val context = navController.context
-                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
-                            val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", File(file.path))
-                            setDataAndType(uri, "application/vnd.android.package-archive")
-                            flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
-                        }
-                        try {
-                            context.startActivity(intent)
-                        } catch (e: Exception) {
-                            android.widget.Toast.makeText(context, context.getString(R.string.could_not_open_apk), android.widget.Toast.LENGTH_SHORT).show()
-                        }
-                    } else {
-                        navController.navigate("viewer/${Uri.encode(file.path)}")
-                    }
+                    // v1.12.0: same routing as the file browser (media →
+                    // viewer, APK → installer, documents → doc viewer, legacy
+                    // Office → external). Previously every non-APK went to
+                    // the image viewer route, which rendered documents blank.
+                    com.example.openMediaFile(context, file, navController, onOpenDocInTab)
                 }
             },
             onLongClick = {
@@ -394,8 +391,11 @@ fun CategoryFileGridItem(
     file: MediaFile,
     selectedFiles: MutableList<String>,
     isSelectionMode: Boolean,
-    navController: NavHostController
+    navController: NavHostController,
+    // v1.12.0: desktop opens documents in a new tab (title = file name).
+    onOpenDocInTab: ((uriString: String, path: String?, title: String) -> Unit)? = null,
 ) {
+    val gridContext = LocalContext.current
     val isSelected = selectedFiles.contains(file.path)
     var gridMenuExpanded by remember { mutableStateOf(false) }
     Box(
@@ -407,21 +407,10 @@ fun CategoryFileGridItem(
                     if (isSelectionMode) {
                         if (isSelected) selectedFiles.remove(file.path) else selectedFiles.add(file.path)
                     } else {
-                        if (file.mimeType == "application/vnd.android.package-archive") {
-                            val context = navController.context
-                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
-                                val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", File(file.path))
-                                setDataAndType(uri, "application/vnd.android.package-archive")
-                                flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
-                            }
-                            try {
-                                context.startActivity(intent)
-                            } catch (e: Exception) {
-                                android.widget.Toast.makeText(context, context.getString(R.string.could_not_open_apk), android.widget.Toast.LENGTH_SHORT).show()
-                            }
-                        } else {
-                            navController.navigate("viewer/${Uri.encode(file.path)}")
-                        }
+                        // v1.12.0: same routing as the file browser (see
+                        // CategoryFileRow) — documents no longer land on a
+                        // blank image-viewer page.
+                        com.example.openMediaFile(gridContext, file, navController, onOpenDocInTab)
                     }
                 },
                 onLongClick = {

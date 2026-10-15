@@ -54,4 +54,8 @@
     <string name="could_not_open_file">ファイルを開けませんでした</string>
     <string name="no_app_to_open">このファイルを開けるアプリがありません</string>
     <string name="select">選択</string>
+    <string name="fullscreen">全画面表示</string>
+    <string name="exit_fullscreen">全画面を終了</string>
+    <string name="select_file">ファイルを選択</string>
+    <string name="pick_file_hint">ファイルをタップしてリクエスト元のアプリに渡します</string>
 </resources>

@@ -39,6 +39,16 @@ import android.net.Uri
  *                                         Master does not need to already know
  *                                         about the file)
  *
+ *  3. Standard file-manager picking (v1.12.0): Media Master answers the
+ *     system file picker so other apps can receive one user-picked file:
+ *
+ *       ACTION_GET_CONTENT / ACTION_OPEN_DOCUMENT (any type)
+ *                                      -> in-app file picker; the tapped file
+ *                                         is returned via setResult + finish.
+ *                                         Handled via [PickRequest.parse], not
+ *                                         [resolve], so a picker launch never
+ *                                         turns into a normal deep link.
+ *
  * [resolve] converts an incoming [Intent] into an internal navigation route
  * string, or `null` when the request is not understood. Callers must treat
  * `null` as "just open the app normally" — never crash.
@@ -76,9 +86,20 @@ object DeepLinks {
                 else -> null
             }
             Intent.ACTION_VIEW -> when {
-                type == "vnd.android.document/directory" -> {
-                    val path = data?.path
-                    if (!path.isNullOrBlank()) "file_browser?path=${Uri.encode(path)}" else "manage"
+                // v1.12.0: also accept resource/folder (used by several
+                // third-party "open folder" senders). Only real filesystem
+                // paths are honored — a content:// provider path is not a
+                // raw path, so it falls back to Manage instead of a bogus
+                // navigation that would show an empty/error browser.
+                type == "vnd.android.document/directory" || type == "resource/folder" -> {
+                    val rawPath = data?.path
+                    val usePath = when {
+                        rawPath.isNullOrBlank() -> null
+                        data?.scheme == "file" -> rawPath
+                        rawPath.startsWith("/storage/") || rawPath.startsWith("/sdcard") -> rawPath
+                        else -> null
+                    }
+                    if (usePath != null) "file_browser?path=${Uri.encode(usePath)}" else "manage"
                 }
                 type?.startsWith("image/") == true ||
                     type?.startsWith("video/") == true ||
@@ -148,4 +169,46 @@ object DeepLinks {
         }.getOrDefault("")
         return name.lowercase().endsWith(".zip")
     }
+}
+
+/**
+ * v1.12.0 file-manager picking: a parsed `ACTION_GET_CONTENT` /
+ * `ACTION_OPEN_DOCUMENT` request. Pure data + [parse] so unit tests pin it
+ * without Android.
+ *
+ * @param mimeType requested type (wildcard when the sender did not care).
+ * @param allowMultiple sender's `EXTRA_ALLOW_MULTIPLE` (honored as
+ *   single-return: pickers that need exactly one file keep working, and
+ *   multi-needing callers still receive a valid single URI).
+ * @param persistable true for `ACTION_OPEN_DOCUMENT` (long-lived access
+ *   expected). Media Master returns a readable URI grant; callers that
+ *   require a persistable `DocumentsProvider` tree should use the system
+ *   picker instead — this limitation is documented, never a crash.
+ */
+data class PickRequest(
+    val mimeType: String,
+    val allowMultiple: Boolean,
+    val persistable: Boolean,
+) {
+    companion object {
+        fun parse(intent: Intent?): PickRequest? {
+            if (intent == null) return null
+            val action = intent.action ?: return null
+            if (action != Intent.ACTION_GET_CONTENT && action != Intent.ACTION_OPEN_DOCUMENT) return null
+            return PickRequest(
+                mimeType = intent.type?.takeUnless { it.isBlank() } ?: "*/*",
+                allowMultiple = intent.getBooleanExtra(Intent.EXTRA_ALLOW_MULTIPLE, false),
+                persistable = action == Intent.ACTION_OPEN_DOCUMENT,
+            )
+        }
+    }
+}
+
+/**
+ * v1.12.0 desktop doc-tab route builder. Pure so unit tests pin it:
+ * `docViewer/{uri}[?path=...]`, mirroring the NavHost route shape.
+ */
+internal fun docTabRoute(uriString: String, path: String?): String {
+    val base = "docViewer/${Uri.encode(uriString)}"
+    return if (path != null) "$base?path=${Uri.encode(path)}" else base
 }

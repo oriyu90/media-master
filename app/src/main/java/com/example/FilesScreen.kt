@@ -66,6 +66,9 @@ fun FilesScreen(
     // v1.10.0: desktop shell passes true so the list defaults to LIST
     // (Explorer Details parity) without clobbering explicit user choices.
     desktop: Boolean = false,
+    // v1.12.0: desktop opens documents in a new tab (title = file name).
+    // Phone default (no-op lambda) keeps direct navigation.
+    onOpenDocInNewTab: (uriString: String, path: String?, title: String) -> Unit = { _, _, _ -> },
 ) {
     val viewState by viewModel.fileTreeState.collectAsStateWithLifecycle()
     val viewMode by viewModel.viewMode.collectAsStateWithLifecycle()
@@ -403,7 +406,7 @@ fun FilesScreen(
                                         if (file.isDirectory) {
                                             viewModel.loadFiles(file.path)
                                         } else {
-                                            openMediaFile(context, file, navController)
+                                            openMediaFile(context, file, navController, onOpenDocInTab = if (desktop) onOpenDocInNewTab else null)
                                         }
                                     }
                                 }
@@ -434,7 +437,7 @@ fun FilesScreen(
                                         if (file.isDirectory) {
                                             viewModel.loadFiles(file.path)
                                         } else {
-                                            openMediaFile(context, file, navController)
+                                            openMediaFile(context, file, navController, onOpenDocInTab = if (desktop) onOpenDocInNewTab else null)
                                         }
                                     }
                                 }
@@ -879,7 +882,15 @@ fun openWithExternalApp(context: android.content.Context, file: MediaFile) {
     }
 }
 
-fun openMediaFile(context: android.content.Context, file: MediaFile, navController: NavHostController) {    if (file.mimeType.startsWith("image/") || file.mimeType.startsWith("video/") || file.mimeType.startsWith("audio/")) {
+fun openMediaFile(
+    context: android.content.Context,
+    file: MediaFile,
+    navController: NavHostController,
+    // v1.12.0: desktop tab opener for documents. When provided, document
+    // kinds open in a new desktop tab instead of direct navigation
+    // (media/APK/external flows are untouched).
+    onOpenDocInTab: ((uriString: String, path: String?, title: String) -> Unit)? = null,
+) {    if (file.mimeType.startsWith("image/") || file.mimeType.startsWith("video/") || file.mimeType.startsWith("audio/")) {
         navController.navigate("viewer/${Uri.encode(file.path)}")
     } else if (file.mimeType == "application/vnd.android.package-archive" || file.path.endsWith(".apk", ignoreCase = true)) {
         val uri = runCatching {
@@ -925,7 +936,12 @@ fun openMediaFile(context: android.content.Context, file: MediaFile, navControll
             return
         }
         try {
-            navController.navigate("docViewer/${Uri.encode(uri.toString())}?path=${Uri.encode(file.path)}") { launchSingleTop = true }
+            val openInTab = onOpenDocInTab
+            if (openInTab != null) {
+                openInTab(uri.toString(), file.path, file.name)
+            } else {
+                navController.navigate("docViewer/${Uri.encode(uri.toString())}?path=${Uri.encode(file.path)}") { launchSingleTop = true }
+            }
         } catch (_: Exception) {
             android.widget.Toast.makeText(context, context.getString(R.string.invalid_file_path), android.widget.Toast.LENGTH_SHORT).show()
         }

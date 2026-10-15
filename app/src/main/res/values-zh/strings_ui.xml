@@ -44,5 +44,5 @@
     <string name="show_date_modified">显示修改日期</string>
     <string name="show_date_created">显示创建日期</string>
     <string name="show_type">显示文件类型</string>
-    <string name="open_with">用其他应用打开</string><string name="open_with_chooser">选择应用</string><string name="could_not_open_file">无法打开文件</string><string name="select">选择</string><string name="no_app_to_open">没有可打开此文件的应用</string><string name="columns">列</string>
+    <string name="open_with">用其他应用打开</string><string name="open_with_chooser">选择应用</string><string name="could_not_open_file">无法打开文件</string><string name="fullscreen">进入全屏</string><string name="exit_fullscreen">退出全屏</string><string name="select_file">选择文件</string><string name="pick_file_hint">点按文件将其发送到请求的应用</string><string name="select">选择</string><string name="no_app_to_open">没有可打开此文件的应用</string><string name="columns">列</string>
 </resources>

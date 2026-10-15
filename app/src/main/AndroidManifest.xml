@@ -73,7 +73,28 @@
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
                 <data android:mimeType="vnd.android.document/directory" />
+                <!-- v1.12.0: some senders use resource/folder for directories. -->
+                <data android:mimeType="resource/folder" />
+            </intent-filter>
+
+            <!-- v1.12.0: act as a standard file manager in system pickers.
+                 GET_CONTENT / OPEN_DOCUMENT with any type: the user picks one
+                 file in Media Master and it is returned to the requester.
+                 (OPEN_DOCUMENT callers receive a readable URI grant; lasting
+                 persistable access is best-effort, see PickRequest.) -->
+            <intent-filter>
+                <action android:name="android.intent.action.GET_CONTENT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.OPENABLE" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.OPEN_DOCUMENT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.OPENABLE" />
+                <data android:mimeType="*/*" />
             </intent-filter>
 
             <!-- Universal document viewer: appear as an "Open with"/default-app

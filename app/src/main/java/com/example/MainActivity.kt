@@ -26,6 +26,7 @@ import androidx.compose.runtime.LaunchedEffect
 import com.example.ui.MainNavigation
 import com.example.ui.theme.MediaMasterTheme
 import com.example.deeplink.DeepLinks
+import com.example.deeplink.PickRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 
 import com.example.playback.PlaybackManager
@@ -42,10 +43,23 @@ class MainActivity : AppCompatActivity() {
      */
     private val pendingDeepLink = MutableStateFlow<String?>(null)
 
+    /**
+     * v1.12.0 file-manager picking: non-null while serving another app's
+     * `ACTION_GET_CONTENT` / `ACTION_OPEN_DOCUMENT`. Takes precedence over
+     * [pendingDeepLink] — a picker launch never becomes a normal deep link.
+     */
+    private val pendingPick = MutableStateFlow<PickRequest?>(null)
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        DeepLinks.resolve(intent)?.let { pendingDeepLink.value = it }
+        val pick = PickRequest.parse(intent)
+        if (pick != null) {
+            pendingPick.value = pick
+            pendingDeepLink.value = null
+        } else {
+            DeepLinks.resolve(intent)?.let { pendingDeepLink.value = it }
+        }
     }
 
     override fun onUserLeaveHint() {
@@ -59,7 +73,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        pendingDeepLink.value = DeepLinks.resolve(intent)
+        // v1.12.0: picker requests win over deep links (cold start included).
+        pendingPick.value = PickRequest.parse(intent)
+        if (pendingPick.value == null) {
+            pendingDeepLink.value = DeepLinks.resolve(intent)
+        }
         PlaybackManager.initialize(this)
         // v1.8.0 (#3): centralised Coil cache so grid thumbnails and viewer
         // images reuse decoded thumbnails instead of full-res re-decode on
@@ -137,7 +155,29 @@ class MainActivity : AppCompatActivity() {
                     fileViewModel = fileViewModel,
                     settingsViewModel = settingsViewModel,
                     deepLinkRoute = pendingDeepLink,
-                    onDeepLinkHandled = { pendingDeepLink.value = null }
+                    onDeepLinkHandled = { pendingDeepLink.value = null },
+                    pickRequest = pendingPick,
+                    // v1.12.0 picker result: hand the granted URI back to the
+                    // requesting app and close. `null` data = user cancelled.
+                    onPickFinished = { uri, mimeType ->
+                        if (uri != null) {
+                            val result = Intent().apply {
+                                data = uri
+                                type = mimeType
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                // Mirror a write grant only when the requester
+                                // asked for one (GET_CONTENT is read-only).
+                                if (intent?.flags?.and(Intent.FLAG_GRANT_WRITE_URI_PERMISSION) != 0) {
+                                    addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                                }
+                            }
+                            setResult(RESULT_OK, result)
+                        } else {
+                            setResult(RESULT_CANCELED)
+                        }
+                        pendingPick.value = null
+                        finish()
+                    },
                 )
             }
         }

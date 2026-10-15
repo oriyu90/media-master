@@ -44,5 +44,5 @@
     <string name="show_date_modified">إظهار تاريخ التعديل</string>
     <string name="show_date_created">إظهار تاريخ الإنشاء</string>
     <string name="show_type">إظهار نوع الملف</string>
-    <string name="open_with">فتح باستخدام</string><string name="open_with_chooser">اختيار تطبيق</string><string name="could_not_open_file">تعذر فتح الملف</string><string name="select">تحديد</string><string name="no_app_to_open">لا يوجد تطبيق يمكنه فتح هذا الملف</string><string name="columns">الأعمدة</string>
+    <string name="open_with">فتح باستخدام</string><string name="open_with_chooser">اختيار تطبيق</string><string name="could_not_open_file">تعذر فتح الملف</string><string name="fullscreen">ملء الشاشة</string><string name="exit_fullscreen">إنهاء ملء الشاشة</string><string name="select_file">تحديد ملف</string><string name="pick_file_hint">انقر ملفًا لإرساله إلى التطبيق الطالب</string><string name="select">تحديد</string><string name="no_app_to_open">لا يوجد تطبيق يمكنه فتح هذا الملف</string><string name="columns">الأعمدة</string>
 </resources>

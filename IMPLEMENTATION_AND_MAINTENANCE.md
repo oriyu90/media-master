@@ -1,4 +1,4 @@
-# Media Master v1.11.0 実装・保守メモ
+# Media Master v1.12.0 実装・保守メモ
 
 最終更新: 2026-10-15
 
@@ -6,21 +6,40 @@
 
 | 項目 | 内容 |
 | --- | --- |
-| バージョン | `1.11.0` (`versionCode 18`) |
+| バージョン | `1.12.0` (`versionCode 19`) |
 | アプリケーションID | `com.yukiorita.mediamaster` |
 | 最小 SDK / target SDK | 24 / 36 |
 | ライセンス | MIT |
 | 著作者 | Yuki_Orita |
 | release APK | `app/build/outputs/apk/release/app-release.apk`（R8 + resource shrink 有効） |
-| APK SHA-256 | `69da38c9a7ccbffab663c0043120ec930e3f0559d358fd739df1e082e5922a5c` |
-| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.10.0 と同一鍵） |
-| GitHub Release | `v1.11.0` (GitHub Releases) |
+| APK SHA-256 | `3d9ac550b7404af05c41a8178ec71eae2b0dab8d25db5472a5dc3ceb058c6cbd` |
+| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.11.0 と同一鍵） |
+| GitHub Release | `v1.12.0` (GitHub Releases) |
 
 release APK は RSA 4096 ビット鍵・APK Signature Scheme v2 署名（`apksigner verify` で確認予定）。署名鍵は `common-rules-document/keystores/media-master-upload-key.jks`（alias `upload`）。
 
-v1.11.0 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitTest`(135件)/`:app:lintDebug`(0エラー)を確認。**実機（エミュレータ）デバッグ実施予定**——本番署名済みAPKをクリーンインストールし5件（アイコン・スクロール・他のアプリで開く・ズーム制限・UI回帰）を目視＋FATAL 0件を確認後に公開。証明書は v0.1.0〜v1.10.0 と同一 `332ce386…eba6`（v2のみ）。
+v1.12.0 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitTest`(146件)/`:app:lintDebug`(0エラー)を確認。**実機（エミュレータ）デバッグ実施予定**——本番署名済みAPKをクリーンインストールし2件（資料タブ＋全画面/ESC・戻る、フォルダVIEW・ファイル選択ピッカー）を目視＋FATAL 0件を確認後に公開。証明書は v0.1.0〜v1.11.0 と同一 `332ce386…eba6`（v2のみ）。
 
-旧リリースの APK SHA-256: v1.10.0 `3663e54015d1495cdd32931412f1c7322a53f195aef0bdb9899fce0e9b07b585`、v1.9.2 `0d41403ece4d59eb94e62a5a4cb5e385f239d22614b16dd727c0d5154e4bc20a`、v1.9.1 `1883e8d144877af852be76d94e9a3d5feb42f94e839da35bd2e0440317bc4a3b`、v1.9.0 `74994a9d1313cb0b2acdec9b15b329b1d3b85b110e9901ef542855b4b33ee85b`、v1.8.0 `e7c07575bbbc6675672d2cf64a30a093fd5b3df1c8fd875eec9d8bfd71caf6c4`、 v1.7.1 `4f79abcc32747a6889787c22d051ff831d55aca27330f81923760fcc63fcc1ee`、v1.7.0 `08236934c0cbf522ce0432595933e03976368ec3b0ee000ad4ced962b2fa9fd5`、v1.6.0 `f922b2b2d797f69fe4b1c9a7aca366e9f1664f8b47c8cfbeeb9aaeb02235b615`。
+旧リリースの APK SHA-256: v1.11.0 `69da38c9a7ccbffab663c0043120ec930e3f0559d358fd739df1e082e5922a5c`、v1.10.0 `3663e54015d1495cdd32931412f1c7322a53f195aef0bdb9899fce0e9b07b585`、v1.9.2 `0d41403ece4d59eb94e62a5a4cb5e385f239d22614b16dd727c0d5154e4bc20a`、v1.9.1 `1883e8d144877af852be76d94e9a3d5feb42f94e839da35bd2e0440317bc4a3b`、v1.9.0 `74994a9d1313cb0b2acdec9b15b329b1d3b85b110e9901ef542855b4b33ee85b`、v1.8.0 `e7c07575bbbc6675672d2cf64a30a093fd5b3df1c8fd875eec9d8bfd71caf6c4`、 v1.7.1 `4f79abcc32747a6889787c22d051ff831d55aca27330f81923760fcc63fcc1ee`、v1.7.0 `08236934c0cbf522ce0432595933e03976368ec3b0ee000ad4ced962b2fa9fd5`、v1.6.0 `f922b2b2d797f69fe4b1c9a7aca366e9f1664f8b47c8cfbeeb9aaeb02235b615`。
+
+## v1.12.0 実装内容（資料タブ＋全画面・標準ファイルマネージャー化）
+
+### 1. 資料のタブ表示＋全画面
+- `DesktopNavigation.openDocInNewTab(uriString, path, title)`：pure `docTabRoute()`（単体テスト）で`docViewer/{uri}[?path=]`を新規タブへ（タブ名=ファイル名）。既知route以外はタブ名を上書きしない既存`LaunchedEffect`のため文書タブ名は維持される。`MediaNavHost`第3コールバック→Files（`openMediaFile(..., onOpenDocInTab)`）/Documents（`DocumentListView`経由）/Category（行・グリッド）へ配線。touchは既定no-opで直接遷移のまま。
+- `DocumentViewerScreen(desktop)`：TopAppBarに全画面ワンクリックボタン（enter/exitアイコン切替）＋全画面中は`AnimatedVisibility` fadeで非表示＋フローティング終了ボタン（常時到達可能）。初回はtouch=ON（destination自体が全画面のため「開いてすぐ全画面」）・desktop=OFF（タブ内埋め込み）。`BackHandler(enabled=isFullScreen)`で解除優先、次pressでpop。ESCは`onPreviewKeyEvent`（desktop全画面時のみ`FocusRequester`、touchはBackHandlerのみ）。
+- Category文書行の空白バグ修正：行・グリッドのonClickを`openMediaFile`委譲へ（メディア→viewer、APK→installer、文書→docViewer、旧Office→外部）。desktop時はタブ経由。
+- 新規文言4キー×5言語（parity検証）。
+
+### 2. 標準ファイルマネージャー化
+- Manifest：directory VIEWにBROWSABLE＋`resource/folder`追加。GET_CONTENT/OPEN_DOCUMENT（OPENABLE＋ワイルドカード）追加。
+- `DeepLinks`：`resource/folder`対応＋directory pathガード（fileスキームまたは`/storage/`・`/sdcard`始まりのみ採用、それ以外はManageへ）。GET_CONTENT系は`resolve()`対象外（`null`→通常起動、pickerと混線しない）。
+- pure `PickRequest.parse`（action/mime/allowMultiple/persistable、単体テスト7件）。`MainActivity`がpickerをdeep linkより優先（cold start/onNewIntent共通）し、`MainNavigation`はpicker中有効時のみ`FilePickerScreen`を表示（通常シェル・deep link消費なし）。
+- 新規`FilePickerScreen`：既存`fileTreeState`再利用、パンくず＋MIME絞り込み（pure `mimeMatches`＋単体テスト4件、ディレクトリ常時表示・不明MIMEは隠さない）、単一タップ返却（FileProvider/contentUri＋読取grant）、Cancel/BACKでCANCELED。削除等の副作用なし。`MainActivity.onPickFinished`で`setResult+finish`。
+- 既知の制約：`EXTRA_ALLOW_MULTIPLE`は単一返却（文書化）。OPEN_DOCUMENTの永続権限はベストエフォート（`DocumentsProvider`は未実装、必要ならシステムピッカー利用を推奨）。
+
+### 検証
+- `:app:testDebugUnitTest` 146件全通過（既存135＋新規11）/`:app:lintDebug` 0エラー。
+- **v1.12.0 実機デバッグ**: 本番署名済みAPKをMedium_Phone_API_36.1へクリーンインストール→権限付与→`resource/folder`のVIEWでDownloadブラウザ直開→PDFタップでtouch全画面（TopAppBar非表示＋フローティング終了ボタン）→戻るでツールバー復帰→GET_CONTENT（`application/pdf`）で選択画面（絞り込み＋パンくず＋空状態）→Download→PDFタップで`setResult+finish`（フォーカスがランチャーに復帰）→設定でデスクトップUI強制＋`wm size/density`拡大でデスクトップシェル→Manage→Downloads→PDFタップでファイル名新規タブに埋め込み表示→ツールバーの全画面ボタンでタブ内全画面→ESC（keyevent 111）でタブ表示に復帰。FATAL 0件。`wm`はreset済み。
 
 ## v1.11.0 実装内容（アイコン・スクロール・他のアプリで開く・ズーム制限・UI精査）
 

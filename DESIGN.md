@@ -1,7 +1,13 @@
 # 設計書兼仕様書 (Media Master)
 
 ## バージョン情報
-- **Version:** 1.11.0
+- **Version:** 1.12.0
+
+## v1.12.0 の設計変更（要約）
+- **資料のタブ＋全画面(#A)**: `DesktopNavigation.openDocInNewTab(uri,path,title)`（pure `docTabRoute`＋単体テスト）で資料をファイル名タブへ。`MediaNavHost`第3コールバック→Files/Documents/Categoryへ配線（touchは既定=直接遷移で不変）。`DocumentViewerScreen(desktop)`にワンクリック全画面ボタン（TopAppBar＋全画面中のフローティング終了ボタン、`AnimatedVisibility` fade）。touchは初回ON・desktopはOFF。`BackHandler`（全画面→解除優先）＋ESC（`onPreviewKeyEvent`＋desktop全画面時のみ`FocusRequester`、touchはBackHandlerのみ依存）。Category文書行の空白バグを`openMediaFile`委譲で修正（メディア→viewer、APK→installer、文書→docViewer、旧Office→外部）。
+- **標準ファイルマネージャー化(#B)**: Manifestにdirectory VIEWへBROWSABLE＋`resource/folder`、GET_CONTENT/OPEN_DOCUMENT（OPENABLE＋ワイルドカード）を追加。`DeepLinks`は`resource/folder`対応＋directory pathガード（fileスキームか`/storage/`・`/sdcard`始まりのみ採用、content系はManageへ）。pure `PickRequest.parse`（単体テスト）。新規`FilePickerScreen`（既存FileViewModelのfileTreeState再利用、MIME絞り込みpure `mimeMatches`＋単体テスト、単一選択のみ・Cancel/BACKでCANCELED、削除等の副作用なし）。`MainActivity`がpickerをdeep linkより優先し`setResult+finish`（読取grant付与、書込は要求時のみ反映）。
+- 安全性：minSdk24維持、新規権限/依存なし、外部起動はtoast化、`!!`なし、日英中阿蘭4キー追加（parity検証）。KDoc内の`*/`・`/*`列注意（Kotlinはブロックコメントがネストするため拾い物MIME表記を避ける）。
+- 既知の制約：`EXTRA_ALLOW_MULTIPLE`は単一返却（文書化）、OPEN_DOCUMENTの永続権限はベストエフォート（`DocumentsProvider`非実装のため。システムピッカー利用を推奨）。
 
 ## v1.11.0 の設計変更（要約）
 - **アイコン(#1)**: 添付フォルダマークへ置換。`drawable/ic_launcher_background.xml`を白単色化、夜間用`drawable-night/`に黒背景＋白フォルダを追加（`drawable-night/ic_launcher_foreground.xml`）。形状はタブ付き単一シルエット（マスクで欠けないよう細い渡しは持たせない）。monochromeはforegroundと同ペア。

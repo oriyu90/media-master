@@ -147,7 +147,11 @@ fun DesktopNavigation(
     navController: NavHostController,
     fileViewModel: FileViewModel,
     settingsViewModel: SettingsViewModel,
-    navHost: @Composable (onPinFolder: (String) -> Unit, onOpenFolderInNewTab: (String) -> Unit) -> Unit
+    navHost: @Composable (
+        onPinFolder: (String) -> Unit,
+        onOpenFolderInNewTab: (String) -> Unit,
+        onOpenDocInNewTab: (uriString: String, path: String?, title: String) -> Unit,
+    ) -> Unit
 ) {
     val context = LocalContext.current
     val customPins by settingsViewModel.pinnedFolders.collectAsStateWithLifecycle()
@@ -174,7 +178,6 @@ fun DesktopNavigation(
     var nextTabId by remember { mutableLongStateOf(1L) }
     val currentEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentEntry?.destination?.route ?: "home"
-
     LaunchedEffect(currentRoute) {
         val index = tabs.indexOfFirst { it.id == selectedTabId }
         if (index >= 0) {
@@ -204,6 +207,22 @@ fun DesktopNavigation(
         val title = raw.ifBlank { context.getString(R.string.files) }
         val route = "file_browser?path=${Uri.encode(path)}"
         val tab = DesktopTab(nextTabId++, title, route)
+        tabs.add(tab)
+        selectedTabId = tab.id
+        navController.navigate(route) { launchSingleTop = true }
+    }
+
+    // v1.12.0: documents open in their own tab (title = file name) instead
+    // of replacing the current tab's content. The tab keeps its title for
+    // docViewer routes (see LaunchedEffect above), and the viewer itself
+    // offers one-click fullscreen with ESC/back to return to the tab.
+    fun openDocInNewTab(uriString: String, path: String?, title: String) {
+        val route = com.example.deeplink.docTabRoute(uriString, path)
+        val tab = DesktopTab(
+            nextTabId++,
+            title.ifBlank { context.getString(R.string.documents) },
+            route,
+        )
         tabs.add(tab)
         selectedTabId = tab.id
         navController.navigate(route) { launchSingleTop = true }
@@ -274,7 +293,7 @@ fun DesktopNavigation(
                 modifier = Modifier.weight(1f).fillMaxWidth()
                     .padding(bottom = if (miniTitle.isNotEmpty()) 84.dp else 0.dp)
             ) {
-                navHost(settingsViewModel::addPinnedFolder, ::openInNewTab)
+                navHost(settingsViewModel::addPinnedFolder, ::openInNewTab, ::openDocInNewTab)
             }
             // v1.8.0 (#7): always-visible mode indicator so users can tell
             // desktop/DeX UI apart from the normal touch UI.

@@ -1,13 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- v1.11.0: light-mode foreground — black folder on white (attached image).
      Single solid silhouette with tab bump; the white gap of the source art is
-     omitted so launcher masks (circle/squircle) never clip a thin bridge. -->
+     omitted so launcher masks (circle/squircle) never clip a thin bridge.
+     v1.12.2: scaled to 0.72 about the center per user request (smaller mark
+     with more breathing room inside launcher masks). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#000000"
-        android:pathData="M30,32h20l6,8h22a8,8 0 0,1 8,8v22a8,8 0 0,1 -8,8H30a8,8 0 0,1 -8,-8V40a8,8 0 0,1 8,-8z" />
+    <group
+        android:scaleX="0.72"
+        android:scaleY="0.72"
+        android:pivotX="54"
+        android:pivotY="54">
+        <path
+            android:fillColor="#000000"
+            android:pathData="M30,32h20l6,8h22a8,8 0 0,1 8,8v22a8,8 0 0,1 -8,8H30a8,8 0 0,1 -8,-8V40a8,8 0 0,1 8,-8z" />
+    </group>
 </vector>

@@ -250,6 +250,7 @@ fun LibraryScreen(viewModel: FileViewModel, navController: NavHostController) {
                     0 -> PhotosView(
                         viewState = viewState,
                         navController = navController,
+                        viewModel = viewModel,
                         selectedFiles = selectedFiles,
                         isSelectionMode = isSelectionMode,
                         photosAndVideos = photosAndVideos,
@@ -297,6 +298,9 @@ private fun LibrarySortMenu(current: SortOption, onSelect: (SortOption) -> Unit)
 private fun PhotosView(
     viewState: ViewState,
     navController: NavHostController,
+    // v1.13.0: the viewer pages through the exact order shown in this grid
+    // (density/sort aware), not the global MediaStore order.
+    viewModel: FileViewModel,
     selectedFiles: MutableList<String>,
     isSelectionMode: Boolean,
     photosAndVideos: List<MediaFile>,
@@ -384,6 +388,10 @@ private fun PhotosView(
                                     if (isSelectionMode) {
                                         if (isSelected) selectedFiles.remove(file.path) else selectedFiles.add(file.path)
                                     } else {
+                                        // v1.13.0: BY_DATE order == photosAndVideos
+                                        // (grouping is a stable partition), so swipe
+                                        // follows the grid; touch starts immersive.
+                                        viewModel.prepareViewer(photosAndVideos, file.path, startFullscreen = true)
                                         navController.navigate("viewer/${Uri.encode(file.path)}")
                                     }
                                 },
@@ -413,6 +421,9 @@ private fun PhotosView(
                                 if (isSelectionMode) {
                                     if (isSelected) selectedFiles.remove(file.path) else selectedFiles.add(file.path)
                                 } else {
+                                    // v1.13.0: compact density has its own sort, so
+                                    // the viewer gets that exact order.
+                                    viewModel.prepareViewer(sorted, file.path, startFullscreen = true)
                                     navController.navigate("viewer/${Uri.encode(file.path)}")
                                 }
                             },

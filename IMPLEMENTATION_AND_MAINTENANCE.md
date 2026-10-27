@@ -1,26 +1,54 @@
-# Media Master v1.12.2 実装・保守メモ
+# Media Master v1.13.0 実装・保守メモ
 
-最終更新: 2026-10-15
+最終更新: 2026-10-27
 
 ## リリース情報
 
 | 項目 | 内容 |
 | --- | --- |
-| バージョン | `1.12.2` (`versionCode 21`) |
+| バージョン | `1.13.0` (`versionCode 22`) |
 | アプリケーションID | `com.yukiorita.mediamaster` |
 | 最小 SDK / target SDK | 24 / 36 |
 | ライセンス | MIT |
 | 著作者 | Yuki_Orita |
 | release APK | `app/build/outputs/apk/release/app-release.apk`（R8 + resource shrink 有効） |
-| APK SHA-256 | `cb67f77dca5d9a638e2dba938b53d12533dffc4c0a239992523b9303422b8571` |
-| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.12.1 と同一鍵） |
-| GitHub Release | `v1.12.2` (GitHub Releases) |
+| APK SHA-256 | `06baec2275ee3239ecca76caec22fd594d34772388b3228dc4de01049c6f49cb` |
+| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.12.2 と同一鍵） |
+| GitHub Release | `v1.13.0` (GitHub Releases) |
 
-release APK は RSA 4096 ビット鍵・APK Signature Scheme v2 署名（`apksigner verify` で確認予定）。署名鍵は `common-rules-document/keystores/media-master-upload-key.jks`（alias `upload`）。
+release APK は RSA 4096 ビット鍵・APK Signature Scheme v2 署名（`apksigner verify` で確認）。署名鍵は `common-rules-document/keystores/media-master-upload-key.jks`（alias `upload`）。
 
-v1.12.2 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitTest`(146件)/`:app:lintDebug`(0エラー)を確認。変更はアイコンのscaleのみ。**実機（エミュレータ）デバッグ実施予定**——本番署名済みAPKをクリーンインストールし2件（資料タブ＋全画面/ESC・戻る、フォルダVIEW・ファイル選択ピッカー）を目視＋FATAL 0件を確認後に公開。証明書は v0.1.0〜v1.11.0 と同一 `332ce386…eba6`（v2のみ）。
+v1.13.0 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitTest`(152件)/`:app:lintDebug`(0エラー)を確認。**実機（エミュレータ）デバッグ**で、ライブラリの表示順スワイプ・全画面/タップオーバーレイ（全画面/終了・編集・削除）・戻るで全画面解除・画像エディタ往復後の同一ページ保持を目視し、アプリのFATAL 0件を確認。Explorerのデスクトップタブは静的な独立監査でPASS（実行環境のADB汚染によりタブ操作の実機確認のみ未完了）。証明書は v0.1.0〜v1.12.2 と同一 `332ce386…eba6`（v2のみ）。
 
-旧リリースの APK SHA-256: v1.12.1 `847d1aad80da47eb519ea1b695878162e7f9bb48c133ee202cafa2b809b82112`、v1.12.0 `3d9ac550b7404af05c41a8178ec71eae2b0dab8d25db5472a5dc3ceb058c6cbd`、v1.11.0 `69da38c9a7ccbffab663c0043120ec930e3f0559d358fd739df1e082e5922a5c`、v1.10.0 `3663e54015d1495cdd32931412f1c7322a53f195aef0bdb9899fce0e9b07b585`、v1.9.2 `0d41403ece4d59eb94e62a5a4cb5e385f239d22614b16dd727c0d5154e4bc20a`、v1.9.1 `1883e8d144877af852be76d94e9a3d5feb42f94e839da35bd2e0440317bc4a3b`、v1.9.0 `74994a9d1313cb0b2acdec9b15b329b1d3b85b110e9901ef542855b4b33ee85b`、v1.8.0 `e7c07575bbbc6675672d2cf64a30a093fd5b3df1c8fd875eec9d8bfd71caf6c4`、 v1.7.1 `4f79abcc32747a6889787c22d051ff831d55aca27330f81923760fcc63fcc1ee`、v1.7.0 `08236934c0cbf522ce0432595933e03976368ec3b0ee000ad4ced962b2fa9fd5`、v1.6.0 `f922b2b2d797f69fe4b1c9a7aca366e9f1664f8b47c8cfbeeb9aaeb02235b615`。
+旧リリースの APK SHA-256: v1.12.2 `cb67f77dca5d9a638e2dba938b53d12533dffc4c0a239992523b9303422b8571`、v1.12.1 `847d1aad80da47eb519ea1b695878162e7f9bb48c133ee202cafa2b809b82112`、v1.12.0 `3d9ac550b7404af05c41a8178ec71eae2b0dab8d25db5472a5dc3ceb058c6cbd`、v1.11.0 `69da38c9a7ccbffab663c0043120ec930e3f0559d358fd739df1e082e5922a5c`、v1.10.0 `3663e54015d1495cdd32931412f1c7322a53f195aef0bdb9899fce0e9b07b585`、v1.9.2 `0d41403ece4d59eb94e62a5a4cb5e385f239d22614b16dd727c0d5154e4bc20a`、v1.9.1 `1883e8d144877af852be76d94e9a3d5feb42f94e839da35bd2e0440317bc4a3b`、v1.9.0 `74994a9d1313cb0b2acdec9b15b329b1d3b85b110e9901ef542855b4b33ee85b`、v1.8.0 `e7c07575bbbc6675672d2cf64a30a093fd5b3df1c8fd875eec9d8bfd71caf6c4`、 v1.7.1 `4f79abcc32747a6889787c22d051ff831d55aca27330f81923760fcc63fcc1ee`、v1.7.0 `08236934c0cbf522ce0432595933e03976368ec3b0ee000ad4ced962b2fa9fd5`、v1.6.0 `f922b2b2d797f69fe4b1c9a7aca366e9f1664f8b47c8cfbeeb9aaeb02235b615`。
+
+## v1.13.0 実装内容（表示順スワイプ・全画面プレビュー・Explorerメディアタブ）
+
+### 1. 表示順ページャー
+- 症状：ライブラリで画像を開いて左右スワイプしても、画面の並び（次の画像）に移動しない。タップした画像は正しく開く。
+- 原因：`ViewerScreen`の`mediaList`が全メディアのグローバル一覧（`_sortOption`順）で、ライブラリの日付グループ（古→新）・コンパクト密度の`compactSortOption`・アルバム絞り込み・カテゴリ/フォルダの一覧順と一致していなかった。
+- 修正：`FileViewModel.ViewerLaunch(path, order, startFullscreen)`と`prepareViewer()`を追加し、呼び出し元が表示順を渡す。`ViewerOrder.resolve()`（pure）がパス順を保持し、欠損を除外、対象のメディア種別のみに限定。`launch.path`がルートと一致するときだけ採用し、deep link/プロセス復元は従来のグローバル一覧へフォールバック。`clearViewerLaunch(path)`で退出時に同一パスのlaunchのみ破棄。
+- 配線：Library（日付グループ／コンパクト）、Album、Category、Files（検索・ソート後）、Manage→Recent。
+- 保持：launchはコンポジション破棄では消さず、NavHost destinationの`ON_DESTROY`（pop時）のみ`clearViewerLaunch`。エディタ往復・メディア再スキャン時は`rememberSaveable`の`lastShownPath`を新しい一覧へ再アンカーし、復元ページ番号の別ファイル表示を防止（監査AUD-01/05）。
+
+### 2. ライブラリ/ドキュメントの全画面
+- `ViewerScreen`を`isFullScreen`（没入＝システムバー＋アプリクローム非表示）と`chromeVisible`（半透明オーバーレイ）に分離。タッチでは最初から没入、タップでオーバーレイを表示。オーバーレイ先頭に全画面/全画面終了ボタンを追加し、削除・編集・共有・名前変更・情報と同居。
+- `WindowInsetsControllerCompat`でstatus/navigation barをhide（`BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE`）。終了時・`onDispose`で必ずshow。`BackHandler`で全画面解除を優先し、次pressでpop。動画は`PlayerView`コントローラ可視性で従来どおり同期。
+- `DocumentViewerScreen`は既存の全画面ボタン/ESC/戻る契約を維持し、touchの全画面時のみシステムバーを隠す。Loading/Error/無効パスでは没入もBack横取りもせず、通常の戻る操作を妨げない（監査AUD-02）。
+
+### 3. Explorerのメディアタブ（デスクトップ）
+- `DesktopNavigation.openViewerInNewTab(path,title)`を追加し、`viewer/{path}`をファイル名タブで開く。Files/Category/Manageからdesktop時のみメディアを新規タブへ（`startFullscreen=false`＝ツールバー表示）。オーバーレイの全画面ボタンでタブ内没入。資料の`openDocInNewTab`・ESC・戻るは不変。
+
+### 検証
+- `:app:testDebugUnitTest` 152件全通過（既存146＋`ViewerOrderTest` 6）。
+- `:app:lintDebug` 0エラー、`:app:assembleDebug` 成功。
+- `:app:assembleRelease` 署名・`apksigner verify`・SHA-256はリリース節に記載。
+- 実機（Medium_Phone_API_36.1 / mm3 AVD、リリース署名APKをクリーンインストール）デバッグ:
+  - Library（日付グループ、03→06）で`mm_test_05`を開く→全画面（status/navigation bar・アプリクローム非表示）を確認。タップで半透明オーバーレイに`Exit fullscreen`・`Text recognition`・`Edit`・`Delete`・`Share`・`Rename`・`File Info`が並ぶことを確認。
+  - 左スワイプで`mm_test_05`→`mm_test_06`（表示順の次）へ移動、右スワイプで戻ることをタイトルで確認。Backで全画面解除（`Enter fullscreen`とstatus barが復帰）→次Backで一覧へ戻る。
+  - `Edit`→画像エディタ→Backで、同じ`mm_test_06`・同じ全画面状態に復帰（AUD-01の修正確認）。
+  - アプリのFATAL/AndroidRuntimeクラッシュ0件（`logcat -b crash`）。画像デコードはエミュレータ環境で`Could not load this image.`となるが、比較用のv1.12.2署名APKでも同一画像で同じ失敗を再現したため、本改修の回帰ではない（端末/エミュレータのデコーダ問題）。表示順・全画面・オーバーレイ・戻る・エディタ往復の確認には影響しない。
+  - Explorerのデスクトップ新規タブは、ADBを介した別アプリ（ImageShot）の自動介入でタブ操作の実機確認が完遂できず、独立監査の静的PASSに留める（未検証として記録）。
 
 ## v1.12.2 アイコン縮小（フォルダ72%化）
 

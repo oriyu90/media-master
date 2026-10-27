@@ -81,7 +81,12 @@ fun AlbumScreen(albumName: String, viewModel: FileViewModel, navController: NavH
                                 MediaGridItem(
                                     file = file,
                                     isSelected = false,
-                                    onClick = { navController.navigate("viewer/${Uri.encode(file.path)}") },
+                                    onClick = {
+                                        // v1.13.0: page within this album in grid
+                                        // order; touch preview starts immersive.
+                                        viewModel.prepareViewer(albumFiles, file.path, startFullscreen = true)
+                                        navController.navigate("viewer/${Uri.encode(file.path)}")
+                                    },
                                     onLongClick = {}
                                 )
                             }

@@ -21,6 +21,22 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
+ * v1.13.0: one-shot hand-off from a list screen to the media viewer.
+ *
+ * The pager must follow the order the user sees, but a Nav route cannot carry
+ * an arbitrary path list safely (transaction size / encoding). List screens
+ * therefore stash the exact visible order in [FileViewModel] right before
+ * navigating; the viewer accepts it only when [path] still matches the route.
+ */
+data class ViewerLaunch(
+    val path: String,
+    /** Exact visible order of media files (see ViewerOrder.resolve). */
+    val order: List<String>,
+    /** Touch/library semantics start immersive; desktop Explorer tabs do not. */
+    val startFullscreen: Boolean,
+)
+
+/**
  * MVI ViewModel: owns UI state and user intents only.
  *
  * All filesystem / MediaStore queries live in [MediaRepository], duplicate
@@ -37,6 +53,25 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _mediaState = MutableStateFlow<ViewState>(ViewState.Loading)
     val mediaState: StateFlow<ViewState> = _mediaState.asStateFlow()
+
+    // v1.13.0: prepared viewer order (see ViewerLaunch). Consumed by
+    // ViewerScreen so swiping pages through the list the user tapped from.
+    private val _viewerLaunch = MutableStateFlow<ViewerLaunch?>(null)
+    val viewerLaunch: StateFlow<ViewerLaunch?> = _viewerLaunch.asStateFlow()
+
+    /**
+     * v1.13.0: publish the exact list/order the viewer should page through.
+     * [ordered] is the displayed list (directories are harmless: the viewer
+     * resolver filters to the target's media family).
+     */
+    fun prepareViewer(ordered: List<MediaFile>, path: String, startFullscreen: Boolean) {
+        _viewerLaunch.value = ViewerLaunch(path, ordered.map { it.path }, startFullscreen)
+    }
+
+    /** Clears a launch only when it belongs to [path], so a stale clear cannot drop a fresh one. */
+    fun clearViewerLaunch(path: String) {
+        if (_viewerLaunch.value?.path == path) _viewerLaunch.value = null
+    }
 
     private val _documentsState = MutableStateFlow<ViewState>(ViewState.Loading)
     val documentsState: StateFlow<ViewState> = _documentsState.asStateFlow()

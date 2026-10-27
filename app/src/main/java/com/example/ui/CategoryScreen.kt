@@ -52,6 +52,9 @@ fun CategoryScreen(
     desktop: Boolean = false,
     // v1.12.0: desktop opens documents in a new tab (title = file name).
     onOpenDocInNewTab: (uriString: String, path: String?, title: String) -> Unit = { _, _, _ -> },
+    // v1.13.0: desktop opens media in a new tab (title = file name); touch
+    // keeps direct viewer navigation (default = old behavior).
+    onOpenViewerInNewTab: (path: String, title: String) -> Unit = { _, _ -> },
 ) {
     val viewState by viewModel.mediaState.collectAsStateWithLifecycle()
     val categoryViewMode by viewModel.categoryViewMode.collectAsStateWithLifecycle()
@@ -236,6 +239,27 @@ fun CategoryScreen(
                             if (parent != null) groupedByParentPath[parent].orEmpty() else emptyList()
                         }
 
+                        // v1.13.0: one tap-routing lambda for both layouts. The
+                        // viewer must page through this tab's exact list; on
+                        // desktop a media file opens in its own tab, while
+                        // documents keep the existing new-tab behavior.
+                        val openFile: (MediaFile) -> Unit = { file ->
+                            val isMedia = file.mimeType.startsWith("image/") ||
+                                file.mimeType.startsWith("video/") ||
+                                file.mimeType.startsWith("audio/")
+                            if (isMedia) {
+                                viewModel.prepareViewer(filesToShow, file.path, startFullscreen = !desktop)
+                            }
+                            if (desktop && isMedia) {
+                                onOpenViewerInNewTab(file.path, file.name)
+                            } else {
+                                com.example.openMediaFile(
+                                    context, file, navController,
+                                    onOpenDocInTab = if (desktop) onOpenDocInNewTab else null,
+                                )
+                            }
+                        }
+
                         if (filesToShow.isEmpty()) {
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 Text(stringResource(R.string.no_files_found), style = MaterialTheme.typography.bodyLarge)
@@ -254,6 +278,7 @@ fun CategoryScreen(
                                             showCreated = showCreated,
                                             showType = showType,
                                             onOpenDocInTab = if (desktop) onOpenDocInNewTab else null,
+                                            onOpenFile = openFile,
                                         )
                                     }
                                 }
@@ -271,6 +296,7 @@ fun CategoryScreen(
                                             isSelectionMode = isSelectionMode,
                                             navController = navController,
                                             onOpenDocInTab = if (desktop) onOpenDocInNewTab else null,
+                                            onOpenFile = openFile,
                                         )
                                     }
                                 }
@@ -302,6 +328,9 @@ fun CategoryFileRow(
     showType: Boolean = true,
     // v1.12.0: desktop opens documents in a new tab (title = file name).
     onOpenDocInTab: ((uriString: String, path: String?, title: String) -> Unit)? = null,
+    // v1.13.0: caller-owned tap routing (viewer order + desktop media tab).
+    // Null preserves the previous direct openMediaFile behavior.
+    onOpenFile: ((MediaFile) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val isSelected = selectedFiles.contains(file.path)
@@ -360,7 +389,10 @@ fun CategoryFileRow(
                     // viewer, APK → installer, documents → doc viewer, legacy
                     // Office → external). Previously every non-APK went to
                     // the image viewer route, which rendered documents blank.
-                    com.example.openMediaFile(context, file, navController, onOpenDocInTab)
+                    // v1.13.0: CategoryScreen supplies onOpenFile so the
+                    // viewer also gets this tab's order.
+                    val open = onOpenFile
+                    if (open != null) open(file) else com.example.openMediaFile(context, file, navController, onOpenDocInTab)
                 }
             },
             onLongClick = {
@@ -394,6 +426,9 @@ fun CategoryFileGridItem(
     navController: NavHostController,
     // v1.12.0: desktop opens documents in a new tab (title = file name).
     onOpenDocInTab: ((uriString: String, path: String?, title: String) -> Unit)? = null,
+    // v1.13.0: caller-owned tap routing (viewer order + desktop media tab).
+    // Null preserves the previous direct openMediaFile behavior.
+    onOpenFile: ((MediaFile) -> Unit)? = null,
 ) {
     val gridContext = LocalContext.current
     val isSelected = selectedFiles.contains(file.path)
@@ -410,7 +445,9 @@ fun CategoryFileGridItem(
                         // v1.12.0: same routing as the file browser (see
                         // CategoryFileRow) — documents no longer land on a
                         // blank image-viewer page.
-                        com.example.openMediaFile(gridContext, file, navController, onOpenDocInTab)
+                        // v1.13.0: onOpenFile carries the viewer order.
+                        val open = onOpenFile
+                        if (open != null) open(file) else com.example.openMediaFile(gridContext, file, navController, onOpenDocInTab)
                     }
                 },
                 onLongClick = {

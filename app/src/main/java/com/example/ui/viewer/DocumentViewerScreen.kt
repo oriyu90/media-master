@@ -81,6 +81,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.navigation.NavHostController
 import com.example.FileViewModel
 import com.example.R
@@ -183,6 +186,25 @@ fun DocumentViewerScreen(
     // only pop the viewer on the next press.
     var isFullScreen by remember(uri) { mutableStateOf(!desktop) }
     BackHandler(enabled = isFullScreen) { isFullScreen = false }
+
+    // v1.13.0: touch fullscreen now also hides Android's status/navigation
+    // bars (previously only the app toolbar was hidden). Desktop tabs are
+    // embedded in the desktop shell and keep their bars. Restored on exiting
+    // fullscreen or leaving the screen; a null activity is a safe no-op.
+    val activity = remember(context) { com.example.desktop.DesktopMode.activityOrNull(context) }
+    DisposableEffect(activity, isFullScreen, desktop) {
+        val controller = if (!desktop && isFullScreen && activity != null) {
+            WindowCompat.getInsetsController(activity.window, activity.window.decorView).also {
+                it.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                it.hide(WindowInsetsCompat.Type.systemBars())
+            }
+        } else null
+        onDispose {
+            if (controller != null) {
+                runCatching { controller.show(WindowInsetsCompat.Type.systemBars()) }
+            }
+        }
+    }
     val escFocus = remember { FocusRequester() }
     LaunchedEffect(isFullScreen, desktop) {
         if (isFullScreen && desktop) runCatching { escFocus.requestFocus() }

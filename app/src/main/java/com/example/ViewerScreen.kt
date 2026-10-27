@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -41,12 +42,15 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.activity.compose.BackHandler
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -63,12 +67,14 @@ import com.example.ui.components.ErrorState
 import com.example.ui.theme.ViewerChromeContainer
 import com.example.ui.theme.ViewerOnSurface
 import com.example.ui.theme.ViewerScrim
+import com.example.viewer.ViewerOrder
 import coil.compose.AsyncImage
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
@@ -77,7 +83,14 @@ import kotlin.math.max
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHostController) {
+fun ViewerScreen(
+    path: String?,
+    viewModel: FileViewModel?,
+    navController: NavHostController,
+    // v1.13.0: desktop Explorer tabs start with chrome and enter immersive
+    // through the overlay's fullscreen button; touch starts immersive.
+    desktop: Boolean = false,
+) {
     val context = LocalContext.current
     if (path == null || viewModel == null) {
         EmptyState(
@@ -88,8 +101,17 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
         return
     }
     val viewState = viewModel.mediaState.collectAsStateWithLifecycle().value
+    // v1.13.0: the launch carries the exact visible order the user tapped from.
+    // Null (deep link, restored process, unknown caller) reproduces v1.12.2.
+    val launch = viewModel.viewerLaunch.collectAsStateWithLifecycle().value
+    val startFullscreen = launch?.takeIf { it.path == path }?.startFullscreen ?: !desktop
 
-    var isFullScreen by remember { mutableStateOf(false) }
+    // v1.13.0: two separate concepts. isFullScreen = immersive mode (system
+    // bars hidden, app chrome off); chromeVisible = translucent top overlay.
+    // Touch library/album previews start immersive; desktop tabs start with
+    // chrome so the overlay is discoverable.
+    var isFullScreen by remember(path) { mutableStateOf(startFullscreen) }
+    var chromeVisible by remember(path) { mutableStateOf(!startFullscreen) }
     
     // OCR State
     var isOcrMode by remember { mutableStateOf(false) }
@@ -98,6 +120,52 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
     var imageSize by remember { mutableStateOf(IntSize.Zero) }
 
     val coroutineScope = rememberCoroutineScope()
+
+    // v1.13.0: only a destination that really shows media should go immersive
+    // or intercept Back. Loading/Error/invalid-path states must keep the bars
+    // and let Back leave the screen immediately (audit AUD-02).
+    val hasTarget = remember(viewState, path) {
+        (viewState as? ViewState.Success)?.files?.any { it.path == path } == true
+    }
+
+    // v1.13.0: Android back leaves immersive mode first; only a non-immersive
+    // viewer lets the system pop the destination (previous nav behavior).
+    BackHandler(enabled = hasTarget && isFullScreen) {
+        isFullScreen = false
+        chromeVisible = true
+    }
+
+    // v1.13.0: hide status + navigation bars in immersive mode (touch only).
+    // Restored on exiting fullscreen and on leaving the screen so bars never
+    // leak into another destination; a null activity (e.g. preview) is a no-op.
+    val activity = remember(context) { com.example.desktop.DesktopMode.activityOrNull(context) }
+    DisposableEffect(activity, isFullScreen, desktop, hasTarget) {
+        val controller = if (hasTarget && !desktop && isFullScreen && activity != null) {
+            WindowCompat.getInsetsController(activity.window, activity.window.decorView).also {
+                it.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                it.hide(WindowInsetsCompat.Type.systemBars())
+            }
+        } else null
+        onDispose {
+            if (controller != null) {
+                runCatching { controller.show(WindowInsetsCompat.Type.systemBars()) }
+            }
+        }
+    }
+
+    // v1.13.0: drop the prepared order only when the destination itself is
+    // destroyed (popped). A composition dispose also happens for a transient
+    // trip to the image/video editor, and clearing there lost the display
+    // order on return (audit AUD-01). Inside a NavHost destination
+    // LocalLifecycleOwner is the back-stack entry.
+    val entryLifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(entryLifecycleOwner, path, viewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_DESTROY) viewModel?.clearViewerLaunch(path ?: "")
+        }
+        entryLifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { entryLifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     when (val s = viewState) {
         is ViewState.Loading -> {
@@ -125,17 +193,15 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
             )
             return
         }
-        val isTargetAudio = targetFile.mimeType.startsWith("audio/")
-        val isTargetImageOrVideo = targetFile.mimeType.startsWith("image/") || targetFile.mimeType.startsWith("video/")
-        
-        val mediaList = remember(s.files, path) {
-            if (isTargetImageOrVideo) {
-                s.files.filter { it.mimeType.startsWith("image/") || it.mimeType.startsWith("video/") }
-            } else if (isTargetAudio) {
-                s.files.filter { it.mimeType.startsWith("audio/") }
-            } else {
-                listOf(targetFile)
-            }
+        // v1.13.0: page through the exact order the launching list displayed.
+        // When that launch is absent or stale, ViewerOrder falls back to the
+        // v1.12.2 global media-family list (deep links keep working).
+        val mediaList = remember(s.files, path, launch) {
+            ViewerOrder.resolve(
+                allFiles = s.files,
+                orderedPaths = launch?.takeIf { it.path == path }?.order,
+                targetPath = path ?: "",
+            )
         }
         
         val initialIndex = mediaList.indexOfFirst { it.path == path }.coerceAtLeast(0)
@@ -143,6 +209,24 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
             initialPage = initialIndex,
             pageCount = { mediaList.size }
         )
+
+        // v1.13.0: keep the page the user was actually looking at when the
+        // list is recomputed (editor round trip, media rescan, process
+        // restore). Anchor *before* any tracking write: on a restored
+        // composition the saved pager index belongs to the previous list, so
+        // reading it first would record the wrong file (audit R-01). Real page
+        // changes are tracked from settledPage, ignoring the initial one.
+        var lastShownPath by rememberSaveable(path) { mutableStateOf(path ?: "") }
+        LaunchedEffect(mediaList) {
+            val desired = mediaList.indexOfFirst { it.path == lastShownPath }
+                .takeIf { it >= 0 } ?: initialIndex
+            if (pagerState.currentPage != desired) pagerState.scrollToPage(desired)
+        }
+        LaunchedEffect(pagerState, mediaList) {
+            snapshotFlow { pagerState.settledPage }
+                .drop(1)
+                .collect { page -> mediaList.getOrNull(page)?.let { lastShownPath = it.path } }
+        }
 
         val safePage = if (pagerState.currentPage >= mediaList.size) maxOf(0, mediaList.size - 1) else pagerState.currentPage
         val currentFile = mediaList.getOrNull(safePage)
@@ -264,7 +348,9 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
                     // a continuous gradient scrim below the bar, so the veil
                     // has no sliding seams or see-through gaps. Chrome also
                     // hides while a dismiss drag is active.
-                    visible = !isFullScreen && !dismissEngaged,
+                    // v1.13.0: visibility is driven by chromeVisible, which is
+                    // independent of immersive mode (tap toggles the overlay).
+                    visible = chromeVisible && !dismissEngaged,
                     enter = fadeIn(),
                     exit = fadeOut(),
                     modifier = Modifier.fillMaxWidth(),
@@ -278,6 +364,25 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
                             }
                         },
                         actions = {
+                            // v1.13.0: one-click immersive toggle in the
+                            // translucent overlay (touch: exit fullscreen;
+                            // desktop: enter it inside the tab).
+                            IconButton(onClick = {
+                                if (isFullScreen) {
+                                    isFullScreen = false
+                                    chromeVisible = true
+                                } else {
+                                    isFullScreen = true
+                                    chromeVisible = false
+                                }
+                            }) {
+                                Icon(
+                                    if (isFullScreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                                    contentDescription = stringResource(
+                                        if (isFullScreen) R.string.exit_fullscreen else R.string.fullscreen,
+                                    ),
+                                )
+                            }
                             if (isImage) {
                                 IconButton(onClick = {
                                     if (isOcrMode) {
@@ -395,7 +500,12 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
                             actionIconContentColor = ViewerOnSurface,
                             navigationIconContentColor = ViewerOnSurface
                         ),
-                        modifier = Modifier.statusBarsPadding(),
+                        // v1.13.0: safeDrawing (not only statusBars) keeps the
+                        // bar clear of the camera cutout while system bars are
+                        // hidden in immersive mode.
+                        modifier = Modifier.windowInsetsPadding(
+                            WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
+                        ),
                     )
                     // Continuous veil below the bar: the translucent bar alone
                     // leaves see-through gaps between buttons over bright
@@ -522,7 +632,10 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
                                                 setShowRewindButton(true)
                                                 setShowFastForwardButton(true)
                                                 setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { visibility ->
+                                                    // v1.13.0: controller visibility drives both
+                                                    // concepts so video overlay/fullscreen stays in sync.
                                                     isFullScreen = visibility != android.view.View.VISIBLE
+                                                    chromeVisible = visibility == android.view.View.VISIBLE
                                                 })
                                             }
                                         },
@@ -547,7 +660,9 @@ fun ViewerScreen(path: String?, viewModel: FileViewModel?, navController: NavHos
                     } else if (pageIsImage) {
                         ImageWithOcrOverlay(
                             uri = pageUri,
-                            onTap = { isFullScreen = !isFullScreen },
+                            // v1.13.0: tap only toggles the overlay; immersive
+                            // mode changes only through the fullscreen button.
+                            onTap = { chromeVisible = !chromeVisible },
                             isOcrMode = isOcrMode && page == pagerState.currentPage,
                             recognizedText = if (page == pagerState.currentPage) recognizedText else null,
                             imageSize = if (page == pagerState.currentPage) imageSize else IntSize.Zero,

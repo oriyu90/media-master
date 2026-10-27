@@ -151,6 +151,9 @@ fun DesktopNavigation(
         onPinFolder: (String) -> Unit,
         onOpenFolderInNewTab: (String) -> Unit,
         onOpenDocInNewTab: (uriString: String, path: String?, title: String) -> Unit,
+        // v1.13.0: media (image/video/audio) opens in its own tab from the
+        // Explorer, same tab machinery as documents.
+        onOpenViewerInNewTab: (path: String, title: String) -> Unit,
     ) -> Unit
 ) {
     val context = LocalContext.current
@@ -228,6 +231,23 @@ fun DesktopNavigation(
         navController.navigate(route) { launchSingleTop = true }
     }
 
+    // v1.13.0: media opened from the Explorer gets its own tab (previously it
+    // replaced the current tab). The launch is prepared by the caller with
+    // startFullscreen=false, so the tab starts with chrome and its overlay
+    // fullscreen button expands the viewer inside the tab.
+    fun openViewerInNewTab(path: String, title: String) {
+        val route = "viewer/" + Uri.encode(path)
+        val fileName = FolderNames.folderDisplayName(path)
+        val tab = DesktopTab(
+            nextTabId++,
+            title.ifBlank { fileName.ifBlank { context.getString(R.string.photos) } },
+            route,
+        )
+        tabs.add(tab)
+        selectedTabId = tab.id
+        navController.navigate(route) { launchSingleTop = true }
+    }
+
     val dropTarget = remember(settingsViewModel) {
         object : DragAndDropTarget {
             override fun onDrop(event: DragAndDropEvent): Boolean {
@@ -293,7 +313,7 @@ fun DesktopNavigation(
                 modifier = Modifier.weight(1f).fillMaxWidth()
                     .padding(bottom = if (miniTitle.isNotEmpty()) 84.dp else 0.dp)
             ) {
-                navHost(settingsViewModel::addPinnedFolder, ::openInNewTab, ::openDocInNewTab)
+                navHost(settingsViewModel::addPinnedFolder, ::openInNewTab, ::openDocInNewTab, ::openViewerInNewTab)
             }
             // v1.8.0 (#7): always-visible mode indicator so users can tell
             // desktop/DeX UI apart from the normal touch UI.

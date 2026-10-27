@@ -33,7 +33,14 @@ import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ManageDashboardScreen(navController: NavHostController, viewModel: FileViewModel) {
+fun ManageDashboardScreen(
+    navController: NavHostController,
+    viewModel: FileViewModel,
+    // v1.13.0: desktop opens recent media in a new tab; touch keeps the
+    // existing viewer navigation. Defaults preserve old call sites.
+    desktop: Boolean = false,
+    onOpenViewerInNewTab: (path: String, title: String) -> Unit = { _, _ -> },
+) {
     // Same canonical roots as the browser and DeX sidebar (incl. SD/USB), resolved off the main thread.
     var storageRoots by remember { mutableStateOf<List<String>>(emptyList()) }
     LaunchedEffect(Unit) {
@@ -62,8 +69,21 @@ fun ManageDashboardScreen(navController: NavHostController, viewModel: FileViewM
                 StorageUsageCard(storageRoots.firstOrNull(), mediaViewState)
             }
             item {
-                RecentFilesRow(mediaViewState) { file ->
-                    navController.navigate("viewer/${android.net.Uri.encode(file.path)}")
+                RecentFilesRow(mediaViewState) { recent, file ->
+                    // v1.13.0: viewer follows the recent row's order; desktop
+                    // media opens in its own tab, everything else keeps the
+                    // previous direct navigation.
+                    val isMedia = file.mimeType.startsWith("image/") ||
+                        file.mimeType.startsWith("video/") ||
+                        file.mimeType.startsWith("audio/")
+                    if (isMedia) {
+                        viewModel.prepareViewer(recent, file.path, startFullscreen = !desktop)
+                    }
+                    if (desktop && isMedia) {
+                        onOpenViewerInNewTab(file.path, file.name)
+                    } else {
+                        navController.navigate("viewer/${android.net.Uri.encode(file.path)}")
+                    }
                 }
             }
             item {
@@ -197,7 +217,7 @@ private fun RoundedCornerShapeAll(radius: androidx.compose.ui.unit.Dp) =
     androidx.compose.foundation.shape.RoundedCornerShape(radius)
 
 @Composable
-private fun RecentFilesRow(mediaViewState: ViewState, onOpen: (MediaFile) -> Unit) {
+private fun RecentFilesRow(mediaViewState: ViewState, onOpen: (List<MediaFile>, MediaFile) -> Unit) {
     val files = (mediaViewState as? ViewState.Success)?.files.orEmpty()
     val recent = remember(files) { files.sortedByDescending { it.dateModified }.take(10) }
     if (recent.isEmpty()) return
@@ -208,7 +228,7 @@ private fun RecentFilesRow(mediaViewState: ViewState, onOpen: (MediaFile) -> Uni
             items(count = recent.size, key = { i -> recent[i].path }, contentType = { "recent" }) { i ->
                 val file = recent[i]
                 Card(
-                    modifier = Modifier.width(96.dp).clickable { onOpen(file) },
+                    modifier = Modifier.width(96.dp).clickable { onOpen(recent, file) },
                 ) {
                     Column(modifier = Modifier.padding(8.dp)) {
                         Box(

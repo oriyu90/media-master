@@ -1,7 +1,14 @@
 # 設計書兼仕様書 (Media Master)
 
 ## バージョン情報
-- **Version:** 1.12.2
+- **Version:** 1.13.0
+
+## v1.13.0 の設計変更（要約）
+- **表示順ページャー**: ナビゲーション引数に任意長のパス一覧を載せるとtransaction size/encodingが危険なため、`FileViewModel.ViewerLaunch(path, order, startFullscreen)`を一方向ハンドオフとして導入。呼び出し元（Library日付/コンパクト、Album、Category、Files、Manage最近）が「いま表示している順序」を`prepareViewer()`で渡し、`ViewerScreen`は`launch.path == route path`のときだけ採用。pure `ViewerOrder.resolve()`が対象のメディア種別（画像/動画・音声・単一）で順序を保持しつつ不足パスを除外し、launchが無い/古い場合はv1.12.2のグローバル一覧フォールバックを再現（deep link・プロセス復元互換）。`clearViewerLaunch(path)`は同一パスのみ破棄し、新旧launchの競合を防止。
+- **表示中ページの保持**: launchはコンポジション破棄では消さず、NavHost destinationの`Lifecycle.Event.ON_DESTROY`（pop時）だけ`clearViewerLaunch`。画像/動画エディタへ移動して戻る場合やメディア再スキャンでも、`lastShownPath`（`rememberSaveable`）を新しい一覧内へ再アンカーして、復元ページ番号が別ファイルを指す事故を防ぐ。
+- **全画面モデルの分離**: `ViewerScreen`の`isFullScreen`（没入）と`chromeVisible`（半透明オーバーレイ）を分離。タッチのライブラリ/アルバム/カテゴリ/ファイルは`isFullScreen=true, chromeVisible=false`で開始、タップはchromeのみトグル。オーバーレイ先頭に全画面/全画面終了ボタン（既存`fullscreen`/`exit_fullscreen`文言）を追加し、没入中は`WindowInsetsControllerCompat.hide(systemBars())`＋transient swipe、終了/`onDispose`で`show()`。`BackHandler(enabled=isFullScreen)`で解除優先→次でpop。動画は`PlayerView`のコントローラ可視性が両状態を同期（従来挙動維持）。`DocumentViewerScreen`は既存のfullscreen契約を変えず、touchの`!desktop`時のみシステムバーを隠す。
+- **Explorerのメディアタブ**: 既存の資料タブ機構を一般化し、`DesktopNavigation.openViewerInNewTab(path,title)`（route `viewer/{path}`、タブ名=ファイル名）を追加。`MediaNavHost`第4コールバック→Files/Category/Manageへ配線し、desktopのみメディアを新規タブで開く（`startFullscreen=false`でツールバー表示、オーバーレイの全画面ボタンでタブ内没入）。touchは既定no-opで直接遷移のまま、資料の`openDocInNewTab`/ESC/戻るは不変。デスクトップの「全画面」はタブ内のアプリクロームのみを隠す（DeXキャプション/OSシステムバーはタブ外枠のため対象外、資料タブと同じ契約）。
+- 安全性：新規依存・権限・DB変更なし。launchはパス照合＋destinationのON_DESTROY時クリアで陳腐化を防止。`DesktopMode.activityOrNull`でActivity参照を解決しnull安全、システムバーは必ず復元。既存のスワイプ/ピンチ/OCR/dismissのpointerInput分岐は無変更。新規文言なし（既存5言語キーを再利用、parity維持）。
 
 ## v1.12.2 の設計変更（要約）
 - **アイコン縮小**: 前景フォルダを`<group scaleX/Y=0.72 pivot=54>`で中央基準縮小（昼夜共通）。背景・マスク定義は不変。

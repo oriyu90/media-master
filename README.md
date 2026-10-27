@@ -4,6 +4,16 @@ Media Master is an open-source Android media and file manager built with Kotlin 
 
 Media Master は、Kotlin と Jetpack Compose で開発されたオープンソースのAndroid向けメディア・ファイル管理アプリです。写真・動画、音楽、書類、ストレージ、アプリ／APK、編集、バックアップを1つのアプリで扱えます。
 
+## v1.13.0
+
+- **Media viewer follows the visible order:** swiping a photo/video now moves to the next/previous item exactly as ordered on screen — Library (date-grouped and compact density), Album, Category, Explorer and Manage → Recent. Before this, the pager used the global MediaStore list, so swiping jumped to an unrelated item/order even though the tapped image opened correctly.
+- **Fullscreen previews for Library and Documents:** on touch devices the media viewer opens immersive (status + navigation bars and the app overlay hidden); tapping reveals the translucent overlay containing delete, edit, share, rename, info **and the fullscreen/exit-fullscreen button**. Back leaves fullscreen first, then closes the viewer. The document viewer now also hides the system bars in its fullscreen mode. Bars are restored on exit/navigation.
+- **Explorer previews use tabs on desktop:** opening an image/video from the file browser, category or Manage opens it in its own titled tab (documents already did). The tab starts with chrome so the overlay's fullscreen button is discoverable, and fullscreen expands inside the tab; document tabs/ESC behaviour is unchanged.
+- **ライブラリのスワイプが表示順に追従:** 画像/動画のスワイプが、画面に表示されている順序（ライブラリの日付グループ・コンパクト密度、アルバム、カテゴリ、エクスプローラー、管理→最近）どおりに次/前へ移動するよう修正。従来はページャーが全メディアのグローバル順を使っていたため、タップした画像は正しくてもスワイプ先が表示順と一致していませんでした。
+- **ライブラリ/ドキュメントの全画面プレビュー:** タッチ端末ではメディアビューアが最初から全画面（ステータスバー・ナビゲーションバー・アプリの透かしを非表示）で開き、タップで削除・編集・共有・名前変更・情報と**全画面/全画面終了ボタン**を含む半透明オーバーレイを表示。戻るは全画面解除が先、次で閉じます。資料ビューアの全画面もシステムバーを隠すようになり、終了・画面遷移時に復元されます。
+- **デスクトップのエクスプローラーはタブ表示:** ファイルブラウザ・カテゴリ・管理から画像/動画を開くと、ファイル名の新規タブで表示（資料は従来どおり）。タブはツールバー表示で開き、オーバーレイの全画面ボタンでタブ内全画面に。資料タブ・ESCの挙動は不変です。
+- Version `1.13.0` (`versionCode 22`), signed with the same upload key as v0.1.0–v1.12.2 (APK Signature Scheme v2 verified). **APK SHA-256: `06baec2275ee3239ecca76caec22fd594d34772388b3228dc4de01049c6f49cb`**.
+
 ## v1.12.2
 
 - **Smaller launcher mark:** folder glyph scaled to 72% about the icon center (light/dark alike) for more breathing room inside launcher masks.

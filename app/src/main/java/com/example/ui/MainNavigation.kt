@@ -123,8 +123,8 @@ fun MainNavigation(
             val desktop = isDesktopLayout(desktopOverride) && maxWidth >= 600.dp
             if (desktop) {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    DesktopNavigation(navController, fileViewModel, settingsViewModel) { onPinFolder, onOpenFolderInNewTab, onOpenDocInNewTab ->
-                        MediaNavHost(navController, fileViewModel, settingsViewModel, true, onPinFolder, onOpenFolderInNewTab, onOpenDocInNewTab)
+                    DesktopNavigation(navController, fileViewModel, settingsViewModel) { onPinFolder, onOpenFolderInNewTab, onOpenDocInNewTab, onOpenViewerInNewTab ->
+                        MediaNavHost(navController, fileViewModel, settingsViewModel, true, onPinFolder, onOpenFolderInNewTab, onOpenDocInNewTab, onOpenViewerInNewTab)
                     }
                     com.example.playback.MiniPlayer(
                         onNavigateToAudio = { navController.navigate("nowPlaying") { launchSingleTop = true } },
@@ -244,6 +244,9 @@ private fun MediaNavHost(
     // v1.12.0: desktop opens documents in a new tab (tab title = file name);
     // phone keeps direct navigation (this default = old behavior).
     onOpenDocInNewTab: (uriString: String, path: String?, title: String) -> Unit = { _, _, _ -> },
+    // v1.13.0: desktop opens media in a new tab (Explorer parity with docs);
+    // phone keeps direct viewer navigation (default = old behavior).
+    onOpenViewerInNewTab: (path: String, title: String) -> Unit = { _, _ -> },
 ) {
     NavHost(navController = navController, startDestination = "home", modifier = Modifier.fillMaxSize()) {
         composable("home") { if (desktop) DesktopHomeScreen(navController) else HomeScreen(navController) }
@@ -252,7 +255,7 @@ private fun MediaNavHost(
         composable("nowPlaying") { NowPlayingScreen(navController) }
         composable("equalizer") { EqualizerScreen(navController) }
         composable("documents") { DocumentsScreen(fileViewModel, navController, desktop, onOpenDocInNewTab) }
-        composable("manage") { ManageDashboardScreen(navController, fileViewModel) }
+        composable("manage") { ManageDashboardScreen(navController, fileViewModel, desktop, onOpenViewerInNewTab) }
         composable(
             route = "file_browser?path={path}",
             arguments = listOf(androidx.navigation.navArgument("path") {
@@ -262,7 +265,7 @@ private fun MediaNavHost(
             })
         ) { backStackEntry ->
             val path = backStackEntry.arguments?.getString("path")?.let { Uri.decode(it) }
-            FilesScreen(fileViewModel, navController, path, onPinFolder, onOpenFolderInNewTab, desktop, onOpenDocInNewTab)
+            FilesScreen(fileViewModel, navController, path, onPinFolder, onOpenFolderInNewTab, desktop, onOpenDocInNewTab, onOpenViewerInNewTab)
         }
         composable("clean") { CleanScreen(fileViewModel, navController) }
         composable("network") { NetworkScreen(navController) }
@@ -276,11 +279,11 @@ private fun MediaNavHost(
             backStackEntry.arguments?.getString("playlistName")?.let(Uri::decode)?.let { PlaylistScreen(it, fileViewModel, navController) }
         }
         composable("category/{categoryName}") { backStackEntry ->
-            backStackEntry.arguments?.getString("categoryName")?.let(Uri::decode)?.let { CategoryScreen(it, fileViewModel, navController, desktop, onOpenDocInNewTab) }
+            backStackEntry.arguments?.getString("categoryName")?.let(Uri::decode)?.let { CategoryScreen(it, fileViewModel, navController, desktop, onOpenDocInNewTab, onOpenViewerInNewTab) }
         }
         composable("viewer/{path}") { backStackEntry ->
             val path = backStackEntry.arguments?.getString("path")?.let(Uri::decode)
-            ViewerScreen(path, fileViewModel, navController)
+            ViewerScreen(path, fileViewModel, navController, desktop)
         }
         composable(
             route = "docViewer/{uriString}?path={path}",

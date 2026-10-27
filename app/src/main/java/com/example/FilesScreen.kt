@@ -69,6 +69,9 @@ fun FilesScreen(
     // v1.12.0: desktop opens documents in a new tab (title = file name).
     // Phone default (no-op lambda) keeps direct navigation.
     onOpenDocInNewTab: (uriString: String, path: String?, title: String) -> Unit = { _, _, _ -> },
+    // v1.13.0: desktop opens media in a new tab (title = file name); phone
+    // keeps direct viewer navigation (default = old behavior).
+    onOpenViewerInNewTab: (path: String, title: String) -> Unit = { _, _ -> },
 ) {
     val viewState by viewModel.fileTreeState.collectAsStateWithLifecycle()
     val viewMode by viewModel.viewMode.collectAsStateWithLifecycle()
@@ -365,6 +368,26 @@ fun FilesScreen(
                         if (searchQuery.isBlank()) state.files
                         else state.files.filter { it.name.contains(searchQuery, ignoreCase = true) }
                     }
+                    // v1.13.0: Explorer media opens in its own desktop tab;
+                    // touch keeps direct navigation. Either way the viewer
+                    // receives this folder's exact displayed order (including
+                    // the active search filter and the current sort).
+                    val openFile: (MediaFile) -> Unit = { file ->
+                        val isMedia = file.mimeType.startsWith("image/") ||
+                            file.mimeType.startsWith("video/") ||
+                            file.mimeType.startsWith("audio/")
+                        if (isMedia) {
+                            viewModel.prepareViewer(displayedFiles, file.path, startFullscreen = !desktop)
+                        }
+                        if (desktop && isMedia) {
+                            onOpenViewerInNewTab(file.path, file.name)
+                        } else {
+                            openMediaFile(
+                                context, file, navController,
+                                onOpenDocInTab = if (desktop) onOpenDocInNewTab else null,
+                            )
+                        }
+                    }
                     if (viewMode == ViewMode.LIST) {
                         // v1.10.0 (#4): Win11 Details header on desktop lists.
                         if (desktop) {
@@ -406,7 +429,7 @@ fun FilesScreen(
                                         if (file.isDirectory) {
                                             viewModel.loadFiles(file.path)
                                         } else {
-                                            openMediaFile(context, file, navController, onOpenDocInTab = if (desktop) onOpenDocInNewTab else null)
+                                            openFile(file)
                                         }
                                     }
                                 }
@@ -437,7 +460,7 @@ fun FilesScreen(
                                         if (file.isDirectory) {
                                             viewModel.loadFiles(file.path)
                                         } else {
-                                            openMediaFile(context, file, navController, onOpenDocInTab = if (desktop) onOpenDocInNewTab else null)
+                                            openFile(file)
                                         }
                                     }
                                 }

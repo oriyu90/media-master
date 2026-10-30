@@ -12,13 +12,13 @@
 | ライセンス | MIT |
 | 著作者 | Yuki_Orita |
 | release APK | `app/build/outputs/apk/release/app-release.apk`（R8 + resource shrink 有効） |
-| APK SHA-256 | `1526670ce00492f092101ba2c4f03ce39b455530fcd389aff104409dc5bd564b` |
+| APK SHA-256 | `b09e2f31e4a20d4f376588fcd58b7a1d35dfc5011e5b99f835bc927172e57f95` |
 | 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.13.0 と同一鍵） |
 | GitHub Release | `v1.14.0` (GitHub Releases) |
 
 release APK は RSA 4096 ビット鍵・APK Signature Scheme v2 署名（`apksigner verify` で確認）。署名鍵は `common-rules-document/keystores/media-master-upload-key.jks`（alias `upload`）。
 
-v1.14.0 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitTest`(196件)/`:app:lintDebug`(0エラー)を確認。**実機（エミュレータ）デバッグ**で、ライブラリからの全画面表示（シェル＋システムバー非表示）、ツールバー上端の隙間なし、全画面ボタンの往復、ライブラリ発エディタの全画面、切り抜き16:9保存（1600×900）、90°回転保存（1200×1600）、四隅合わせ保存（1442×1091）、傾き/カラーの中央リセット、エクスプローラータブの全画面を目視し、FATAL 0件を確認。証明書は v0.1.0〜v1.13.0 と同一 `332ce386…eba6`（v2のみ）。
+v1.14.0 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitTest`(198件)/`:app:lintDebug`(0エラー)を確認。**実機（エミュレータ）デバッグ**で、ライブラリからの全画面表示（シェル＋システムバー非表示）、ツールバー上端の隙間なし、全画面ボタンの往復、ライブラリ発エディタの全画面、切り抜き16:9＋明るさの同時保存（1600×900・色適用）、90°回転保存（1200×1600）、四隅合わせ保存、傾き/カラーの中央リセット、エクスプローラータブの全画面、ライブラリの動画が再生コントローラ表示中も全画面のままであることを目視し、FATAL 0件を確認。証明書は v0.1.0〜v1.13.0 と同一 `332ce386…eba6`（v2のみ）。
 
 旧リリースの APK SHA-256: v1.13.0 `06baec2275ee3239ecca76caec22fd594d34772388b3228dc4de01049c6f49cb`、v1.12.2 `cb67f77dca5d9a638e2dba938b53d12533dffc4c0a239992523b9303422b8571`、v1.12.1 `847d1aad80da47eb519ea1b695878162e7f9bb48c133ee202cafa2b809b82112`、v1.12.0 `3d9ac550b7404af05c41a8178ec71eae2b0dab8d25db5472a5dc3ceb058c6cbd`、v1.11.0 `69da38c9a7ccbffab663c0043120ec930e3f0559d358fd739df1e082e5922a5c`、v1.10.0 `3663e54015d1495cdd32931412f1c7322a53f195aef0bdb9899fce0e9b07b585`、v1.9.2 `0d41403ece4d59eb94e62a5a4cb5e385f239d22614b16dd727c0d5154e4bc20a`、v1.9.1 `1883e8d144877af852be76d94e9a3d5feb42f94e839da35bd2e0440317bc4a3b`、v1.9.0 `74994a9d1313cb0b2acdec9b15b329b1d3b85b110e9901ef542855b4b33ee85b`、v1.8.0 `e7c07575bbbc6675672d2cf64a30a093fd5b3df1c8fd875eec9d8bfd71caf6c4`、 v1.7.1 `4f79abcc32747a6889787c22d051ff831d55aca27330f81923760fcc63fcc1ee`、v1.7.0 `08236934c0cbf522ce0432595933e03976368ec3b0ee000ad4ced962b2fa9fd5`、v1.6.0 `f922b2b2d797f69fe4b1c9a7aca366e9f1664f8b47c8cfbeeb9aaeb02235b615`。
 
@@ -29,6 +29,7 @@ v1.14.0 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitT
 - 修正：pure `ui/DesktopViewerPolicy.kt`（`isMediaPresentationRoute` / `shouldCollapseDesktopShell`）を追加。`ViewerScreen` は `onDesktopImmersiveChange(isFullScreen && hasTarget)` を通知し、`MainNavigation` が `desktopImmersive` を保持。`DesktopNavigation` はシェルの兄弟（サイドバー、タブ帯、フッター、MiniPlayer 予約）を `if (!hideShell)` で条件付きコンポーズする。NavHost の呼び出し位置は変えないため、ページャ/ズーム/OCR/バックスタックは保持される。ルート変更で非メディアルートなら必ず false に戻す。
 - システムバーの hide/show は `DesktopNavigation` の `DisposableEffect(hideShell)` が所有（ViewerScreen の `onDispose` が show するとビューア→編集でバーが復活するため）。タッチは従来どおり ViewerScreen 所有。デスクトップの ESC でも全画面解除（`onPreviewKeyEvent`＋`FocusRequester`）。
 - ライブラリ/アルバム発の編集画面も「メディア提示ルート」に含めるため全画面を維持。エクスプローラー（ピン留め/端末）発は `startFullscreen=false` のままタブ内表示で、全画面ボタンでウィンドウ全体に拡大。
+- **動画のコントローラ競合（リリース前スモークで発見）**: `PlayerView.setControllerVisibilityListener` が可視性で `isFullScreen` を上書きしていたため、ライブラリから動画を開くと再生コントローラ表示直後にシェルが戻っていた。コントローラは `chromeVisible` のみを駆動し、没入状態は全画面ボタン/Back/ESCが所有するよう修正。動画もシェル/システムバーなしで開くことを実機確認。
 
 ### 2. 透かしツールバーの上隙間
 - 原因：`TopAppBar` の外側に `Modifier.windowInsetsPadding(safeDrawing.top)` を付けており、Material3 の Surface（背景）ごとステータスバー下へ押し下げていた。
@@ -46,7 +47,7 @@ v1.14.0 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitT
 ### 5. 四隅を合わせる（遠近補正）
 - pure `ui/editor/PerspectiveMath.kt`：`PerspectiveQuad`、凸性（外積の符号＋面積）、`perspectiveOutputSize`（対辺平均）、`setPolyToPoly` 用の src/dst 配列、表示座標変換、画素円形ヒットテスト。
 - 変形タブに「四隅を合わせる」を追加。モード中は画像上に四隅＋外側減光＋ガイド円を描き、ドラッグは交差する形を棄却。OK で `applyPerspective` が現在の幾何を原寸で焼き込み、quad→矩形へ写像した新ビットマップに置換（キャンセル/リセット/失敗Toast付き）。幾何パラメータは焼き込み済みのため0へ戻す。
-- 実機：左上の角を内側へドラッグ→OK で画像が切り抜き＆変形され、保存結果 `1442×1091`。FATAL 0件。
+- 実機：左上の角を内側へドラッグ→OK で画像が切り抜き＆変形され、保存結果 `1260×972`。FATAL 0件。
 
 ### 6. 幾何パイプラインの作り直し（プレビュー=保存）
 - 新規 pure `ui/editor/GeometryMath.kt`：`tiltProjectedCorners`（画像長辺に比例したカメラ距離の純射影）、`geometryCorners`（tilt→flip→rotateZ）、`geometryBounds`。`android.graphics.Camera` を廃止（ピクセル固定距離のため1024pxプレビューと原寸保存で歪みが不一致だった）。
@@ -58,13 +59,15 @@ v1.14.0 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitT
 - 新規依存・権限・DB変更なし。minSdk24維持。`startFullscreen` 既定（ライブラリ/アルバム=true、エクスプローラー=false）は不変。出力先は従来どおり `Pictures/Edited`（元ファイル不変）。
 
 ## v1.14.0 検証
-- `:app:testDebugUnitTest` **196件全通過**（v1.13.0の152件＋`DesktopViewerPolicyTest` 4、`CropMathTest` 18、`PerspectiveMathTest` 12、`GeometryMathTest` 10、既存差分）。
+- `:app:testDebugUnitTest` **198件全通過**（v1.13.0の152件＋`DesktopViewerPolicyTest` 4、`CropMathTest` 20、`PerspectiveMathTest` 12、`GeometryMathTest` 10、既存差分）。
 - `:app:lintDebug` 0エラー（警告133・ヒント10のみ）、`:app:assembleDebug` 成功、`:app:assembleRelease` 署名・`apksigner verify` はリリース節。
 - **実機デバッグ（mm3 AVD / Android 16.1 / 2400×1080 / 設定→デスクトップモード→常にデスクトップ）**:
   - ライブラリ→画像タップ：サイドバー・タブ帯・フッター・MiniPlayer・システムバーが消え、画像がウィンドウ全体に表示（uiautomator は `Image viewer [0,0][2400,1080]` のみ）。ツールバー表示時は y=0..167 がバー背景で隙間なし。`Exit fullscreen` でシェルとバーが復帰し、再度 `Enter fullscreen` で全画面。
-  - `Edit` でエディタへ：シェルなし・システムバーなしの全画面。切り抜き 16:9→保存 1600×900、90°回転→保存 1200×1600、四隅合わせ→保存 1442×1091。カラー/傾きリセットも実機確認。
+  - `Edit` でエディタへ：シェルなし・システムバーなしの全画面。切り抜き 16:9→保存 1600×900、90°回転→保存 1200×1600、四隅合わせ→保存 1260×972。カラー/傾きリセットも実機確認。
   - ピン留め `Pictures`→`Edited` の画像：ファイル名タブでビューアが開き、タブ内はツールバー表示。`Enter fullscreen` でシェル＋バーが消え、Back でタブに復帰。
-  - リリース署名APK（R8有効）をクリーンインストールして起動・ライブラリ→全画面表示・変形タブ→四隅合わせ→OK→保存（1422×1076）まで確認し、FATAL 0件（R8で難読化された実配布物のスモーク）。
+  - ライブラリから動画を開く：再生コントローラが表示されてもシェル/システムバーは復帰せず、ウィンドウ全体のまま。
+  - 切り抜き16:9＋明るさ変更の同時保存：`Edited_Image_...jpg` が1600×900で、色行列が1パスで適用されていることを画素で確認。四隅合わせ→保存（1260×972）も再確認。
+  - リリース署名APK（R8有効）をクリーンインストールして起動・ライブラリ→全画面表示・変形タブ→四隅合わせ→OK→保存（1260×972）まで確認し、FATAL 0件（R8で難読化された実配布物のスモーク）。
   - `logcat -b crash` FATAL 0件。
   - 参考：v1.13.0 署名APKでも同じ操作を再現し、ライブラリのメディアがタブ内表示のまま（本改修の対象バグ）であること、およびデスクトップライブラリの初期スクロールで先頭行が見切れる既存挙動（本改修前から同一）を確認した。後者は今回のスコープ外（ライブラリの表示順・スクロール仕様）として記録する。
   - 既知の制約：横長（高さ411dp）のデスクトップウィンドウでは編集コントロールが縦スクロールになる（画像領域を確保するため）。タッチ/縦画面では従来どおり全景が収まる。
@@ -72,7 +75,7 @@ v1.14.0 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitT
 ## v1.14.0 設計評価（リリース後レビュー）
 
 ### 目的と結果
-5件の要望はすべて実装・実機確認済み。①ライブラリ（デスクトップ）の全画面、②ツールバー上端の隙間、③傾き/カラーの中央リセット、④切り抜きのアスペクト比、⑤四隅合わせ。196件の単体テスト、lint 0エラー、R8署名APKの実機スモークまで完了した。
+5件の要望はすべて実装・実機確認済み。①ライブラリ（デスクトップ）の全画面、②ツールバー上端の隙間、③傾き/カラーの中央リセット、④切り抜きのアスペクト比、⑤四隅合わせ。198件の単体テスト、lint 0エラー、R8署名APKの実機スモークまで完了した。
 
 ### 主要な設計判断（代替案との比較）
 - **シェル折り畳み**: 別Activity/別NavHostで全画面表示する案、`ModalBottomSheet`的に上へ重ねる案、`movableContentOf`で移す案を検討。別ホストはバックスタック・ページャ・OCR・ズーム状態の引き継ぎが複雑で、`movableContentOf`は呼び出し箇所の制約が大きい。**サイドバー/タブ帯/フッター/MiniPlayerという兄弟だけを条件付きコンポーズ**する方式が最小差分で状態を保持でき、ルートゲート（`DesktopViewerPolicy`）と組み合わせて復帰漏れも防げるため採用。
@@ -89,6 +92,17 @@ v1.14.0 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitT
 - **多言語/RTL**: 5ロケール（en/ja/zh/ar/nl）に同一キーを追加し、`LocaleStringParityTest`とXMLパースで確認。レイアウトは`start/end`と対称な四隅計算のためRTLでも破綻しない。
 - **アクセシビリティ**: リセットボタンに`reset_adjustment`のcontentDescription、スライダーに軸名のcontentDescription、48dpタップ領域、`FilterChip`の選択状態を維持。
 - **性能**: プレビュー再描画は1024px・キャンセル可能。エディタ起動時のみデコード。`LazyRow`/`LazyVerticalGrid`のkey/contentTypeは既存方針を維持。
+
+### リリース前の独立監査（サブエージェント）と対応
+公開後に別コンテキストの監査エージェントへ v1.14.0 の差分を読取専用でレビューさせ、以下を修正した。
+- **切り抜き比率の維持**: 傾き/回転で画像のアスペクトが変わるたびに `fitAspect`（最大枠）で切り抜きがリセットされていた。`rescaleToAspect` を追加し、現在の高さを保ったまま比率に合わせて幅だけ再計算する方式へ（初回ロード/復元時は再計算しない）。
+- **メモリ上限**: 4096pxデコード後も回転で外接矩形が拡大し、保存時に100MB級のBitmapを追加確保し得た。`applyGeometry` の出力長辺も4096pxにクランプし、色行列は切り抜き用の中間Bitmapを作らず1パスで描画。さらに `android:largeHeap="true"` を付与。
+- **編集画面のカットアウト**: デスクトップでステータスバー非表示時にM3既定インセットではカットアウトへ食い込むため、`safeDrawing` を `windowInsets` に指定。
+- **失敗表示**: 遠近適用の失敗（poly-to-poly/確保失敗）で「四隅が交差」と誤表示していたため、専用 `perspective_failed` を追加。
+- **リセット文言**: コントラスト/彩度の既定は範囲中央ではないため、contentDescriptionを「Reset」系へ統一。
+- **レターボックスの角**: 切り抜き枠が全画面のとき角ハンドルの半分が画像外になるため、角のタップ開始のみ画像外（許容範囲内）も受け付けるよう変更。
+- **状態復元**: `cropRect`/`aspectOption`/`quad` を `rememberSaveable`（Saver）にし、傾き/回転だけ復元されて切り抜きが消える不整合を解消。
+- 監査の指摘のうち「四隅OKで既存の切り抜きがリセットされる」「ラスタ出力のinstrumentedテストがない」は既知の制約/テスト課題として残す（後者は今後の候補）。
 
 ### 残課題（意図的なスコープ外）
 - 画像編集のUndo/Redo（四隅OKは焼き込みのため不可逆。必要なら編集セッションのスタック導入）。

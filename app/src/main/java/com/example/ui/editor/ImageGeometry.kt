@@ -9,6 +9,7 @@ import android.graphics.Color
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Matrix
 import android.graphics.Paint
+import android.graphics.Rect
 import android.net.Uri
 import android.provider.MediaStore
 import androidx.annotation.WorkerThread
@@ -19,6 +20,7 @@ import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 /**
  * v1.14.0: one geometry pipeline shared by the live preview and the save.
@@ -122,14 +124,30 @@ fun applyGeometry(source: Bitmap, params: GeometryParams): Bitmap {
     val height = source.height
     val matrix = geometryMatrix(width, height, params)
     val bounds = transformedBounds(width, height, params)
-    val outW = ceil(bounds[2] - bounds[0]).toInt().coerceAtLeast(1)
-    val outH = ceil(bounds[3] - bounds[1]).toInt().coerceAtLeast(1)
+    val rawW = ceil(bounds[2] - bounds[0]).toInt().coerceAtLeast(1)
+    val rawH = ceil(bounds[3] - bounds[1]).toInt().coerceAtLeast(1)
+    // Rotation/tilt enlarge the bounding box (a 45° rotation of a 4096px
+    // image is ~5800px). Clamp the output too, not just the decode, so the
+    // save cannot allocate a >100 MB ARGB bitmap on top of the source.
+    var outW = rawW
+    var outH = rawH
+    val maxEdge = max(rawW, rawH)
+    val scale = if (maxEdge > MAX_EDIT_EDGE) {
+        MAX_EDIT_EDGE.toFloat() / maxEdge
+    } else {
+        1f
+    }
+    if (scale < 1f) {
+        outW = (rawW * scale).roundToInt().coerceAtLeast(1)
+        outH = (rawH * scale).roundToInt().coerceAtLeast(1)
+    }
     val output = Bitmap.createBitmap(outW, outH, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(output)
     // The editor/viewer background is black; use the same for the corners
     // exposed by a tilt so the preview and the saved JPEG agree.
     canvas.drawColor(Color.BLACK)
     matrix.postTranslate(-bounds[0], -bounds[1])
+    if (scale < 1f) matrix.postScale(scale, scale)
     val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     canvas.drawBitmap(source, matrix, paint)
     return output
@@ -181,37 +199,42 @@ suspend fun saveEditedImage(
     colorMatrix: android.graphics.ColorMatrix?,
 ): Result<Uri> = withContext(Dispatchers.IO) {
     runCatching {
-        val geometry = applyGeometry(source, params)
-        var cropped: Bitmap? = null
-        var output: Bitmap? = null
+        val owned = mutableListOf<Bitmap>()
         try {
+            val geometry = applyGeometry(source, params)
+            if (geometry !== source) owned += geometry
             val pixels = crop.toPixelRect(geometry.width, geometry.height)
-            val croppedBitmap: Bitmap = if (pixels.left == 0 && pixels.top == 0 &&
+            val full = pixels.left == 0 && pixels.top == 0 &&
                 pixels.right == geometry.width && pixels.bottom == geometry.height
-            ) {
-                geometry
-            } else {
-                Bitmap.createBitmap(geometry, pixels.left, pixels.top, pixels.width, pixels.height)
-            }
-            cropped = croppedBitmap
-            // Free the full-frame copy as soon as the crop exists: editing a
-            // 48 MP photo otherwise holds three ARGB buffers at once.
-            if (croppedBitmap !== geometry && geometry !== source && !geometry.isRecycled) {
-                geometry.recycle()
-            }
-            val outputBitmap: Bitmap = if (colorMatrix != null) {
-                val target = Bitmap.createBitmap(croppedBitmap.width, croppedBitmap.height, Bitmap.Config.ARGB_8888)
-                val canvas = Canvas(target)
+            // One pass for the colour path: draw the crop rect straight into
+            // the colour target instead of allocating a separate cropped
+            // bitmap (saves a full-resolution ARGB buffer at save time).
+            val output: Bitmap = if (colorMatrix != null) {
+                val target = Bitmap.createBitmap(pixels.width, pixels.height, Bitmap.Config.ARGB_8888)
+                owned += target
                 val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     colorFilter = ColorMatrixColorFilter(colorMatrix)
                 }
-                canvas.drawBitmap(croppedBitmap, 0f, 0f, paint)
-                if (croppedBitmap !== source && !croppedBitmap.isRecycled) croppedBitmap.recycle()
+                Canvas(target).drawBitmap(
+                    geometry,
+                    Rect(pixels.left, pixels.top, pixels.right, pixels.bottom),
+                    Rect(0, 0, pixels.width, pixels.height),
+                    paint,
+                )
                 target
+            } else if (full) {
+                geometry
             } else {
-                croppedBitmap
+                val cropped = Bitmap.createBitmap(
+                    geometry,
+                    pixels.left,
+                    pixels.top,
+                    pixels.width,
+                    pixels.height,
+                )
+                owned += cropped
+                cropped
             }
-            output = outputBitmap
 
             val values = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, "Edited_Image_${System.currentTimeMillis()}.jpg")
@@ -227,7 +250,7 @@ suspend fun saveEditedImage(
                 ?: throw IOException("MediaStore insert returned null")
             val saved = runCatching {
                 context.contentResolver.openOutputStream(uri)?.use { stream ->
-                    outputBitmap.compress(Bitmap.CompressFormat.JPEG, 95, stream)
+                    output.compress(Bitmap.CompressFormat.JPEG, 95, stream)
                 } ?: false
             }.getOrDefault(false)
             if (!saved) {
@@ -236,20 +259,9 @@ suspend fun saveEditedImage(
             }
             uri
         } finally {
-            val finalOutput = output
-            val finalCropped = cropped
-            if (finalOutput != null && finalOutput !== source && !finalOutput.isRecycled) {
-                finalOutput.recycle()
-            }
-            if (finalCropped != null && finalCropped !== source &&
-                finalCropped !== finalOutput && !finalCropped.isRecycled
-            ) {
-                finalCropped.recycle()
-            }
-            if (geometry !== source && geometry !== finalCropped &&
-                geometry !== finalOutput && !geometry.isRecycled
-            ) {
-                geometry.recycle()
+            // Only bitmaps we allocated; the caller still owns `source`.
+            owned.forEach { bitmap ->
+                if (!bitmap.isRecycled) runCatching { bitmap.recycle() }
             }
         }
     }

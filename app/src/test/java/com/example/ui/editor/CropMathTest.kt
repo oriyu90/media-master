@@ -190,4 +190,24 @@ class CropMathTest {
         assertEquals(0f, fit.width, epsilon)
         assertEquals(0f, fit.height, epsilon)
     }
+
+    @Test
+    fun `rescaleToAspect keeps a locked ratio when the bitmap aspect changes`() {
+        // A 1:1 crop at 40% height on a 1.0 aspect bitmap.
+        val rect = CropRect(0.3f, 0.3f, 0.5f, 0.5f)
+        val rescaled = rescaleToAspect(rect, 1f, 2f)
+        assertRatio(rescaled, 1f, 2f)
+        assertEquals(0.4f, rescaled.centerX, 0.01f)
+        assertEquals(0.4f, rescaled.centerY, 0.01f)
+        assertInside(rescaled)
+    }
+
+    @Test
+    fun `rescaleToAspect never shrinks below the minimum size`() {
+        val rect = CropRect(0.49f, 0.49f, 0.51f, 0.51f)
+        val rescaled = rescaleToAspect(rect, 16f / 9f, 4f / 3f)
+        assertTrue(rescaled.width >= 0.05f - 0.001f)
+        assertTrue(rescaled.height >= 0.05f - 0.001f)
+        assertInside(rescaled)
+    }
 }

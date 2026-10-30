@@ -684,9 +684,13 @@ fun ViewerScreen(
                                                 setShowRewindButton(true)
                                                 setShowFastForwardButton(true)
                                                 setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { visibility ->
-                                                    // v1.13.0: controller visibility drives both
-                                                    // concepts so video overlay/fullscreen stays in sync.
-                                                    isFullScreen = visibility != android.view.View.VISIBLE
+                                                    // v1.14.0: the PlayerView shows its controller as
+                                                    // soon as a video starts. Driving isFullScreen from
+                                                    // that visibility immediately dropped the desktop
+                                                    // shell back in, so a video opened from Library was
+                                                    // never full-window. The controller now only drives
+                                                    // the overlay; immersive mode is owned by the
+                                                    // fullscreen button / Back / ESC.
                                                     chromeVisible = visibility == android.view.View.VISIBLE
                                                 })
                                             }

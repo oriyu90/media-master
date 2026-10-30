@@ -268,3 +268,43 @@ fun fitImageRect(
 /** True when a normalized point lies inside the rectangle. */
 fun CropRect.containsNormalized(x: Float, y: Float): Boolean =
     x >= left && x <= right && y >= top && y <= bottom
+
+/**
+ * Keep a locked-aspect frame when the working bitmap's aspect changes (tilt
+ * bounds or a rotation). Unlike [fitAspect] this never jumps to the maximum
+ * frame: the current height is kept and only the width is adjusted to the
+ * new normalized ratio, centred on the old frame and clamped to bounds.
+ */
+fun rescaleToAspect(
+    rect: CropRect,
+    ratio: Float,
+    imageAspect: Float,
+    minSize: Float = 0.05f,
+): CropRect {
+    if (!isValidAspect(ratio) || !isValidAspect(imageAspect)) return rect.normalized()
+    val k = ratio / imageAspect // normalized width / height
+    if (!k.isFinite() || k <= 0f) return rect.normalized()
+    val current = rect.normalized()
+    var h = current.height.coerceAtLeast(minSize)
+    var w = h * k
+    if (w > 1f) {
+        w = 1f
+        h = w / k
+    }
+    if (h > 1f) {
+        h = 1f
+        w = h * k
+    }
+    if (w < minSize) {
+        w = minSize
+        h = w / k
+    }
+    if (h < minSize) {
+        h = minSize
+        w = h * k
+    }
+    if (w > 1f || h > 1f) return fitAspect(current, ratio, imageAspect)
+    val cx = current.centerX.coerceIn(w / 2f, 1f - w / 2f)
+    val cy = current.centerY.coerceIn(h / 2f, 1f - h / 2f)
+    return CropRect(cx - w / 2f, cy - h / 2f, cx + w / 2f, cy + h / 2f)
+}

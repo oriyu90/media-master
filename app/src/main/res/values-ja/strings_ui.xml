@@ -59,6 +59,7 @@
     <string name="select_file">ファイルを選択</string>
     <string name="pick_file_hint">ファイルをタップしてリクエスト元のアプリに渡します</string>
 
-    <string name="reset_adjustment">中央に戻す</string><string name="crop_aspect_ratio">アスペクト比</string><string name="aspect_free">自由</string><string name="aspect_original">元の比率</string><string name="aspect_square">1:1</string><string name="aspect_4_3">4:3</string><string name="aspect_3_4">3:4</string><string name="aspect_16_9">16:9</string><string name="aspect_9_16">9:16</string><string name="aspect_3_2">3:2</string><string name="aspect_2_3">2:3</string>
+    <string name="reset_adjustment">リセット</string><string name="crop_aspect_ratio">アスペクト比</string><string name="aspect_free">自由</string><string name="aspect_original">元の比率</string><string name="aspect_square">1:1</string><string name="aspect_4_3">4:3</string><string name="aspect_3_4">3:4</string><string name="aspect_16_9">16:9</string><string name="aspect_9_16">9:16</string><string name="aspect_3_2">3:2</string><string name="aspect_2_3">2:3</string>
     <string name="crop_help">枠をドラッグして切り抜きます。アスペクト比を選ぶと固定されます。</string><string name="reset_crop">切り抜きをリセット</string><string name="perspective_align_corners">四隅を合わせる</string><string name="perspective_help">四隅をドラッグし、OKでその範囲を切り抜いて変形します。</string><string name="perspective_invalid">四隅が交差しないようにしてください。</string><string name="ok">OK</string><string name="save_failed">編集した画像を保存できませんでした。</string><string name="image_open_failed">この画像を開けませんでした。</string>
+    <string name="perspective_failed">遠近補正を適用できませんでした。</string>
 </resources>

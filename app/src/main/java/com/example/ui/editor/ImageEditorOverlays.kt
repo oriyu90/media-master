@@ -51,9 +51,12 @@ fun CropOverlay(
                     val down = awaitFirstDown(requireUnconsumed = false)
                     val nx = (down.position.x - fit.left) / fit.width
                     val ny = (down.position.y - fit.top) / fit.height
-                    if (nx < 0f || nx > 1f || ny < 0f || ny > 1f) return@awaitEachGesture
                     val toleranceX = (handlePx / fit.width).coerceIn(0.01f, 0.5f)
                     val toleranceY = (handlePx / fit.height).coerceIn(0.01f, 0.5f)
+                    // Corner grips are allowed to start slightly in the
+                    // letterbox (a FULL crop puts half of each grip on the
+                    // image edge); moving the frame still requires a point
+                    // inside it.
                     val corner = hitTestCorner(latest, nx, ny, toleranceX, toleranceY)
                     val moving = corner == null && latest.containsNormalized(nx, ny)
                     if (corner == null && !moving) return@awaitEachGesture

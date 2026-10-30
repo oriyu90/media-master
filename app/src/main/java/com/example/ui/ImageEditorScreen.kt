@@ -16,6 +16,8 @@ import androidx.compose.material.icons.automirrored.filled.CompareArrows
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,7 +38,9 @@ import com.example.ui.editor.AspectOption
 import com.example.ui.editor.CropOverlay
 import com.example.ui.editor.CropRect
 import com.example.ui.editor.GeometryParams
+import com.example.ui.editor.NormalizedPoint
 import com.example.ui.editor.PerspectiveOverlay
+import com.example.ui.editor.PerspectiveQuad
 import com.example.ui.editor.applyPerspective
 import com.example.ui.editor.decodeSampledBitmap
 import com.example.ui.editor.defaultQuad
@@ -44,6 +48,7 @@ import com.example.ui.editor.downscaleBitmap
 import com.example.ui.editor.fitAspect
 import com.example.ui.editor.fitImageRect
 import com.example.ui.editor.isUsableQuad
+import com.example.ui.editor.rescaleToAspect
 import com.example.ui.editor.resolveRatio
 import com.example.ui.editor.saveEditedImage
 import kotlinx.coroutines.Dispatchers
@@ -54,6 +59,35 @@ import kotlin.math.abs
 private const val TAB_COLOR = 0
 private const val TAB_TRANSFORM = 1
 private const val TAB_CROP = 2
+
+private val CropRectSaver = listSaver<CropRect, Float>(
+    save = { listOf(it.left, it.top, it.right, it.bottom) },
+    restore = { CropRect(it[0], it[1], it[2], it[3]) },
+)
+
+private val AspectOptionSaver = Saver<AspectOption, String>(
+    save = { it.name },
+    restore = { runCatching { AspectOption.valueOf(it) }.getOrDefault(AspectOption.FREE) },
+)
+
+private val PerspectiveQuadSaver = listSaver<PerspectiveQuad, Float>(
+    save = {
+        listOf(
+            it.topLeft.x, it.topLeft.y,
+            it.topRight.x, it.topRight.y,
+            it.bottomRight.x, it.bottomRight.y,
+            it.bottomLeft.x, it.bottomLeft.y,
+        )
+    },
+    restore = {
+        PerspectiveQuad(
+            NormalizedPoint(it[0], it[1]),
+            NormalizedPoint(it[2], it[3]),
+            NormalizedPoint(it[4], it[5]),
+            NormalizedPoint(it[6], it[7]),
+        )
+    },
+)
 
 /**
  * v1.14.0 image editor.
@@ -89,10 +123,10 @@ fun ImageEditorScreen(uriString: String, navController: NavHostController) {
     var flipHorizontal by rememberSaveable { mutableStateOf(false) }
 
     // Crop / perspective
-    var cropRect by remember { mutableStateOf(CropRect.FULL) }
-    var aspectOption by remember { mutableStateOf(AspectOption.FREE) }
+    var cropRect by rememberSaveable(stateSaver = CropRectSaver) { mutableStateOf(CropRect.FULL) }
+    var aspectOption by rememberSaveable(stateSaver = AspectOptionSaver) { mutableStateOf(AspectOption.FREE) }
     var perspectiveMode by remember { mutableStateOf(false) }
-    var quad by remember { mutableStateOf(defaultQuad()) }
+    var quad by rememberSaveable(stateSaver = PerspectiveQuadSaver) { mutableStateOf(defaultQuad()) }
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
 
     val geometry = GeometryParams(
@@ -147,13 +181,18 @@ fun ImageEditorScreen(uriString: String, navController: NavHostController) {
         )
     }
 
-    // A rotate/flip changes the bitmap aspect; re-fit a locked crop frame so
-    // the visible frame keeps the ratio the chip promises.
-    LaunchedEffect(imageAspect, aspectOption) {
-        val ratio = aspectOption.resolveRatio(imageAspect)
-        if (ratio != null && !perspectiveMode) {
-            cropRect = fitAspect(cropRect, ratio, imageAspect)
-        }
+    // A rotate/flip changes the bitmap aspect. Keep a locked frame's ratio by
+    // rescaling it in place (never jump back to the maximum frame); the first
+    // real aspect after load/restore is adopted as-is.
+    var lastImageAspect by remember { mutableFloatStateOf(-1f) }
+    LaunchedEffect(previewBitmap, imageAspect) {
+        if (previewBitmap == null) return@LaunchedEffect
+        val previous = lastImageAspect
+        lastImageAspect = imageAspect
+        if (previous <= 0f || perspectiveMode) return@LaunchedEffect
+        if (abs(imageAspect - previous) < 0.0001f) return@LaunchedEffect
+        val ratio = aspectOption.resolveRatio(imageAspect) ?: return@LaunchedEffect
+        cropRect = rescaleToAspect(cropRect, ratio, imageAspect)
     }
 
     fun save() {
@@ -202,7 +241,7 @@ fun ImageEditorScreen(uriString: String, navController: NavHostController) {
             }
             if (baked == null) {
                 isApplyingPerspective = false
-                Toast.makeText(context, R.string.perspective_invalid, Toast.LENGTH_LONG).show()
+                Toast.makeText(context, R.string.perspective_failed, Toast.LENGTH_LONG).show()
             } else {
                 bitmap = baked
                 previewBitmap = baked
@@ -261,6 +300,11 @@ fun ImageEditorScreen(uriString: String, navController: NavHostController) {
                         }
                     }
                 },
+                // v1.14.0: bar background reaches the top edge while the
+                // title stays clear of a camera cutout in desktop windows.
+                windowInsets = WindowInsets.safeDrawing.only(
+                    WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
+                ),
             )
         }
     ) { innerPadding ->

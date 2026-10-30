@@ -136,7 +136,7 @@
     <string name="pick_file_hint">Tap a file to send it to the requesting app</string>
 
     <!-- v1.14.0: editor crop / perspective / reset affordances -->
-    <string name="reset_adjustment">Reset to center</string>
+    <string name="reset_adjustment">Reset</string>
     <string name="crop_aspect_ratio">Aspect ratio</string>
     <string name="aspect_free">Free</string>
     <string name="aspect_original">Original</string>
@@ -155,4 +155,5 @@
     <string name="ok">OK</string>
     <string name="save_failed">Could not save the edited image.</string>
     <string name="image_open_failed">Could not open this image.</string>
+    <string name="perspective_failed">Could not apply the perspective correction.</string>
 </resources>

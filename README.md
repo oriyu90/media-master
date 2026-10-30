@@ -4,6 +4,22 @@ Media Master is an open-source Android media and file manager built with Kotlin 
 
 Media Master は、Kotlin と Jetpack Compose で開発されたオープンソースのAndroid向けメディア・ファイル管理アプリです。写真・動画、音楽、書類、ストレージ、アプリ／APK、編集、バックアップを1つのアプリで扱えます。
 
+## v1.14.0
+
+- **Library is a full-window gallery on desktop:** opening a photo or video from Library (or an Album) on a desktop/DeX shell now folds away the sidebar, tab strip, footer and mini-player and hides the system bars, so the media fills the whole window. The overlay fullscreen button really toggles that state (it previously only hid the in-app toolbar), and the image/video editor opened from that viewer also stays full-window. Explorer tabs (pinned folders, devices) keep the viewer inside their tab; their fullscreen button expands it to the whole window and Back/ESC restores the tab.
+- **Overlay toolbar reaches the top edge:** removed the extra outer `windowInsetsPadding` that pushed the translucent bar (background included) below the status bar. The bar's surface now fills the status-bar/cutout area while its content stays safe, so there is no see-through gap above the buttons.
+- **Reset-to-centre buttons:** every tilt axis (X/Y/Z) and every colour slider now has a reset button at its right end. It returns contrast/saturation to 1 and the other values to 0, and disables itself when the slider is already neutral.
+- **Crop aspect ratios:** the Crop tab gained Free / Original / 1:1 / 4:3 / 3:4 / 16:9 / 9:16 / 3:2 / 2:3 presets. The frame locks to the chosen ratio while dragging and the saved JPEG matches it (a 16:9 crop of a 1600×1200 photo exports as 1600×900).
+- **Align corners (perspective):** the Transform tab now offers a four-corner mode next to flip and rotate. Drag each corner and tap OK; that quad immediately becomes the image's four corners (crop + perspective straighten). Cancel and reset are always available, and a folding/crossing quad is rejected instead of producing a broken export.
+- **Preview equals export:** tilt/rotate/flip are rendered with the same pure projection for the preview and the encoder. A 90° rotation now exports at the swapped dimensions instead of being clipped, and tilt is identical between the 1024px preview and the full-size save. Very large photos are sampled to 4096px while editing (OOM safety), and a failed save reports it instead of closing silently.
+- **ライブラリはデスクトップでも全画面ギャラリー:** デスクトップ/DeX でライブラリ（アルバム含む）から画像・動画を開くと、サイドバー・タブ帯・フッター・MiniPlayer を畳み、システムバーも隠してウィンドウ全体に表示します。透かしツールバーの全画面ボタンが実際にこの状態を切り替え（従来はアプリ内ツールバーが隠れるだけ）、そこから開く画像/動画エディタも全画面のままです。ピン留めフォルダ・端末のエクスプローラーは従来どおりタブ内表示で、全画面ボタンでウィンドウ全体に拡大、戻る/ESC でタブに復帰します。
+- **ツールバー上端の隙間を解消:** 半透明バー（背景ごと）をステータスバー下へ押し下げていた外側の `windowInsetsPadding` を削除。バーの Surface がステータスバー/カットアウト領域まで届き、内容だけが安全領域に収まるため、ボタン上の透け隙間がなくなります。
+- **中央リセットボタン:** 傾き X/Y/Z とカラー各項目のスライダー右端にリセットボタンを追加。コントラスト/彩度は 1、それ以外は 0 に戻し、既に中央なら無効表示になります。
+- **切り抜きのアスペクト比:** 切り抜きタブに 自由 / 元の比率 / 1:1 / 4:3 / 3:4 / 16:9 / 9:16 / 3:2 / 2:3 を追加。ドラッグ中も比率を維持し、保存結果も一致します（1600×1200 の 16:9 切り抜きは 1600×900 で保存）。
+- **四隅を合わせる（遠近補正）:** 変形タブの左右反転・90°回転の並びに四隅モードを追加。四隅をドラッグして OK を押すと、その範囲が画像の四隅になるよう即座に切り抜き＆変形します。キャンセル/リセットも常時可能で、四隅が交差する形は破綻防止のため適用しません。
+- **プレビューと保存の一致:** 傾き・回転・反転をプレビューと保存で同一の純射影から生成。90°回転は従来のように見切れず、長辺が入れ替わったサイズで保存され、1024px プレビューと原寸保存の傾きも一致します。巨大画像は編集中 4096px に間引いて OOM を防ぎ、保存失敗は無言で閉じずに通知します。
+- Version `1.14.0` (`versionCode 23`), signed with the same upload key as v0.1.0–v1.13.0 (APK Signature Scheme v2 verified). **APK SHA-256: `1526670ce00492f092101ba2c4f03ce39b455530fcd389aff104409dc5bd564b`**.
+
 ## v1.13.0
 
 - **Media viewer follows the visible order:** swiping a photo/video now moves to the next/previous item exactly as ordered on screen — Library (date-grouped and compact density), Album, Category, Explorer and Manage → Recent. Before this, the pager used the global MediaStore list, so swiping jumped to an unrelated item/order even though the tapped image opened correctly.

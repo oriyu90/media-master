@@ -1,6 +1,14 @@
 @file:androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 package com.example
 
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.onGloballyPositioned
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -90,6 +98,10 @@ fun ViewerScreen(
     // v1.13.0: desktop Explorer tabs start with chrome and enter immersive
     // through the overlay's fullscreen button; touch starts immersive.
     desktop: Boolean = false,
+    // v1.14.0: lets the desktop shell fold away (sidebar/tabs/footer/player)
+    // while this viewer is immersive, and come back when it is not. The shell
+    // gates this on the route, so a pop can never strand a chrome-less window.
+    onDesktopImmersiveChange: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
     if (path == null || viewModel == null) {
@@ -110,8 +122,10 @@ fun ViewerScreen(
     // bars hidden, app chrome off); chromeVisible = translucent top overlay.
     // Touch library/album previews start immersive; desktop tabs start with
     // chrome so the overlay is discoverable.
-    var isFullScreen by remember(path) { mutableStateOf(startFullscreen) }
-    var chromeVisible by remember(path) { mutableStateOf(!startFullscreen) }
+    // v1.14.0: rememberSaveable so a trip to the image/video editor and back
+    // keeps the immersive state (the destination's saved state survives).
+    var isFullScreen by rememberSaveable(path) { mutableStateOf(startFullscreen) }
+    var chromeVisible by rememberSaveable(path) { mutableStateOf(!startFullscreen) }
     
     // OCR State
     var isOcrMode by remember { mutableStateOf(false) }
@@ -135,11 +149,31 @@ fun ViewerScreen(
         chromeVisible = true
     }
 
+    // v1.14.0: the desktop shell follows the immersive flag. Only the viewer
+    // (and the editors it opened) report this; DesktopNavigation gates it on
+    // the current route and resets it when the user lands elsewhere.
+    SideEffect {
+        onDesktopImmersiveChange(hasTarget && isFullScreen)
+    }
+
+    // v1.14.0: desktop keyboard parity with DocumentViewerScreen — ESC leaves
+    // fullscreen first, a second ESC/back closes the viewer. Touch is covered
+    // by BackHandler above.
+    val escFocus = remember { FocusRequester() }
+    LaunchedEffect(desktop, isFullScreen, hasTarget) {
+        if (desktop && isFullScreen && hasTarget) {
+            runCatching { escFocus.requestFocus() }
+        }
+    }
+
     // v1.13.0: hide status + navigation bars in immersive mode (touch only).
     // Restored on exiting fullscreen and on leaving the screen so bars never
     // leak into another destination; a null activity (e.g. preview) is a no-op.
     val activity = remember(context) { com.example.desktop.DesktopMode.activityOrNull(context) }
     DisposableEffect(activity, isFullScreen, desktop, hasTarget) {
+        // Touch keeps the viewer-owned bar handling. Desktop is handled by
+        // the shell (DesktopNavigation) so the bars stay hidden across the
+        // editor round trip instead of being restored by this onDispose.
         val controller = if (hasTarget && !desktop && isFullScreen && activity != null) {
             WindowCompat.getInsetsController(activity.window, activity.window.decorView).also {
                 it.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
@@ -339,6 +373,21 @@ fun ViewerScreen(
         // v1.8.0 (#5): Scaffold content ignores innerPadding so the media
         // stays full-bleed; the bar is a translucent fade overlay that never
         // triggers remeasure/resize when toggled.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .focusRequester(escFocus)
+                .focusable()
+                .onPreviewKeyEvent { event ->
+                    if (isFullScreen && event.key == Key.Escape && event.type == KeyEventType.KeyUp) {
+                        isFullScreen = false
+                        chromeVisible = true
+                        true
+                    } else {
+                        false
+                    }
+                },
+        ) {
         Scaffold(
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
             containerColor = ViewerScrim,
@@ -500,11 +549,14 @@ fun ViewerScreen(
                             actionIconContentColor = ViewerOnSurface,
                             navigationIconContentColor = ViewerOnSurface
                         ),
-                        // v1.13.0: safeDrawing (not only statusBars) keeps the
-                        // bar clear of the camera cutout while system bars are
-                        // hidden in immersive mode.
-                        modifier = Modifier.windowInsetsPadding(
-                            WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
+                        // v1.14.0: the Surface must reach the very top edge —
+                        // the old outer windowInsetsPadding pushed the whole
+                        // bar (background included) below the status bar and
+                        // left a see-through gap. M3 applies `windowInsets`
+                        // *inside* the Surface, so the background fills the
+                        // status-bar/cutout area while the content stays safe.
+                        windowInsets = WindowInsets.safeDrawing.only(
+                            WindowInsetsSides.Top + WindowInsetsSides.Horizontal
                         ),
                     )
                     // Continuous veil below the bar: the translucent bar alone
@@ -703,6 +755,7 @@ fun ViewerScreen(
                 }
             }
         }
+        } // Box (ESC focus)
         } // when (Success)
     } // when
 }

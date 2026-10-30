@@ -30,17 +30,22 @@ fun AdjustmentControls(
     Column(modifier = modifier.fillMaxWidth()) {
         selectedAdjustment?.let { adjustment ->
             val label = stringResource(adjustment.labelRes)
+            val defaultValue = getDefaultAdjustmentValue(adjustment)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(label, style = MaterialTheme.typography.labelMedium)
-                Slider(
-                    value = adjustmentValues[adjustment] ?: getDefaultAdjustmentValue(adjustment),
+                // v1.14.0: EditorSlider renders the label, the slider and the
+                // right-hand reset button (contrast/saturation 1f, the rest
+                // 0f) in one row, so a separate Text(label) is not added.
+                com.example.ui.components.EditorSlider(
+                    label = label,
+                    value = adjustmentValues[adjustment] ?: defaultValue,
+                    defaultValue = defaultValue,
                     onValueChange = { onAdjustmentChange(adjustment, it) },
-                    valueRange = getAdjustmentRange(adjustment)
+                    valueRange = getAdjustmentRange(adjustment),
                 )
             }
         }

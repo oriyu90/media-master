@@ -122,14 +122,36 @@ fun MainNavigation(
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val desktop = isDesktopLayout(desktopOverride) && maxWidth >= 600.dp
             if (desktop) {
+                // v1.14.0: the Library is a gallery — its viewer (and the
+                // editor it opens) requests the whole window. The shell folds
+                // away and the overlay MiniPlayer hides with it.
+                var desktopImmersive by remember { mutableStateOf(false) }
                 Box(modifier = Modifier.fillMaxSize()) {
-                    DesktopNavigation(navController, fileViewModel, settingsViewModel) { onPinFolder, onOpenFolderInNewTab, onOpenDocInNewTab, onOpenViewerInNewTab ->
-                        MediaNavHost(navController, fileViewModel, settingsViewModel, true, onPinFolder, onOpenFolderInNewTab, onOpenDocInNewTab, onOpenViewerInNewTab)
+                    DesktopNavigation(
+                        navController,
+                        fileViewModel,
+                        settingsViewModel,
+                        immersive = desktopImmersive,
+                        onImmersiveChange = { desktopImmersive = it },
+                    ) { onPinFolder, onOpenFolderInNewTab, onOpenDocInNewTab, onOpenViewerInNewTab ->
+                        MediaNavHost(
+                            navController,
+                            fileViewModel,
+                            settingsViewModel,
+                            true,
+                            onPinFolder,
+                            onOpenFolderInNewTab,
+                            onOpenDocInNewTab,
+                            onOpenViewerInNewTab,
+                            onDesktopImmersiveChange = { desktopImmersive = it },
+                        )
                     }
-                    com.example.playback.MiniPlayer(
-                        onNavigateToAudio = { navController.navigate("nowPlaying") { launchSingleTop = true } },
-                        modifier = Modifier.align(Alignment.BottomCenter),
-                    )
+                    if (!desktopImmersive) {
+                        com.example.playback.MiniPlayer(
+                            onNavigateToAudio = { navController.navigate("nowPlaying") { launchSingleTop = true } },
+                            modifier = Modifier.align(Alignment.BottomCenter),
+                        )
+                    }
                 }
             } else {
                 // v1.9.0 (MD3 remake): phone shell uses a Scaffold whose
@@ -247,6 +269,8 @@ private fun MediaNavHost(
     // v1.13.0: desktop opens media in a new tab (Explorer parity with docs);
     // phone keeps direct viewer navigation (default = old behavior).
     onOpenViewerInNewTab: (path: String, title: String) -> Unit = { _, _ -> },
+    // v1.14.0: desktop shell takeover requested by the viewer.
+    onDesktopImmersiveChange: (Boolean) -> Unit = {},
 ) {
     NavHost(navController = navController, startDestination = "home", modifier = Modifier.fillMaxSize()) {
         composable("home") { if (desktop) DesktopHomeScreen(navController) else HomeScreen(navController) }
@@ -283,7 +307,7 @@ private fun MediaNavHost(
         }
         composable("viewer/{path}") { backStackEntry ->
             val path = backStackEntry.arguments?.getString("path")?.let(Uri::decode)
-            ViewerScreen(path, fileViewModel, navController, desktop)
+            ViewerScreen(path, fileViewModel, navController, desktop, onDesktopImmersiveChange)
         }
         composable(
             route = "docViewer/{uriString}?path={path}",

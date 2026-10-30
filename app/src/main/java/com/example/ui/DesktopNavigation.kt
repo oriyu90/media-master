@@ -17,6 +17,9 @@ import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draganddrop.DragAndDropEvent
@@ -147,6 +150,11 @@ fun DesktopNavigation(
     navController: NavHostController,
     fileViewModel: FileViewModel,
     settingsViewModel: SettingsViewModel,
+    // v1.14.0: the viewer/editor asks for the whole window; the shell then
+    // folds away. [immersive] is hoisted so the MiniPlayer drawn above this
+    // shell can hide in the same frame.
+    immersive: Boolean = false,
+    onImmersiveChange: (Boolean) -> Unit = {},
     navHost: @Composable (
         onPinFolder: (String) -> Unit,
         onOpenFolderInNewTab: (String) -> Unit,
@@ -181,6 +189,39 @@ fun DesktopNavigation(
     var nextTabId by remember { mutableLongStateOf(1L) }
     val currentEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentEntry?.destination?.route ?: "home"
+    // v1.14.0: leaving the viewer/editor (Back to Library, Home, ...) restores
+    // the shell even though the destination that asked for immersion is gone.
+    LaunchedEffect(currentRoute) {
+        if (!isMediaPresentationRoute(currentRoute)) onImmersiveChange(false)
+    }
+    val hideShell = shouldCollapseDesktopShell(immersive, currentRoute)
+
+    // v1.14.0: while the viewer owns the desktop window, hide the system bars
+    // there too. Doing it here (not in ViewerScreen) keeps them hidden when
+    // the viewer is replaced by the image/video editor, and restores them on
+    // the way back to a tabbed screen.
+    val immersiveActivity = remember(context) {
+        com.example.desktop.DesktopMode.activityOrNull(context)
+    }
+    DisposableEffect(immersiveActivity, hideShell) {
+        val controller = if (hideShell && immersiveActivity != null) {
+            WindowCompat.getInsetsController(
+                immersiveActivity.window,
+                immersiveActivity.window.decorView,
+            ).also {
+                it.systemBarsBehavior =
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                it.hide(WindowInsetsCompat.Type.systemBars())
+            }
+        } else null
+        onDispose {
+            if (controller != null) {
+                runCatching {
+                    controller.show(WindowInsetsCompat.Type.systemBars())
+                }
+            }
+        }
+    }
     LaunchedEffect(currentRoute) {
         val index = tabs.indexOfFirst { it.id == selectedTabId }
         if (index >= 0) {
@@ -262,62 +303,70 @@ fun DesktopNavigation(
     }
 
     Row(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
-        DesktopSidebar(
-            modifier = Modifier
-                .widthIn(min = 220.dp, max = 280.dp)
-                .fillMaxHeight()
-                .dragAndDropTarget(
-                    shouldStartDragAndDrop = { event ->
-                        ClipDescription.MIMETYPE_TEXT_PLAIN in event.mimeTypes()
-                    },
-                    target = dropTarget
-                ),
-            currentRoute = currentRoute,
-            storageRoots = roots,
-            standardPins = standardPins,
-            customPins = customPins.toList().sorted(),
-            serverUrl = serverUrl,
-            onNavigate = ::navigateInCurrentTab,
-            onNewTab = ::openInNewTab,
-            onRemovePin = settingsViewModel::removePinnedFolder
-        )
-        // v1.9.1: structural separators use outline, not outlineVariant —
-        // outlineVariant is ~1.9:1 on near-black dark surfaces (invisible
-        // hairlines); outline stays ≥3:1 in both themes.
-        VerticalDivider(color = MaterialTheme.colorScheme.outline)
-        Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-            DesktopTabStrip(
-                tabs = tabs,
-                selectedTabId = selectedTabId,
-                onSelect = { tab ->
-                    selectedTabId = tab.id
-                    navController.navigate(tab.route) { launchSingleTop = true }
-                },
-                onClose = { tab ->
-                    if (tabs.size == 1) return@DesktopTabStrip
-                    val wasSelected = selectedTabId == tab.id
-                    tabs.remove(tab)
-                    if (wasSelected) {
-                        val next = tabs.last()
-                        selectedTabId = next.id
-                        navController.navigate(next.route) { launchSingleTop = true }
-                    }
-                }
+        // v1.14.0: only the siblings are conditional — the NavHost below keeps
+        // its identity, so folding the shell never resets the viewer pager,
+        // zoom, OCR state or the back stack.
+        if (!hideShell) {
+            DesktopSidebar(
+                modifier = Modifier
+                    .widthIn(min = 220.dp, max = 280.dp)
+                    .fillMaxHeight()
+                    .dragAndDropTarget(
+                        shouldStartDragAndDrop = { event ->
+                            ClipDescription.MIMETYPE_TEXT_PLAIN in event.mimeTypes()
+                        },
+                        target = dropTarget
+                    ),
+                currentRoute = currentRoute,
+                storageRoots = roots,
+                standardPins = standardPins,
+                customPins = customPins.toList().sorted(),
+                serverUrl = serverUrl,
+                onNavigate = ::navigateInCurrentTab,
+                onNewTab = ::openInNewTab,
+                onRemovePin = settingsViewModel::removePinnedFolder
             )
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            // v1.9.1: structural separators use outline, not outlineVariant —
+            // outlineVariant is ~1.9:1 on near-black dark surfaces (invisible
+            // hairlines); outline stays ≥3:1 in both themes.
+            VerticalDivider(color = MaterialTheme.colorScheme.outline)
+        }
+        Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+            if (!hideShell) {
+                DesktopTabStrip(
+                    tabs = tabs,
+                    selectedTabId = selectedTabId,
+                    onSelect = { tab ->
+                        selectedTabId = tab.id
+                        navController.navigate(tab.route) { launchSingleTop = true }
+                    },
+                    onClose = { tab ->
+                        if (tabs.size == 1) return@DesktopTabStrip
+                        val wasSelected = selectedTabId == tab.id
+                        tabs.remove(tab)
+                        if (wasSelected) {
+                            val next = tabs.last()
+                            selectedTabId = next.id
+                            navController.navigate(next.route) { launchSingleTop = true }
+                        }
+                    }
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            }
             // v1.9.0 (MD3 remake): reserve the overlay MiniPlayer's height so
             // content grids never end up underneath it while audio plays.
             // Detection/layout logic above is untouched (DeX freeze).
+            // v1.14.0: no reservation while the viewer owns the whole window.
             val miniTitle by com.example.playback.PlaybackManager.currentMediaTitle.collectAsStateWithLifecycle()
             Box(
                 modifier = Modifier.weight(1f).fillMaxWidth()
-                    .padding(bottom = if (miniTitle.isNotEmpty()) 84.dp else 0.dp)
+                    .padding(bottom = if (!hideShell && miniTitle.isNotEmpty()) 84.dp else 0.dp)
             ) {
                 navHost(settingsViewModel::addPinnedFolder, ::openInNewTab, ::openDocInNewTab, ::openViewerInNewTab)
             }
             // v1.8.0 (#7): always-visible mode indicator so users can tell
             // desktop/DeX UI apart from the normal touch UI.
-            DesktopModeFooter()
+            if (!hideShell) DesktopModeFooter()
         }
     }
 }

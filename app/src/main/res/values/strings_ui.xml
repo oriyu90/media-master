@@ -60,7 +60,7 @@
     <string name="tilt_x">Tilt X (pitch)</string>
     <string name="tilt_y">Tilt Y (yaw)</string>
     <string name="tilt_z">Tilt Z (roll)</string>
-    <string name="perspective_crop_help">Drag the four red corners to set the perspective crop area.</string>
+
     <string name="reset_corners">Reset corners</string>
     <string name="notification_settings">Notification settings</string>
     <string name="cannot_open_app">Cannot open this app</string>
@@ -134,4 +134,25 @@
     <string name="exit_fullscreen">Exit fullscreen</string>
     <string name="select_file">Select file</string>
     <string name="pick_file_hint">Tap a file to send it to the requesting app</string>
+
+    <!-- v1.14.0: editor crop / perspective / reset affordances -->
+    <string name="reset_adjustment">Reset to center</string>
+    <string name="crop_aspect_ratio">Aspect ratio</string>
+    <string name="aspect_free">Free</string>
+    <string name="aspect_original">Original</string>
+    <string name="aspect_square">1:1</string>
+    <string name="aspect_4_3">4:3</string>
+    <string name="aspect_3_4">3:4</string>
+    <string name="aspect_16_9">16:9</string>
+    <string name="aspect_9_16">9:16</string>
+    <string name="aspect_3_2">3:2</string>
+    <string name="aspect_2_3">2:3</string>
+    <string name="crop_help">Drag the frame to crop. Pick an aspect ratio to lock it.</string>
+    <string name="reset_crop">Reset crop</string>
+    <string name="perspective_align_corners">Align corners</string>
+    <string name="perspective_help">Drag the four corners, then tap OK to crop and straighten that area.</string>
+    <string name="perspective_invalid">Keep the corners convex (no crossing).</string>
+    <string name="ok">OK</string>
+    <string name="save_failed">Could not save the edited image.</string>
+    <string name="image_open_failed">Could not open this image.</string>
 </resources>

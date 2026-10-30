@@ -1,26 +1,73 @@
-# Media Master v1.13.0 実装・保守メモ
+# Media Master v1.14.0 実装・保守メモ
 
-最終更新: 2026-10-27
+最終更新: 2026-10-31
 
 ## リリース情報
 
 | 項目 | 内容 |
 | --- | --- |
-| バージョン | `1.13.0` (`versionCode 22`) |
+| バージョン | `1.14.0` (`versionCode 23`) |
 | アプリケーションID | `com.yukiorita.mediamaster` |
 | 最小 SDK / target SDK | 24 / 36 |
 | ライセンス | MIT |
 | 著作者 | Yuki_Orita |
 | release APK | `app/build/outputs/apk/release/app-release.apk`（R8 + resource shrink 有効） |
-| APK SHA-256 | `06baec2275ee3239ecca76caec22fd594d34772388b3228dc4de01049c6f49cb` |
-| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.12.2 と同一鍵） |
-| GitHub Release | `v1.13.0` (GitHub Releases) |
+| APK SHA-256 | `1526670ce00492f092101ba2c4f03ce39b455530fcd389aff104409dc5bd564b` |
+| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.13.0 と同一鍵） |
+| GitHub Release | `v1.14.0` (GitHub Releases) |
 
 release APK は RSA 4096 ビット鍵・APK Signature Scheme v2 署名（`apksigner verify` で確認）。署名鍵は `common-rules-document/keystores/media-master-upload-key.jks`（alias `upload`）。
 
-v1.13.0 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitTest`(152件)/`:app:lintDebug`(0エラー)を確認。**実機（エミュレータ）デバッグ**で、ライブラリの表示順スワイプ・全画面/タップオーバーレイ（全画面/終了・編集・削除）・戻るで全画面解除・画像エディタ往復後の同一ページ保持を目視し、アプリのFATAL 0件を確認。Explorerのデスクトップタブは静的な独立監査でPASS（実行環境のADB汚染によりタブ操作の実機確認のみ未完了）。証明書は v0.1.0〜v1.12.2 と同一 `332ce386…eba6`（v2のみ）。
+v1.14.0 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitTest`(196件)/`:app:lintDebug`(0エラー)を確認。**実機（エミュレータ）デバッグ**で、ライブラリからの全画面表示（シェル＋システムバー非表示）、ツールバー上端の隙間なし、全画面ボタンの往復、ライブラリ発エディタの全画面、切り抜き16:9保存（1600×900）、90°回転保存（1200×1600）、四隅合わせ保存（1442×1091）、傾き/カラーの中央リセット、エクスプローラータブの全画面を目視し、FATAL 0件を確認。証明書は v0.1.0〜v1.13.0 と同一 `332ce386…eba6`（v2のみ）。
 
-旧リリースの APK SHA-256: v1.12.2 `cb67f77dca5d9a638e2dba938b53d12533dffc4c0a239992523b9303422b8571`、v1.12.1 `847d1aad80da47eb519ea1b695878162e7f9bb48c133ee202cafa2b809b82112`、v1.12.0 `3d9ac550b7404af05c41a8178ec71eae2b0dab8d25db5472a5dc3ceb058c6cbd`、v1.11.0 `69da38c9a7ccbffab663c0043120ec930e3f0559d358fd739df1e082e5922a5c`、v1.10.0 `3663e54015d1495cdd32931412f1c7322a53f195aef0bdb9899fce0e9b07b585`、v1.9.2 `0d41403ece4d59eb94e62a5a4cb5e385f239d22614b16dd727c0d5154e4bc20a`、v1.9.1 `1883e8d144877af852be76d94e9a3d5feb42f94e839da35bd2e0440317bc4a3b`、v1.9.0 `74994a9d1313cb0b2acdec9b15b329b1d3b85b110e9901ef542855b4b33ee85b`、v1.8.0 `e7c07575bbbc6675672d2cf64a30a093fd5b3df1c8fd875eec9d8bfd71caf6c4`、 v1.7.1 `4f79abcc32747a6889787c22d051ff831d55aca27330f81923760fcc63fcc1ee`、v1.7.0 `08236934c0cbf522ce0432595933e03976368ec3b0ee000ad4ced962b2fa9fd5`、v1.6.0 `f922b2b2d797f69fe4b1c9a7aca366e9f1664f8b47c8cfbeeb9aaeb02235b615`。
+旧リリースの APK SHA-256: v1.13.0 `06baec2275ee3239ecca76caec22fd594d34772388b3228dc4de01049c6f49cb`、v1.12.2 `cb67f77dca5d9a638e2dba938b53d12533dffc4c0a239992523b9303422b8571`、v1.12.1 `847d1aad80da47eb519ea1b695878162e7f9bb48c133ee202cafa2b809b82112`、v1.12.0 `3d9ac550b7404af05c41a8178ec71eae2b0dab8d25db5472a5dc3ceb058c6cbd`、v1.11.0 `69da38c9a7ccbffab663c0043120ec930e3f0559d358fd739df1e082e5922a5c`、v1.10.0 `3663e54015d1495cdd32931412f1c7322a53f195aef0bdb9899fce0e9b07b585`、v1.9.2 `0d41403ece4d59eb94e62a5a4cb5e385f239d22614b16dd727c0d5154e4bc20a`、v1.9.1 `1883e8d144877af852be76d94e9a3d5feb42f94e839da35bd2e0440317bc4a3b`、v1.9.0 `74994a9d1313cb0b2acdec9b15b329b1d3b85b110e9901ef542855b4b33ee85b`、v1.8.0 `e7c07575bbbc6675672d2cf64a30a093fd5b3df1c8fd875eec9d8bfd71caf6c4`、 v1.7.1 `4f79abcc32747a6889787c22d051ff831d55aca27330f81923760fcc63fcc1ee`、v1.7.0 `08236934c0cbf522ce0432595933e03976368ec3b0ee000ad4ced962b2fa9fd5`、v1.6.0 `f922b2b2d797f69fe4b1c9a7aca366e9f1664f8b47c8cfbeeb9aaeb02235b615`。
+
+## v1.14.0 実装内容（ライブラリ全画面・ツールバー・編集リセット/切り抜き比率/四隅合わせ）
+
+### 1. ライブラリ（デスクトップ）の全画面
+- 現状：ライブラリは `prepareViewer(startFullscreen=true)` を渡していたが、`ViewerScreen` のシステムバー非表示が `!desktop` 限定で、デスクトップシェル（サイドバー/タブ帯/フッター/MiniPlayer）も常に残っていた。全画面ボタンはアプリ内オーバーレイを隠すだけだった。
+- 修正：pure `ui/DesktopViewerPolicy.kt`（`isMediaPresentationRoute` / `shouldCollapseDesktopShell`）を追加。`ViewerScreen` は `onDesktopImmersiveChange(isFullScreen && hasTarget)` を通知し、`MainNavigation` が `desktopImmersive` を保持。`DesktopNavigation` はシェルの兄弟（サイドバー、タブ帯、フッター、MiniPlayer 予約）を `if (!hideShell)` で条件付きコンポーズする。NavHost の呼び出し位置は変えないため、ページャ/ズーム/OCR/バックスタックは保持される。ルート変更で非メディアルートなら必ず false に戻す。
+- システムバーの hide/show は `DesktopNavigation` の `DisposableEffect(hideShell)` が所有（ViewerScreen の `onDispose` が show するとビューア→編集でバーが復活するため）。タッチは従来どおり ViewerScreen 所有。デスクトップの ESC でも全画面解除（`onPreviewKeyEvent`＋`FocusRequester`）。
+- ライブラリ/アルバム発の編集画面も「メディア提示ルート」に含めるため全画面を維持。エクスプローラー（ピン留め/端末）発は `startFullscreen=false` のままタブ内表示で、全画面ボタンでウィンドウ全体に拡大。
+
+### 2. 透かしツールバーの上隙間
+- 原因：`TopAppBar` の外側に `Modifier.windowInsetsPadding(safeDrawing.top)` を付けており、Material3 の Surface（背景）ごとステータスバー下へ押し下げていた。
+- 修正：外側 padding を削除し、`TopAppBar(windowInsets = safeDrawing.only(Top + Horizontal))` へ移動。背景は y=0 から描画され、内容だけが安全領域に収まる。実機（没入時）で y=0..167 がツールバー背景、y=168 からメディアであることをピクセル確認。
+
+### 3. 中央リセットボタン
+- 共有 `ui/components/EditorSlider.kt`（ラベル＋スライダー＋右端 48dp リセット）を追加。傾き X/Y/Z（既定0）とカラー全項目（`getDefaultAdjustmentValue`：コントラスト/彩度1、他0）に適用。既に既定値ならボタン無効。動画エディタの Adjust も同じ部品を使うため同時に対応。
+- 実機：傾きスライダーをドラッグ→リセットでサムが中央（1127px）へ戻り、アイコンが無効色に戻ることを確認。カラーは輝度スライダーでプレビューが白へ変化→リセットで元の画素値へ復帰。
+
+### 4. 切り抜きのアスペクト比
+- pure `ui/editor/CropMath.kt`：`CropRect`（0..1、幾何適用後ビットマップ基準）、`AspectOption`（自由/元/1:1/4:3/3:4/16:9/9:16/3:2/2:3）、`fitAspect`、`resizeCorner`（比率固定は反対角アンカー）、`moveRect`、`toPixelRect`、`fitImageRect`。表示は `ContentScale.Fit` の実矩形に一致。
+- 切り抜きタブに `FilterChip` 列を追加。オーバーレイは Canvas で外側減光・3分割ガイド・L字ハンドル。角は画素円形のタップ判定（X/Y別トーランス）でリサイズ、内側ドラッグで移動。`Reset crop` で全画像＋自由に戻す。
+- 実機：1600×1200 の写真で 16:9 を選択→枠 361×203px（1.78）→保存結果 `Edited_Image_...jpg` が **1600×900**。
+
+### 5. 四隅を合わせる（遠近補正）
+- pure `ui/editor/PerspectiveMath.kt`：`PerspectiveQuad`、凸性（外積の符号＋面積）、`perspectiveOutputSize`（対辺平均）、`setPolyToPoly` 用の src/dst 配列、表示座標変換、画素円形ヒットテスト。
+- 変形タブに「四隅を合わせる」を追加。モード中は画像上に四隅＋外側減光＋ガイド円を描き、ドラッグは交差する形を棄却。OK で `applyPerspective` が現在の幾何を原寸で焼き込み、quad→矩形へ写像した新ビットマップに置換（キャンセル/リセット/失敗Toast付き）。幾何パラメータは焼き込み済みのため0へ戻す。
+- 実機：左上の角を内側へドラッグ→OK で画像が切り抜き＆変形され、保存結果 `1442×1091`。FATAL 0件。
+
+### 6. 幾何パイプラインの作り直し（プレビュー=保存）
+- 新規 pure `ui/editor/GeometryMath.kt`：`tiltProjectedCorners`（画像長辺に比例したカメラ距離の純射影）、`geometryCorners`（tilt→flip→rotateZ）、`geometryBounds`。`android.graphics.Camera` を廃止（ピクセル固定距離のため1024pxプレビューと原寸保存で歪みが不一致だった）。
+- `ImageGeometry.kt`：`applyGeometry` は `Matrix.setPolyToPoly(srcRect→quad)` で描画。90°回転は外接矩形になり、従来の「回転しても元サイズで切り取られる」見切れを解消。`decodeSampledBitmap`（長辺4096上限・inSampleSize）、`downscaleBitmap`（プレビュー1024）、`saveEditedImage`（幾何→切り抜き→色行列→JPEG、中間Bitmapは即recycle、失敗は Result→Toast）。
+- プレビューは同じ `applyGeometry` を縮小コピーに適用。色行列も同一。エディタのスライダー変更は `Dispatchers.Default` で再描画。
+
+### 7. 文字列/互換
+- 5ロケール（en/ja/zh/ar/nl）に `reset_adjustment`、`crop_aspect_ratio`、`aspect_*`（9）、`crop_help`、`reset_crop`、`perspective_align_corners`、`perspective_help`、`perspective_invalid`、`ok`、`save_failed`、`image_open_failed` を追加。既存キーは不変。
+- 新規依存・権限・DB変更なし。minSdk24維持。`startFullscreen` 既定（ライブラリ/アルバム=true、エクスプローラー=false）は不変。出力先は従来どおり `Pictures/Edited`（元ファイル不変）。
+
+## v1.14.0 検証
+- `:app:testDebugUnitTest` **196件全通過**（v1.13.0の152件＋`DesktopViewerPolicyTest` 4、`CropMathTest` 18、`PerspectiveMathTest` 12、`GeometryMathTest` 10、既存差分）。
+- `:app:lintDebug` 0エラー（警告133・ヒント10のみ）、`:app:assembleDebug` 成功、`:app:assembleRelease` 署名・`apksigner verify` はリリース節。
+- **実機デバッグ（mm3 AVD / Android 16.1 / 2400×1080 / 設定→デスクトップモード→常にデスクトップ）**:
+  - ライブラリ→画像タップ：サイドバー・タブ帯・フッター・MiniPlayer・システムバーが消え、画像がウィンドウ全体に表示（uiautomator は `Image viewer [0,0][2400,1080]` のみ）。ツールバー表示時は y=0..167 がバー背景で隙間なし。`Exit fullscreen` でシェルとバーが復帰し、再度 `Enter fullscreen` で全画面。
+  - `Edit` でエディタへ：シェルなし・システムバーなしの全画面。切り抜き 16:9→保存 1600×900、90°回転→保存 1200×1600、四隅合わせ→保存 1442×1091。カラー/傾きリセットも実機確認。
+  - ピン留め `Pictures`→`Edited` の画像：ファイル名タブでビューアが開き、タブ内はツールバー表示。`Enter fullscreen` でシェル＋バーが消え、Back でタブに復帰。
+  - リリース署名APK（R8有効）をクリーンインストールして起動・ライブラリ→全画面表示・変形タブ→四隅合わせ→OK→保存（1422×1076）まで確認し、FATAL 0件（R8で難読化された実配布物のスモーク）。
+  - `logcat -b crash` FATAL 0件。
+  - 参考：v1.13.0 署名APKでも同じ操作を再現し、ライブラリのメディアがタブ内表示のまま（本改修の対象バグ）であること、およびデスクトップライブラリの初期スクロールで先頭行が見切れる既存挙動（本改修前から同一）を確認した。後者は今回のスコープ外（ライブラリの表示順・スクロール仕様）として記録する。
+  - 既知の制約：横長（高さ411dp）のデスクトップウィンドウでは編集コントロールが縦スクロールになる（画像領域を確保するため）。タッチ/縦画面では従来どおり全景が収まる。
 
 ## v1.13.0 実装内容（表示順スワイプ・全画面プレビュー・Explorerメディアタブ）
 

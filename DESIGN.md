@@ -1,7 +1,18 @@
 # 設計書兼仕様書 (Media Master)
 
 ## バージョン情報
-- **Version:** 1.13.0
+- **Version:** 1.14.0
+
+## v1.14.0 の設計変更（要約）
+- **デスクトップ没入の分離**: 「ビューア内の全画面フラグ」と「デスクトップシェルを畳むか」を分けた。`ui/DesktopViewerPolicy.kt`（pure）が `viewer/`・`imageEditor/`・`videoEditor/` のルートだけをメディア提示として判定し、`ViewerScreen` は `onDesktopImmersiveChange(isFullScreen && hasTarget)` を通知するだけ。`MainNavigation` が `desktopImmersive` を保持し、`DesktopNavigation` はサイドバー・タブ帯・フッターを **兄弟要素として条件付きコンポーズ**する（NavHost の呼び出し位置は固定なので、ページャ・ズーム・OCR・バックスタックは破棄されない）。ライブラリへ戻るルート変更で必ず false に戻すため、クロームのないウィンドウが残らない。
+- **システムバーの所有権**: デスクトップの hide/show は `DesktopNavigation` の `DisposableEffect(hideShell)` が所有する。ViewerScreen の `onDispose` で show すると、ビューア→編集の遷移（ビューアのコンポジション破棄）でバーが復活して編集画面が全画面でなくなるため。タッチは従来どおり ViewerScreen が所有。
+- **ツールバー上端**: `TopAppBar` の外側に付けていた `windowInsetsPadding(safeDrawing.top)` を削除し、`windowInsets` 引数へ `safeDrawing.only(Top + Horizontal)` を渡す。Material3 は Surface の内側でインセットを消費するため、背景はステータスバー/カットアウト領域まで届き、内容だけが安全領域に収まる（隙間なし・没入時はインセット0で完全一致）。
+- **エディタの幾何パイプライン**: 新規 pure `ui/editor/GeometryMath.kt` が傾き（X/Y）・反転・Z回転後の四隅を返し、`ImageGeometry.kt` が `Matrix.setPolyToPoly` でその四隅へ写像する。従来の `android.graphics.Camera` はカメラ距離がピクセル固定で、1024px プレビューと原寸保存の歪みが一致しなかった。新実装は画像長辺に比例した距離の純射影なので解像度非依存（`GeometryMathTest` で固定）。90°回転も外接矩形で計算するため見切れない。
+- **プレビュー=保存**: プレビューは長辺1024pxの縮小コピーに同じ `applyGeometry` を適用し、保存は作業ビットマップ（長辺4096pxにサンプリング）へ同じ関数を適用する。色行列も同一。作業ビットマップは編集開始時に4096pxへ間引き、中間 Bitmap は即時 `recycle()`、失敗は `Result` で返して Toast（無言で閉じない）。
+- **切り抜き**: pure `ui/editor/CropMath.kt` の `CropRect`（0..1、幾何適用後基準）と `AspectOption`（自由/元/1:1/4:3/3:4/16:9/9:16/3:2/2:3）。比率固定時は反対角アンカーで画素比率を維持し、境界・最小サイズでクランプ。表示は `ContentScale.Fit` の実矩形（`fitImageRect`）に合わせ、`CropOverlay` が角リサイズ/内側移動を画素円形のタップ判定で処理する。
+- **四隅合わせ**: pure `ui/editor/PerspectiveMath.kt` の `PerspectiveQuad`（凸性・面積・出力サイズ）。変形タブの「四隅を合わせる」でモードに入り、OK 時に現在の幾何を原寸で焼き込んだうえで `setPolyToPoly(quad→矩形)` を実行し、その場で作業ビットマップを置換する（要望どおり「OKで切り抜き＆変形」）。キャンセル/リセット、交差時の OK 無効化、失敗時の Toast を備える。
+- **リセットUI**: 共有 `ui/components/EditorSlider.kt`（ラベル＋スライダー＋右端リセット）を傾き3軸とカラー全項目（画像/動画の Adjust）に適用。既定値は `getDefaultAdjustmentValue` と一致し、既に既定ならボタン無効。
+- 互換/安全: 新規依存・権限・DB変更なし、minSdk24維持。`startFullscreen` 既定（ライブラリ/アルバム=true、エクスプローラー=false）は不変。5ロケール（en/ja/zh/ar/nl）に新キーのみ追加し parity テストで強制。画像編集の出力先は従来どおり `Pictures/Edited`（元ファイル不変）。
 
 ## v1.13.0 の設計変更（要約）
 - **表示順ページャー**: ナビゲーション引数に任意長のパス一覧を載せるとtransaction size/encodingが危険なため、`FileViewModel.ViewerLaunch(path, order, startFullscreen)`を一方向ハンドオフとして導入。呼び出し元（Library日付/コンパクト、Album、Category、Files、Manage最近）が「いま表示している順序」を`prepareViewer()`で渡し、`ViewerScreen`は`launch.path == route path`のときだけ採用。pure `ViewerOrder.resolve()`が対象のメディア種別（画像/動画・音声・単一）で順序を保持しつつ不足パスを除外し、launchが無い/古い場合はv1.12.2のグローバル一覧フォールバックを再現（deep link・プロセス復元互換）。`clearViewerLaunch(path)`は同一パスのみ破棄し、新旧launchの競合を防止。

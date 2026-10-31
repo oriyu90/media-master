@@ -69,6 +69,12 @@ import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.navigation.NavHostController
+import com.example.external.ExternalMediaInfo
+import com.example.external.ExternalViewerRequest
+import com.example.external.externalMediaList
+import com.example.external.libraryMediaOrder
+import com.example.external.matchLibraryFile
+import com.example.external.resolveExternalMediaInfo
 import com.example.ui.components.ConfirmDeleteDialog
 import com.example.ui.components.EmptyState
 import com.example.ui.components.ErrorState
@@ -102,9 +108,13 @@ fun ViewerScreen(
     // while this viewer is immersive, and come back when it is not. The shell
     // gates this on the route, so a pop can never strand a chrome-less window.
     onDesktopImmersiveChange: (Boolean) -> Unit = {},
+    // v2.0.0: another app's ACTION_VIEW image/video. When present the viewer
+    // opens on that URI (no Library route lookup) and pages through the
+    // Library order only when the file is actually visible there.
+    external: ExternalViewerRequest? = null,
 ) {
     val context = LocalContext.current
-    if (path == null || viewModel == null) {
+    if (viewModel == null || (external == null && path == null)) {
         EmptyState(
             icon = Icons.Default.BrokenImage,
             title = stringResource(R.string.invalid_file_path),
@@ -116,7 +126,92 @@ fun ViewerScreen(
     // v1.13.0: the launch carries the exact visible order the user tapped from.
     // Null (deep link, restored process, unknown caller) reproduces v1.12.2.
     val launch = viewModel.viewerLaunch.collectAsStateWithLifecycle().value
-    val startFullscreen = launch?.takeIf { it.path == path }?.startFullscreen ?: !desktop
+
+    // v2.0.0: resolve the incoming URI once (display name/size, MediaStore id
+    // and DATA path). Until it returns, a name/mime fallback keeps the image
+    // visible immediately; the Library match is re-evaluated when it arrives.
+    val externalUri = remember(external?.uriString) { external?.uriString?.let(Uri::parse) }
+    val externalInfo by produceState<ExternalMediaInfo?>(
+        initialValue = null,
+        externalUri,
+        external?.mimeType,
+    ) {
+        value = if (externalUri == null) {
+            null
+        } else {
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    resolveExternalMediaInfo(context, externalUri, external?.mimeType)
+                }.getOrNull()
+            }
+        }
+    }
+    val fallbackExternalInfo = remember(externalUri, external?.mimeType) {
+        externalUri?.let { uri ->
+            ExternalMediaInfo(
+                uriString = uri.toString(),
+                mimeType = external?.mimeType
+                    ?.takeIf { it.isNotBlank() && it != "*/*" }
+                    ?: "image/*",
+                displayName = uri.lastPathSegment ?: "media",
+                size = 0L,
+                path = if (uri.scheme == "file") uri.path else null,
+                mediaId = -1L,
+            )
+        }
+    }
+    val info = externalInfo ?: fallbackExternalInfo
+    val externalFile = remember(externalUri, info) {
+        if (externalUri != null && info != null) {
+            MediaFile(
+                id = info.mediaId,
+                name = info.displayName,
+                path = info.path ?: externalUri.toString(),
+                size = info.size,
+                mimeType = info.mimeType,
+                dateModified = info.dateModified,
+                contentUri = externalUri,
+            )
+        } else {
+            null
+        }
+    }
+    val allFiles = (viewState as? ViewState.Success)?.files ?: emptyList()
+    val excludedFolders = viewModel.excludedFolders.collectAsStateWithLifecycle().value
+    // v2.0.0: match against the Library's visible order (excluded folders
+    // hidden, oldest first, same as the Photos grid).
+    val libraryOrder = remember(allFiles, excludedFolders, external) {
+        if (external != null) libraryMediaOrder(allFiles, excludedFolders) else emptyList()
+    }
+    val matchedLibraryFile = remember(libraryOrder, info, external) {
+        if (external != null && info != null) matchLibraryFile(libraryOrder, info) else null
+    }
+    val routeKey = external?.uriString ?: path ?: ""
+    // v2.0.0: an external viewer can be the very first screen after a cold
+    // start, and the media list is only loaded by Library/Album screens. Load
+    // it once so an image that exists in the Library can page even then; a
+    // failed scan is not retried in a loop (single-page fallback remains).
+    // Plain remember (not saveable): a restored process still needs the one
+    // library load for paging; the flag only prevents a loop within a session.
+    var externalLibraryRequested by remember(routeKey) { mutableStateOf(false) }
+    LaunchedEffect(external, viewState) {
+        if (external != null && !externalLibraryRequested && viewState !is ViewState.Success) {
+            externalLibraryRequested = true
+            viewModel.loadAllMedia()
+        }
+    }
+    val targetFile = if (external != null) {
+        matchedLibraryFile ?: externalFile
+    } else {
+        allFiles.find { it.path == path }
+    }
+    // External media always opens immersive (the request is "show me this
+    // picture"); the Library/Explorer rules are unchanged.
+    val startFullscreen = if (external != null) {
+        true
+    } else {
+        launch?.takeIf { it.path == path }?.startFullscreen ?: !desktop
+    }
 
     // v1.13.0: two separate concepts. isFullScreen = immersive mode (system
     // bars hidden, app chrome off); chromeVisible = translucent top overlay.
@@ -124,8 +219,8 @@ fun ViewerScreen(
     // chrome so the overlay is discoverable.
     // v1.14.0: rememberSaveable so a trip to the image/video editor and back
     // keeps the immersive state (the destination's saved state survives).
-    var isFullScreen by rememberSaveable(path) { mutableStateOf(startFullscreen) }
-    var chromeVisible by rememberSaveable(path) { mutableStateOf(!startFullscreen) }
+    var isFullScreen by rememberSaveable(routeKey) { mutableStateOf(startFullscreen) }
+    var chromeVisible by rememberSaveable(routeKey) { mutableStateOf(!startFullscreen) }
     
     // OCR State
     var isOcrMode by remember { mutableStateOf(false) }
@@ -138,15 +233,34 @@ fun ViewerScreen(
     // v1.13.0: only a destination that really shows media should go immersive
     // or intercept Back. Loading/Error/invalid-path states must keep the bars
     // and let Back leave the screen immediately (audit AUD-02).
-    val hasTarget = remember(viewState, path) {
-        (viewState as? ViewState.Success)?.files?.any { it.path == path } == true
+    // v2.0.0: an external URI is a valid target even before the Library scan
+    // finishes (the viewer never waits for the library to show the image).
+    val hasTarget = targetFile != null
+
+    // v2.0.0: external media always leaves to the Library screen — closing,
+    // Back, ESC and drag-to-dismiss must not strand the user on an invisible
+    // external route. Library viewers keep the normal pop behavior.
+    fun closeViewer() {
+        if (external != null) {
+            navController.navigate("library") {
+                popUpTo(navController.graph.startDestinationId) { inclusive = false }
+                launchSingleTop = true
+            }
+        } else {
+            navController.popBackStack()
+        }
     }
 
     // v1.13.0: Android back leaves immersive mode first; only a non-immersive
     // viewer lets the system pop the destination (previous nav behavior).
-    BackHandler(enabled = hasTarget && isFullScreen) {
-        isFullScreen = false
-        chromeVisible = true
+    // v2.0.0: a non-immersive external viewer goes to the Library.
+    BackHandler(enabled = hasTarget) {
+        if (isFullScreen) {
+            isFullScreen = false
+            chromeVisible = true
+        } else {
+            closeViewer()
+        }
     }
 
     // v1.14.0: the desktop shell follows the immersive flag. Only the viewer
@@ -193,7 +307,7 @@ fun ViewerScreen(
     // order on return (audit AUD-01). Inside a NavHost destination
     // LocalLifecycleOwner is the back-stack entry.
     val entryLifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(entryLifecycleOwner, path, viewModel) {
+    DisposableEffect(entryLifecycleOwner, routeKey, viewModel) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_DESTROY) viewModel?.clearViewerLaunch(path ?: "")
         }
@@ -201,7 +315,15 @@ fun ViewerScreen(
         onDispose { entryLifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    when (val s = viewState) {
+    // External requests synthesize a Success state so the viewer renders
+    // immediately even while the Library scan is loading or failed; the
+    // Library only contributes the optional paging order.
+    val effectiveState: ViewState = if (external != null) {
+        ViewState.Success(allFiles, path ?: "")
+    } else {
+        viewState
+    }
+    when (val s = effectiveState) {
         is ViewState.Loading -> {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = ViewerOnSurface)
@@ -218,7 +340,6 @@ fun ViewerScreen(
             return
         }
         is ViewState.Success -> {
-        val targetFile = s.files.find { it.path == path }
         if (targetFile == null) {
             EmptyState(
                 icon = Icons.Default.BrokenImage,
@@ -230,15 +351,33 @@ fun ViewerScreen(
         // v1.13.0: page through the exact order the launching list displayed.
         // When that launch is absent or stale, ViewerOrder falls back to the
         // v1.12.2 global media-family list (deep links keep working).
-        val mediaList = remember(s.files, path, launch) {
-            ViewerOrder.resolve(
-                allFiles = s.files,
-                orderedPaths = launch?.takeIf { it.path == path }?.order,
-                targetPath = path ?: "",
-            )
+        // v2.0.0: an external target pages through the Library order only when
+        // the file is visible there; otherwise it is a single page.
+        val mediaList = remember(
+            allFiles,
+            path,
+            launch,
+            external,
+            matchedLibraryFile,
+            libraryOrder,
+            externalFile,
+        ) {
+            if (external != null) {
+                externalMediaList(
+                    libraryOrder = libraryOrder,
+                    matched = matchedLibraryFile,
+                    externalFile = externalFile ?: return@remember emptyList(),
+                )
+            } else {
+                ViewerOrder.resolve(
+                    allFiles = allFiles,
+                    orderedPaths = launch?.takeIf { it.path == path }?.order,
+                    targetPath = path ?: "",
+                )
+            }
         }
-        
-        val initialIndex = mediaList.indexOfFirst { it.path == path }.coerceAtLeast(0)
+
+        val initialIndex = mediaList.indexOfFirst { it.path == targetFile.path }.coerceAtLeast(0)
         val pagerState = androidx.compose.foundation.pager.rememberPagerState(
             initialPage = initialIndex,
             pageCount = { mediaList.size }
@@ -250,8 +389,20 @@ fun ViewerScreen(
         // composition the saved pager index belongs to the previous list, so
         // reading it first would record the wrong file (audit R-01). Real page
         // changes are tracked from settledPage, ignoring the initial one.
-        var lastShownPath by rememberSaveable(path) { mutableStateOf(path ?: "") }
-        LaunchedEffect(mediaList) {
+        var lastShownPath by rememberSaveable(routeKey) { mutableStateOf(targetFile.path) }
+        LaunchedEffect(mediaList, targetFile.path) {
+            // When the Library scan finishes after the external image is
+            // already on screen, adopt the matched library path and jump the
+            // pager to it without closing/reopening the viewer.
+            // Adopt the matched Library file only when the current anchor is
+            // no longer in the list (first expansion or a rescan that removed
+            // it). Re-applying it unconditionally would yank the user back to
+            // the incoming image after they swiped to another page.
+            if (external != null && matchedLibraryFile != null &&
+                mediaList.none { it.path == lastShownPath }
+            ) {
+                lastShownPath = matchedLibraryFile.path
+            }
             val desired = mediaList.indexOfFirst { it.path == lastShownPath }
                 .takeIf { it >= 0 } ?: initialIndex
             if (pagerState.currentPage != desired) pagerState.scrollToPage(desired)
@@ -297,7 +448,7 @@ fun ViewerScreen(
                 val anim = Animatable(dismissOffsetY)
                 if (shouldConfirmDismiss(totalDy, dismissThresholdPx) && viewerHeightPx > 0f) {
                     runCatching { anim.animateTo(viewerHeightPx, tween(220)) { dismissOffsetY = value } }
-                    navController.popBackStack()
+                    closeViewer()
                 } else {
                     runCatching { anim.animateTo(0f, tween(180)) { dismissOffsetY = value } }
                 }
@@ -379,9 +530,13 @@ fun ViewerScreen(
                 .focusRequester(escFocus)
                 .focusable()
                 .onPreviewKeyEvent { event ->
-                    if (isFullScreen && event.key == Key.Escape && event.type == KeyEventType.KeyUp) {
-                        isFullScreen = false
-                        chromeVisible = true
+                    if (event.key == Key.Escape && event.type == KeyEventType.KeyUp) {
+                        if (isFullScreen) {
+                            isFullScreen = false
+                            chromeVisible = true
+                        } else {
+                            closeViewer()
+                        }
                         true
                     } else {
                         false
@@ -408,7 +563,7 @@ fun ViewerScreen(
                     TopAppBar(
                         title = { Text(currentFile.name, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
                         navigationIcon = {
-                            IconButton(onClick = { navController.popBackStack() }) {
+                            IconButton(onClick = { closeViewer() }) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                             }
                         },
@@ -486,26 +641,32 @@ fun ViewerScreen(
                                     Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.edit))
                                 }
                             }
+                            // v2.0.0: an external-only item has no Library
+                            // identity, so destructive actions stay hidden;
+                            // share/edit/info remain available.
+                            val canModify = external == null || matchedLibraryFile != null
                             var confirmDelete by remember { mutableStateOf(false) }
-                            if (confirmDelete) {
-                                ConfirmDeleteDialog(
-                                    title = stringResource(R.string.delete),
-                                    message = currentFile.name,
-                                    confirmLabel = stringResource(R.string.delete),
-                                    dismissLabel = stringResource(R.string.cancel),
-                                    onDismiss = { confirmDelete = false },
-                                    onConfirm = {
-                                        confirmDelete = false
-                                        val deletedPath = currentFile.path
-                                        coroutineScope.launch {
-                                            viewModel.deleteFile(deletedPath, currentFile.contentUri)
-                                            navController.popBackStack()
-                                        }
-                                    },
-                                )
-                            }
-                            IconButton(onClick = { confirmDelete = true }) {
-                                Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete))
+                            if (canModify) {
+                                if (confirmDelete) {
+                                    ConfirmDeleteDialog(
+                                        title = stringResource(R.string.delete),
+                                        message = currentFile.name,
+                                        confirmLabel = stringResource(R.string.delete),
+                                        dismissLabel = stringResource(R.string.cancel),
+                                        onDismiss = { confirmDelete = false },
+                                        onConfirm = {
+                                            confirmDelete = false
+                                            val deletedPath = currentFile.path
+                                            coroutineScope.launch {
+                                                viewModel.deleteFile(deletedPath, currentFile.contentUri)
+                                                closeViewer()
+                                            }
+                                        },
+                                    )
+                                }
+                                IconButton(onClick = { confirmDelete = true }) {
+                                    Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete))
+                                }
                             }
                             IconButton(onClick = {
                                 val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
@@ -517,19 +678,21 @@ fun ViewerScreen(
                             }) {
                                 Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share))
                             }
-                            var showRenameDialog by remember { mutableStateOf(false) }
-                            if (showRenameDialog) {
-                                RenameDialog(
-                                    currentName = currentFile.name,
-                                    onDismiss = { showRenameDialog = false },
-                                    onConfirm = { newName ->
-                                        showRenameDialog = false
-                                        viewModel.renameFile(currentFile.path, currentFile.contentUri, newName)
-                                    },
-                                )
-                            }
-                            IconButton(onClick = { showRenameDialog = true }) {
-                                Icon(Icons.Default.DriveFileRenameOutline, contentDescription = stringResource(R.string.rename))
+                            if (canModify) {
+                                var showRenameDialog by remember { mutableStateOf(false) }
+                                if (showRenameDialog) {
+                                    RenameDialog(
+                                        currentName = currentFile.name,
+                                        onDismiss = { showRenameDialog = false },
+                                        onConfirm = { newName ->
+                                            showRenameDialog = false
+                                            viewModel.renameFile(currentFile.path, currentFile.contentUri, newName)
+                                        },
+                                    )
+                                }
+                                IconButton(onClick = { showRenameDialog = true }) {
+                                    Icon(Icons.Default.DriveFileRenameOutline, contentDescription = stringResource(R.string.rename))
+                                }
                             }
                             var showInfoSheet by remember { mutableStateOf(false) }
                             if (showInfoSheet) {

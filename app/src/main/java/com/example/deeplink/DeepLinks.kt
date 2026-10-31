@@ -28,10 +28,13 @@ import android.net.Uri
  *
  *       ACTION_EDIT  of an image       -> image editor
  *       ACTION_EDIT  of a video        -> video editor
- *       ACTION_VIEW  of image/video/audio -> library (targeted single-file
- *                                          viewing for external URIs arrives in
- *                                          a later phase once the viewer accepts
- *                                          a stand-alone URI)
+ *       ACTION_VIEW  of image/video      -> the media viewer, opened fullscreen
+ *                                          on the incoming URI. If the file is
+ *                                          visible in the Library it pages in
+ *                                          the Library order; otherwise it is a
+ *                                          single page and closing/dismissing
+ *                                          lands on the Library screen.
+ *       ACTION_VIEW  of audio             -> library (existing behavior)
  *       ACTION_VIEW  of a directory    -> file browser at that path
  *       ACTION_VIEW  of text/csv/json/markdown/pdf/word/powerpoint/zip
  *                                      -> the universal document viewer, opened
@@ -101,9 +104,21 @@ object DeepLinks {
                     }
                     if (usePath != null) "file_browser?path=${Uri.encode(usePath)}" else "manage"
                 }
-                type?.startsWith("image/") == true ||
-                    type?.startsWith("video/") == true ||
-                    type?.startsWith("audio/") == true -> "library"
+                type?.startsWith("image/") == true || type?.startsWith("video/") == true -> {
+                    if (data != null && isLocalMediaUri(data)) {
+                        externalViewerRoute(data.toString(), type)
+                    } else {
+                        // Remote URLs and missing data keep the previous
+                        // Library behavior instead of an unreadable file URI.
+                        "library"
+                    }
+                }
+                type?.startsWith("audio/") == true -> "library"
+                // v2.0.0: senders that only carry a media file name (generic
+                // type) still open in the media viewer instead of a browser.
+                data != null && isLocalMediaUri(data) &&
+                    mediaFallbackMime(type, data) != null ->
+                    externalViewerRoute(data.toString(), mediaFallbackMime(type, data))
                 data != null && isDocumentViewerType(type) -> route("docViewer", data.toString())
                 // v1.10.0: ZIP from external apps. Some senders omit the MIME
                 // type (null / */* / octet-stream) and only carry a .zip URI,
@@ -114,6 +129,46 @@ object DeepLinks {
             }
             else -> null
         }
+    }
+
+    /**
+     * v2.0.0: route for a media file handed over by another app. The viewer
+     * decodes its own arguments, so the URI and MIME are encoded as separate
+     * path/query parts.
+     */
+    fun externalViewerRoute(uriString: String, mimeType: String?): String {
+        val base = "externalViewer/${Uri.encode(uriString)}"
+        return if (mimeType.isNullOrBlank() || mimeType == "*/*") {
+            base
+        } else {
+            "$base?mime=${Uri.encode(mimeType)}"
+        }
+    }
+
+    /** Common image/video extensions used when the sender omits the MIME. */
+    /** Only local providers can be opened by the viewer (no http/rtsp). */
+    private fun isLocalMediaUri(uri: Uri?): Boolean =
+        uri?.scheme == "content" || uri?.scheme == "file"
+
+    private val MEDIA_VIEW_MIME_BY_EXTENSION = mapOf(
+        "jpg" to "image/jpeg", "jpeg" to "image/jpeg", "png" to "image/png",
+        "gif" to "image/gif", "webp" to "image/webp", "bmp" to "image/bmp",
+        "heic" to "image/heic", "heif" to "image/heif", "avif" to "image/avif",
+        "mp4" to "video/mp4", "m4v" to "video/x-m4v", "mkv" to "video/x-matroska",
+        "webm" to "video/webm", "3gp" to "video/3gpp", "mov" to "video/quicktime",
+    )
+
+    /**
+     * v2.0.0: MIME inferred from the file name for image/video senders that
+     * pass a wildcard or no type at all. Only fires for generic types so an
+     * explicit document MIME can never be hijacked.
+     */
+    internal fun mediaFallbackMime(type: String?, data: Uri): String? {
+        if (type != null && type != "*/*" && type != "application/octet-stream") return null
+        val name = runCatching { data.lastPathSegment.orEmpty() }.getOrDefault("")
+        val extension = name.substringAfterLast('.', "").lowercase()
+        if (extension.isEmpty()) return null
+        return MEDIA_VIEW_MIME_BY_EXTENSION[extension]
     }
 
     private fun resolveAppScheme(uri: Uri): String? {

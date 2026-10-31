@@ -16,6 +16,7 @@ internal val MEDIA_PRESENTATION_PREFIXES = listOf(
     // NavController reports destination *patterns*: "viewer/{path}",
     // "imageEditor/{uriString}", "videoEditor/{uriString}".
     "viewer/",
+    "externalViewer/",
     "imageEditor/",
     "videoEditor/",
 )

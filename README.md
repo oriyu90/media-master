@@ -4,6 +4,20 @@ Media Master is an open-source Android media and file manager built with Kotlin 
 
 Media Master は、Kotlin と Jetpack Compose で開発されたオープンソースのAndroid向けメディア・ファイル管理アプリです。写真・動画、音楽、書類、ストレージ、アプリ／APK、編集、バックアップを1つのアプリで扱えます。
 
+## v2.0.0
+
+- **Photos and videos from other apps open in the viewer:** `ACTION_VIEW` image/video now launches the in-app media viewer directly on the incoming URI, fullscreen (and full-window on desktop/DeX) instead of dropping the user on the Library grid. Senders that omit the MIME type but carry a `.jpg`/`.png`/`.heic`/`.mp4`/… name are recognized too.
+- **Library-aware paging:** the incoming URI is matched against the Library's visible photo/video order by content URI, resolved file path or MediaStore id. When it is in the Library, swiping moves to the previous/next Library item; when it is not, the viewer is a **single page** so a swipe can never move to an unrelated file.
+- **Safe single-item mode:** an external-only item hides Delete and Rename (it belongs to another provider); Share, Edit, OCR and File info remain available. A matched Library item keeps the normal actions.
+- **Always returns to the Library:** Back, ESC, the toolbar back arrow and swipe-down close an external viewer to the Library screen (the normal viewer still pops back to wherever it was opened from).
+- **No regressions:** normal Library/Album/Explorer viewing, paging, fullscreen, drag-to-dismiss, OCR, editing, desktop tabs and document/ZIP/audio deep links keep their previous behavior. The Library is loaded once on a cold-start external open so paging works even when the viewer is the first screen.
+- **他のアプリの写真・動画をビューアで表示:** `ACTION_VIEW` の画像/動画が、ライブラリ一覧ではなくアプリ内ビューアで直接全画面表示されるようになりました（デスクトップ/DeXではウィンドウ全体）。MIME が `*/*` や未指定でも、`.jpg`/`.png`/`.heic`/`.mp4` などの拡張子から判定します。
+- **ライブラリ連動のページング:** 渡された URI を、content URI・解決したファイルパス・MediaStore ID の順でライブラリの表示順（写真タブと同じ、除外フォルダ非表示・更新日時順）と照合します。ライブラリ内にあれば前後の画像へスワイプ移動でき、無ければ**1ページだけ**の表示になり、無関係な画像へ移動しません。
+- **安全な単体表示:** ライブラリ外のファイルでは削除・名前変更を非表示（他プロバイダのファイルを破壊しない）。共有・編集・文字認識・情報は利用できます。ライブラリ内の一致時は通常の操作が可能です。
+- **閉じるとライブラリへ:** 外部ビューアでは戻る・ESC・ツールバーの戻る・下スワイプのいずれもライブラリ画面へ移動します（通常のビューアは従来どおり元の画面へ戻る）。
+- **回帰なし:** 通常のライブラリ/アルバム/エクスプローラーの表示・ページング・全画面・下スワイプ・OCR・編集・デスクトップタブ・文書/ZIP/音声のディープリンクは不変。コールドスタートで外部ビューアが最初の画面でもページングできるよう、ライブラリを一度だけ読み込みます。
+- Version `2.0.0` (`versionCode 24`), signed with the same upload key as v0.1.0–v1.14.0 (APK Signature Scheme v2 verified). **APK SHA-256: `67e8807f9172adedd71989e16bbd4d8a1be7794b5c4708f53483467f9b5135fb`**.
+
 ## v1.14.0
 
 - **Library is a full-window gallery on desktop:** opening a photo or video from Library (or an Album) on a desktop/DeX shell now folds away the sidebar, tab strip, footer and mini-player and hides the system bars, so the media fills the whole window. The overlay fullscreen button really toggles that state (it previously only hid the in-app toolbar), and the image/video editor opened from that viewer also stays full-window. Explorer tabs (pinned folders, devices) keep the viewer inside their tab; their fullscreen button expands it to the whole window and Back/ESC restores the tab.

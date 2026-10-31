@@ -1,4 +1,4 @@
-# Media Master v1.14.0 実装・保守メモ
+# Media Master v2.0.0 実装・保守メモ
 
 最終更新: 2026-10-31
 
@@ -6,21 +6,80 @@
 
 | 項目 | 内容 |
 | --- | --- |
-| バージョン | `1.14.0` (`versionCode 23`) |
+| バージョン | `2.0.0` (`versionCode 24`) |
 | アプリケーションID | `com.yukiorita.mediamaster` |
 | 最小 SDK / target SDK | 24 / 36 |
 | ライセンス | MIT |
 | 著作者 | Yuki_Orita |
 | release APK | `app/build/outputs/apk/release/app-release.apk`（R8 + resource shrink 有効） |
-| APK SHA-256 | `b09e2f31e4a20d4f376588fcd58b7a1d35dfc5011e5b99f835bc927172e57f95` |
-| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.13.0 と同一鍵） |
-| GitHub Release | `v1.14.0` (GitHub Releases) |
+| APK SHA-256 | `67e8807f9172adedd71989e16bbd4d8a1be7794b5c4708f53483467f9b5135fb` |
+| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.14.0 と同一鍵） |
+| GitHub Release | `v2.0.0` (GitHub Releases) |
 
 release APK は RSA 4096 ビット鍵・APK Signature Scheme v2 署名（`apksigner verify` で確認）。署名鍵は `common-rules-document/keystores/media-master-upload-key.jks`（alias `upload`）。
 
-v1.14.0 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitTest`(198件)/`:app:lintDebug`(0エラー)を確認。**実機（エミュレータ）デバッグ**で、ライブラリからの全画面表示（シェル＋システムバー非表示）、ツールバー上端の隙間なし、全画面ボタンの往復、ライブラリ発エディタの全画面、切り抜き16:9＋明るさの同時保存（1600×900・色適用）、90°回転保存（1200×1600）、四隅合わせ保存、傾き/カラーの中央リセット、エクスプローラータブの全画面、ライブラリの動画が再生コントローラ表示中も全画面のままであることを目視し、FATAL 0件を確認。証明書は v0.1.0〜v1.13.0 と同一 `332ce386…eba6`（v2のみ）。
+v2.0.0 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitTest`(215件)/`:app:lintDebug`(0エラー)を確認。**実機（エミュレータ）デバッグ**で、外部 `ACTION_VIEW` の画像が全画面で開くこと、ライブラリ内の画像は前後スワイプで移動できること（コールドスタート含む）、ライブラリ外の画像は1ページのみで下スワイプ/戻るでライブラリへ移動すること、外部のみのファイルでは削除・名前変更が出ないこと、デスクトップでシェルが畳まれること、通常ビューアの全画面・ページング・下スワイプが不変であることを確認し、FATAL 0件。証明書は v0.1.0〜v1.14.0 と同一 `332ce386…eba6`（v2のみ）。
 
-旧リリースの APK SHA-256: v1.13.0 `06baec2275ee3239ecca76caec22fd594d34772388b3228dc4de01049c6f49cb`、v1.12.2 `cb67f77dca5d9a638e2dba938b53d12533dffc4c0a239992523b9303422b8571`、v1.12.1 `847d1aad80da47eb519ea1b695878162e7f9bb48c133ee202cafa2b809b82112`、v1.12.0 `3d9ac550b7404af05c41a8178ec71eae2b0dab8d25db5472a5dc3ceb058c6cbd`、v1.11.0 `69da38c9a7ccbffab663c0043120ec930e3f0559d358fd739df1e082e5922a5c`、v1.10.0 `3663e54015d1495cdd32931412f1c7322a53f195aef0bdb9899fce0e9b07b585`、v1.9.2 `0d41403ece4d59eb94e62a5a4cb5e385f239d22614b16dd727c0d5154e4bc20a`、v1.9.1 `1883e8d144877af852be76d94e9a3d5feb42f94e839da35bd2e0440317bc4a3b`、v1.9.0 `74994a9d1313cb0b2acdec9b15b329b1d3b85b110e9901ef542855b4b33ee85b`、v1.8.0 `e7c07575bbbc6675672d2cf64a30a093fd5b3df1c8fd875eec9d8bfd71caf6c4`、 v1.7.1 `4f79abcc32747a6889787c22d051ff831d55aca27330f81923760fcc63fcc1ee`、v1.7.0 `08236934c0cbf522ce0432595933e03976368ec3b0ee000ad4ced962b2fa9fd5`、v1.6.0 `f922b2b2d797f69fe4b1c9a7aca366e9f1664f8b47c8cfbeeb9aaeb02235b615`。
+旧リリースの APK SHA-256: v1.14.0 `b09e2f31e4a20d4f376588fcd58b7a1d35dfc5011e5b99f835bc927172e57f95`、v1.13.0 `06baec2275ee3239ecca76caec22fd594d34772388b3228dc4de01049c6f49cb`、v1.12.2 `cb67f77dca5d9a638e2dba938b53d12533dffc4c0a239992523b9303422b8571`、v1.12.1 `847d1aad80da47eb519ea1b695878162e7f9bb48c133ee202cafa2b809b82112`、v1.12.0 `3d9ac550b7404af05c41a8178ec71eae2b0dab8d25db5472a5dc3ceb058c6cbd`、v1.11.0 `69da38c9a7ccbffab663c0043120ec930e3f0559d358fd739df1e082e5922a5c`、v1.10.0 `3663e54015d1495cdd32931412f1c7322a53f195aef0bdb9899fce0e9b07b585`、v1.9.2 `0d41403ece4d59eb94e62a5a4cb5e385f239d22614b16dd727c0d5154e4bc20a`、v1.9.1 `1883e8d144877af852be76d94e9a3d5feb42f94e839da35bd2e0440317bc4a3b`、v1.9.0 `74994a9d1313cb0b2acdec9b15b329b1d3b85b110e9901ef542855b4b33ee85b`、v1.8.0 `e7c07575bbbc6675672d2cf64a30a093fd5b3df1c8fd875eec9d8bfd71caf6c4`、 v1.7.1 `4f79abcc32747a6889787c22d051ff831d55aca27330f81923760fcc63fcc1ee`、v1.7.0 `08236934c0cbf522ce0432595933e03976368ec3b0ee000ad4ced962b2fa9fd5`、v1.6.0 `f922b2b2d797f69fe4b1c9a7aca366e9f1664f8b47c8cfbeeb9aaeb02235b615`。
+
+## v2.0.0 実装内容（外部アプリの写真・動画をライブラリビューアで表示）
+
+### 1. 外部 VIEW の入口
+- 現状: `DeepLinks.resolve` の `ACTION_VIEW` は image/video/audio をすべて `"library"` に送り、単体ファイル表示は未実装だった。
+- 変更: image/video を新ルート `externalViewer/{uriString}?mime={mime}` へ。MIME が `*/*`・未指定・`application/octet-stream` の場合は拡張子（jpg/jpeg/png/gif/webp/bmp/heic/heif/avif/mp4/m4v/mkv/webm/3gp/mov）から推定する。audio は従来どおり `library`、文書/ZIP/フォルダのルートは不変。Manifest の intent-filter は既存のまま。
+- `DesktopViewerPolicy` に `externalViewer/` を追加し、デスクトップではシェル（サイドバー/タブ帯/フッター/MiniPlayer）とシステムバーを畳んで全画面表示。
+
+### 2. 照合とページング
+- 新規 `external/ExternalMediaInfo` と `resolveExternalMediaInfo()`。`OpenableColumns`（表示名・サイズ）、MediaStore（`_ID`/`DATA`/`DATE_MODIFIED`）をベストエフォートで取得し、全クエリを `runCatching` で保護。解決前は URI 最終セグメント＋インテント MIME のフォールバックで即時表示。
+- pure `matchLibraryFile()` は content URI 文字列 → 解決パス → MediaStore `_ID` の順で照合。表示名・サイズのみの照合は行わない（誤ページングより単体表示を優先）。
+- `libraryMediaOrder()` は写真タブと同じ「画像/動画のみ・除外フォルダ非表示・更新日時昇順」。`externalMediaList()` は一致時のみライブラリ順、不一致時は外部ファイル1件。
+- 外部ビューアがコールドスタートの最初の画面でもページングできるよう、`mediaState` 未取得時に `loadAllMedia()` を一度だけ実行（失敗時の無限リトライなし）。
+
+### 3. ビューアの外部モード
+- `ViewerScreen(external=…)` は外部リクエストを合成の `ViewState.Success` として扱い、ライブラリ読み込み中でも画像を即時表示。全画面開始、システムバー/シェルは既存の没入経路を使用。
+- `closeViewer()` は外部時のみ `library` へ `popUpTo(startDestination)` で遷移。戻る/ESC/ツールバーの戻る/下スワイプ/削除後のすべてがライブラリへ着地する。通常ビューアは従来どおり `popBackStack()`。
+- 外部のみの項目は `canModify=false` として削除・名前変更を非表示。共有・編集・OCR・情報は利用可能。ライブラリ内の一致時は通常の削除/名前変更が可能（ライブラリの contentUri を使用）。
+
+### 4. 安全設計
+- URI 権限切れ・プロバイダ非対応は既存の画像エラーUIに落ち、閉じればライブラリへ。`_ID` はボリューム跨ぎの衝突可能性があるため content URI/パスの照合を優先。
+- 外部プロバイダのファイルを破壊する操作は提供しない。`runCatching` でクエリ/メタデータ取得を保護。既存の `ViewerOrder`・全画面・スワイプ・OCR・dismiss・通常ディープリンクは不変。
+
+## v2.0.0 検証
+- `:app:testDebugUnitTest` **215件全通過**（v1.14.0の198件＋`ExternalMediaTest` 11、`DeepLinksTest` 追加5、`DesktopViewerPolicyTest` 追加1）。
+- `:app:lintDebug` 0エラー（警告のみ）、`:app:assembleDebug` 成功、`:app:assembleRelease` 署名・`apksigner verify` はリリース節。
+- **実機デバッグ（mm3 AVD / Android 16.1 / 2400×1080）**:
+  - コールドスタートで `content://media/external/images/media/30` を `ACTION_VIEW`: 全画面、タイトル `landscape_1600x1200.jpg`、削除/名前変更あり。左スワイプで `portrait_1200x1600.jpg` へ（ライブラリ順のページング）。戻る2回でライブラリ画面。
+  - ライブラリ外の `file:///sdcard/Android/data/com.yukiorita.mediamaster/files/external_private.jpg` を `ACTION_VIEW`: 全画面、タイトル `external_private.jpg`、削除/名前変更なし。水平スワイプで変化なし。下スワイプでライブラリ画面。
+  - デスクトップ強制時: 外部画像でサイドバー/タブ帯/フッターが消え、閉じるとライブラリ（シェル復帰）。通常ビューアの全画面・ページング・下スワイプも従来どおり。
+  - `logcat -b crash` FATAL 0件。
+  - 参考: ライブラリ読み込み前に外部ビューアを開いた場合は一度だけ `loadAllMedia()` を実行し、読み込み完了後に一致ページへ移動する。
+
+## v2.0.0 設計評価（リリース前レビュー）
+
+### 目的と結果
+「外部アプリから渡された写真・動画をライブラリのビューアで全画面表示し、ライブラリ内なら前後移動、無ければ1ページで閉じるとライブラリへ」を実装。215件の単体テスト、lint 0エラー、エミュレータ実機でのコールドスタート/通常起動/不一致/デスクトップ確認まで完了した。
+
+### 主要な設計判断
+- **入口を分ける**: 既存の `viewer/{path}` は MediaStore のパス前提で、外部 URI を無理に通すと `ViewState` の Loading/Error やページャ初期化と衝突する。専用 `externalViewer/{uriString}?mime=` を追加し、`ViewerScreen` は `external` 指定時だけ「合成 Success」で即時表示する。既存のビューア経路（`ViewerOrder`）は不変。
+- **ライブラリ照合を安全側に**: content URI → 解決パス → MediaStore id の順。id は MediaStore authority かつ同一ボリュームのときだけ使用（`_ID` はボリュームごとに独立、第三者の数値パスと衝突するため）。表示名・サイズのみの照合はしない。誤って別の写真をページングするより、1ページ表示の方が安全。
+- **閉じる先を固定**: 外部ビューアは `closeViewer()` で `library` へ `popUpTo(home)`。戻る/ESC/戻る矢印/下スワイプ/削除後がすべて同じ着地点になり、外部ルートがバックスタックに残らない。
+- **破壊的操作の分離**: 外部のみの項目は `canModify=false` で削除/名前変更を非表示。編集は新しい MediaStore 行を書き出す既存仕様のため、外部プロバイダのファイルを上書きしない。
+- **コールドスタート**: 外部ビューアが最初の画面でも `mediaState` を一度だけ読み込み、ライブラリ内一致ならページングできる。プロセス復元時も再試行できるよう、試行フラグは `remember`（保存しない）。
+
+### 独立監査（サブエージェント）と対応
+公開前に別コンテキストの監査エージェントが差分を読取専用でレビュー。Critical なし、High 1件・Medium 3件・Low 4件を指摘し、以下を修正した。
+- **High: MediaStore id のボリューム/authority 無視** → `mediaId` は MediaStore authority のときだけ採用し、`volume` を正規化して同一ボリュームのファイルだけ id 照合。第三者プロバイダの数値パス（WhatsApp/Telegram 等）や SD カードの同一 id で別ファイルを表示・ページングしない。テストを安全側の期待値に更新。
+- **Medium: プロセス復元後にライブラリを読まない** → 試行フラグを `rememberSaveable` から `remember` へ。
+- **Medium: 2回目の ACTION_VIEW が同じ destination を使い回す** → 外部ルートのみ `popUpTo("externalViewer/{uriString}?mime={mime}") { inclusive = true }` で新しい引数の destination を作る。
+- **Medium: 再スキャンで一致画像へ引き戻す** → 現在のアンカーが一覧から消えたときだけ一致画像へ再アンカー。
+- **Low: http(s) を外部メディアとして開く** → content/file スキームのみ許可（それ以外は従来の Library）。
+- **Low: 除外フォルダの空文字ガードの不一致** → ライブラリと同じ判定に揃える。
+- 残課題: ラスタ表示/閉じる/削除ガードの instrumented テストは未整備（純粋計算・DeepLinks・ポリシー・実機で補完）。表示名は解決完了まで URI 末尾の短い一時名になることがある。
+
+### 残課題（意図的なスコープ外）
+- 外部 URI の永続権限（ACTION_VIEW の一時 grant はプロセス復元で失効し得る。その場合はエラー表示→閉じてライブラリ）。
+- Google Photos などクラウド専用 URI の照合（ローカル MediaStore に存在しないため1ページ表示）。
+- ラスタ経路の instrumentation テスト（今後の候補）。
 
 ## v1.14.0 実装内容（ライブラリ全画面・ツールバー・編集リセット/切り抜き比率/四隅合わせ）
 

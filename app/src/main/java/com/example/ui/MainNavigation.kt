@@ -32,6 +32,7 @@ import com.example.SettingsViewModel
 import com.example.FilesScreen
 import com.example.ViewerScreen
 import com.example.deeplink.PickRequest
+import com.example.external.ExternalViewerRequest
 import com.example.ui.viewer.DocumentViewerScreen
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
@@ -93,7 +94,15 @@ fun MainNavigation(
         val route = pendingDeepLink
         if (isGranted && route != null) {
             runCatching {
-                navController.navigate(route) { launchSingleTop = true }
+                navController.navigate(route) {
+                    launchSingleTop = true
+                    // v2.0.0: a second ACTION_VIEW for another image must create
+                    // a fresh destination. Single-top alone reuses the entry and
+                    // Compose can keep the previous arguments/image on screen.
+                    if (route.startsWith("externalViewer/")) {
+                        popUpTo("externalViewer/{uriString}?mime={mime}") { inclusive = true }
+                    }
+                }
             }
             onDeepLinkHandled()
         }
@@ -304,6 +313,35 @@ private fun MediaNavHost(
         }
         composable("category/{categoryName}") { backStackEntry ->
             backStackEntry.arguments?.getString("categoryName")?.let(Uri::decode)?.let { CategoryScreen(it, fileViewModel, navController, desktop, onOpenDocInNewTab, onOpenViewerInNewTab) }
+        }
+        // v2.0.0: another app's ACTION_VIEW image/video. The viewer shows the
+        // incoming URI immediately; it pages through the Library order only
+        // when the file is visible there (otherwise a single page).
+        composable(
+            route = "externalViewer/{uriString}?mime={mime}",
+            arguments = listOf(
+                androidx.navigation.navArgument("uriString") {
+                    type = androidx.navigation.NavType.StringType
+                },
+                androidx.navigation.navArgument("mime") {
+                    type = androidx.navigation.NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+            ),
+        ) { backStackEntry ->
+            val externalUri = backStackEntry.arguments?.getString("uriString")?.let(Uri::decode)
+            val externalMime = backStackEntry.arguments?.getString("mime")?.let(Uri::decode)
+            if (externalUri != null) {
+                ViewerScreen(
+                    path = null,
+                    viewModel = fileViewModel,
+                    navController = navController,
+                    desktop = desktop,
+                    onDesktopImmersiveChange = onDesktopImmersiveChange,
+                    external = ExternalViewerRequest(externalUri, externalMime),
+                )
+            }
         }
         composable("viewer/{path}") { backStackEntry ->
             val path = backStackEntry.arguments?.getString("path")?.let(Uri::decode)

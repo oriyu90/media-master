@@ -66,9 +66,67 @@ class DeepLinksTest {
     }
 
     @Test
-    fun actionView_media_opensLibrary() {
-        val i = Intent(Intent.ACTION_VIEW).apply { setDataAndType(Uri.parse("content://x/1"), "image/jpeg") }
+    fun actionView_image_and_video_openTheExternalViewer() {
+        val image = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(Uri.parse("content://x/1"), "image/jpeg")
+        }
+        assertEquals(
+            "externalViewer/${Uri.encode("content://x/1")}?mime=${Uri.encode("image/jpeg")}",
+            DeepLinks.resolve(image),
+        )
+        val video = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(Uri.parse("content://x/2"), "video/mp4")
+        }
+        assertEquals(
+            "externalViewer/${Uri.encode("content://x/2")}?mime=${Uri.encode("video/mp4")}",
+            DeepLinks.resolve(video),
+        )
+    }
+
+    @Test
+    fun actionView_remoteImageUrl_keepsTheLibraryFallback() {
+        val remote = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(Uri.parse("https://example.com/photo.jpg"), "image/jpeg")
+        }
+        assertEquals("library", DeepLinks.resolve(remote))
+    }
+
+    @Test
+    fun actionView_audio_keepsOpeningTheLibrary() {
+        val audio = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(Uri.parse("content://x/3"), "audio/mpeg")
+        }
+        assertEquals("library", DeepLinks.resolve(audio))
+    }
+
+    @Test
+    fun actionView_mediaWithoutData_fallsBackToLibrary() {
+        val i = Intent(Intent.ACTION_VIEW).apply { type = "image/jpeg" }
         assertEquals("library", DeepLinks.resolve(i))
+    }
+
+    @Test
+    fun actionView_genericType_infersImageAndVideoExtensions() {
+        val jpg = Intent(Intent.ACTION_VIEW).apply { data = Uri.parse("content://x/photo.JPG") }
+        assertEquals(
+            "externalViewer/${Uri.encode("content://x/photo.JPG")}?mime=${Uri.encode("image/jpeg")}",
+            DeepLinks.resolve(jpg),
+        )
+        val mp4 = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(Uri.parse("file:///tmp/clip.mp4"), "application/octet-stream")
+        }
+        assertEquals(
+            "externalViewer/${Uri.encode("file:///tmp/clip.mp4")}?mime=${Uri.encode("video/mp4")}",
+            DeepLinks.resolve(mp4),
+        )
+    }
+
+    @Test
+    fun externalViewerRoute_omitsAWildcardMime() {
+        assertEquals(
+            "externalViewer/${Uri.encode("content://x/4")}",
+            DeepLinks.externalViewerRoute("content://x/4", "*/*"),
+        )
     }
 
     @Test
@@ -97,8 +155,10 @@ class DeepLinksTest {
 
     @Test
     fun actionView_zipFallback_doesNotHijackNonZip() {
+        // .png now opens the media viewer via the v2.0.0 media fallback, so
+        // use an extension that is neither media nor zip for this guard.
         val i = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(Uri.parse("content://x/photo.png"), "application/octet-stream")
+            setDataAndType(Uri.parse("content://x/data.bin"), "application/octet-stream")
         }
         assertNull(DeepLinks.resolve(i))
     }

@@ -1,7 +1,15 @@
 # 設計書兼仕様書 (Media Master)
 
 ## バージョン情報
-- **Version:** 1.14.0
+- **Version:** 2.0.0
+
+## v2.0.0 の設計変更（要約）
+- **外部メディアの入口**: 新ルート `externalViewer/{uriString}?mime={mime}`。`DeepLinks` の `ACTION_VIEW` image/video をここへ送り、MIME がワイルドカード/未指定/octet-stream の場合は拡張子（jpg/png/heic/mp4/mkv…）から推定する。audio は従来どおり `library`、文書/ZIP/フォルダは不変。`DesktopViewerPolicy` に `externalViewer/` を追加し、デスクトップではシェルを畳んで全画面表示する。
+- **外部 URI の解決**: 新規 `external/ExternalMediaInfo` と `resolveExternalMediaInfo()`。`OpenableColumns`（表示名・サイズ）と MediaStore（`_ID`/`DATA`/`DATE_MODIFIED`）をベストエフォートで読み、全クエリを `runCatching` で保護する。解決前は URI 最終セグメントとインテント MIME のフォールバックで即時表示する。
+- **ライブラリ照合**: pure `matchLibraryFile()` が content URI 文字列 → 解決パス → MediaStore `_ID` の順で照合。表示名・サイズのみの照合はしない（誤ったページングより単体表示が安全）。`libraryMediaOrder()` は写真タブと同じく画像/動画のみ・除外フォルダ非表示・更新日時昇順。`externalMediaList()` は一致時のみライブラリ順、不一致時は外部ファイル1件を返す。
+- **ビューアの外部モード**: `ViewerScreen(external=…)` は `externalViewer` を合成の `ViewState.Success` として扱い、ライブラリ読み込み中でも画像を即時表示。`mediaState` 未取得なら `loadAllMedia()` を一度だけ実行し、コールドスタートでも一致時にページングできる。全画面開始、`closeViewer()` は外部時のみ `library` へ `popUpTo(home)` で遷移（戻る/ESC/戻る矢印/下スワイプ/削除後）。外部のみの項目は `canModify=false` で削除/名前変更を非表示。
+- **安全設計**: URI 権限切れ・プロバイダ非対応は既存の画像エラーUIに落ち、閉じればライブラリへ。`_ID` はボリューム跨ぎの衝突可能性があるため content URI/パスの照合を優先。外部ファイルの破壊的操作なし。既存の `ViewerOrder`・全画面・スワイプ・OCR・dismiss・通常ディープリンクは不変。
+- テスト: `ExternalMediaTest`（一致/不一致/順序/1ページ/ID解析）、`DeepLinksTest`（externalViewer・音声・MIMEフォールバック）、`DesktopViewerPolicyTest`。実機でコールドスタート一致→ページング、不一致→単体＋下スワイプでライブラリ、デスクトップのシェル折り畳みを確認。
 
 ## v1.14.0 の設計変更（要約）
 - **デスクトップ没入の分離**: 「ビューア内の全画面フラグ」と「デスクトップシェルを畳むか」を分けた。`ui/DesktopViewerPolicy.kt`（pure）が `viewer/`・`imageEditor/`・`videoEditor/` のルートだけをメディア提示として判定し、`ViewerScreen` は `onDesktopImmersiveChange(isFullScreen && hasTarget)` を通知するだけ。`MainNavigation` が `desktopImmersive` を保持し、`DesktopNavigation` はサイドバー・タブ帯・フッターを **兄弟要素として条件付きコンポーズ**する（NavHost の呼び出し位置は固定なので、ページャ・ズーム・OCR・バックスタックは破棄されない）。ライブラリへ戻るルート変更で必ず false に戻すため、クロームのないウィンドウが残らない。

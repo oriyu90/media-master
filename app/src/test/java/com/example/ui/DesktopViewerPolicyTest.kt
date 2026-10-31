@@ -17,6 +17,12 @@ class DesktopViewerPolicyTest {
     }
 
     @Test
+    fun `external media handed over by another app is presented full-window`() {
+        assertTrue(isMediaPresentationRoute("externalViewer/{uriString}?mime={mime}"))
+        assertTrue(shouldCollapseDesktopShell(true, "externalViewer/{uriString}?mime={mime}"))
+    }
+
+    @Test
     fun `editors reached from the gallery keep the full-window presentation`() {
         assertTrue(isMediaPresentationRoute("imageEditor/{uriString}"))
         assertTrue(isMediaPresentationRoute("videoEditor/{uriString}"))

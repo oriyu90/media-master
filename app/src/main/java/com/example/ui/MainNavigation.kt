@@ -39,6 +39,9 @@ import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.google.accompanist.permissions.isGranted
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalPermissionsApi::class)
@@ -80,7 +83,23 @@ fun MainNavigation(
     val permissionsState = rememberMultiplePermissionsState(permissionsToRequest)
 
     
-    val hasAllFilesAccess = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R && Environment.isExternalStorageManager()
+    // v2.0.1: MANAGE_EXTERNAL_STORAGE is granted on a system screen. Without an
+    // ON_RESUME re-read, the gate below (and the pending external VIEW waiting
+    // on it) relied on an incidental recomposition to notice the grant, so a
+    // user could return from Settings and still see the permission screen.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var permissionTick by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) permissionTick++
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    val hasAllFilesAccess = remember(permissionTick) {
+        android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R &&
+            Environment.isExternalStorageManager()
+    }
     // Android's media permissions do not cover PDFs and ordinary files. Full file access is
     // therefore required on Android 11+ before presenting a file-manager interface.
     val isGranted = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
@@ -90,10 +109,19 @@ fun MainNavigation(
     }
     // Apply an external deep link once storage access is granted and the NavHost exists.
     // Unknown routes are swallowed so a malformed external intent can never crash the app.
-    LaunchedEffect(pendingDeepLink, isGranted) {
+    // v2.0.1: also key on the current entry. On a cold start the deep link can
+    // be requested before the NavHost has installed its graph; the first
+    // attempt then fails and the request stays pending. Re-running when the
+    // first destination appears retries it instead of leaving the user on Home.
+    val currentEntry by navController.currentBackStackEntryAsState()
+    LaunchedEffect(pendingDeepLink, isGranted, currentEntry?.id) {
         val route = pendingDeepLink
         if (isGranted && route != null) {
-            runCatching {
+            // v2.0.1: only mark the request handled when navigation landed. A
+            // swallowed failure used to discard it silently (the app stayed on
+            // Home and the photo never opened); leaving it pending lets the
+            // next composition or restore retry it.
+            val navigated = runCatching {
                 navController.navigate(route) {
                     launchSingleTop = true
                     // v2.0.0: a second ACTION_VIEW for another image must create
@@ -103,8 +131,8 @@ fun MainNavigation(
                         popUpTo("externalViewer/{uriString}?mime={mime}") { inclusive = true }
                     }
                 }
-            }
-            onDeepLinkHandled()
+            }.isSuccess
+            if (navigated) onDeepLinkHandled()
         }
     }
 
@@ -222,12 +250,18 @@ private fun PhoneScaffold(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val showBar = TOP_DESTINATIONS.any { it.route == currentRoute }
+    // v2.0.1: the viewer and the editors are full-window surfaces. The mini
+    // player used to inset them by its height, so playing audio while a photo
+    // was open left a strip at the bottom and "fullscreen" was not fullscreen.
+    val hideMiniPlayer = isMediaPresentationRoute(currentRoute)
     Scaffold(
         bottomBar = {
             Column {
-                com.example.playback.MiniPlayer(
-                    onNavigateToAudio = { navController.navigate("nowPlaying") { launchSingleTop = true } },
-                )
+                if (!hideMiniPlayer) {
+                    com.example.playback.MiniPlayer(
+                        onNavigateToAudio = { navController.navigate("nowPlaying") { launchSingleTop = true } },
+                    )
+                }
                 if (showBar) {
                     BottomNavBar(
                         currentRoute = currentRoute,

@@ -34,6 +34,9 @@ import com.example.playback.PlaybackManager
 class MainActivity : AppCompatActivity() {
     companion object {
         var shouldEnterPiP = false
+
+        /** Saved-state key: route of the deep link this instance already applied. */
+        private const val STATE_HANDLED_DEEP_LINK = "handled_deep_link"
     }
 
     /**
@@ -42,6 +45,14 @@ class MainActivity : AppCompatActivity() {
      * Consumed by [MainNavigation] once storage access is granted.
      */
     private val pendingDeepLink = MutableStateFlow<String?>(null)
+
+    /**
+     * v2.0.1: route this instance already applied. After process death the
+     * Activity is recreated with the original ACTION_VIEW intent; replaying it
+     * dragged the user back to a photo they had already dismissed. Saving the
+     * route (not a bare boolean) still lets a *different* new intent through.
+     */
+    private var handledDeepLink: String? = null
 
     /**
      * v1.12.0 file-manager picking: non-null while serving another app's
@@ -58,6 +69,8 @@ class MainActivity : AppCompatActivity() {
             pendingPick.value = pick
             pendingDeepLink.value = null
         } else {
+            // A brand-new intent is a new request even if it repeats a route.
+            handledDeepLink = null
             DeepLinks.resolve(intent)?.let { pendingDeepLink.value = it }
         }
     }
@@ -68,6 +81,11 @@ class MainActivity : AppCompatActivity() {
             enterPictureInPictureMode(android.app.PictureInPictureParams.Builder().build())
         }
     }
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(STATE_HANDLED_DEEP_LINK, handledDeepLink)
+    }
+
     private val fileViewModel: FileViewModel by viewModels()
     private val settingsViewModel: SettingsViewModel by viewModels()
 
@@ -75,8 +93,13 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         // v1.12.0: picker requests win over deep links (cold start included).
         pendingPick.value = PickRequest.parse(intent)
+        // v2.0.1: skip replaying the launch intent only when this exact route
+        // was already applied before the process died (see handledDeepLink).
+        // A genuinely new intent still opens its target.
         if (pendingPick.value == null) {
-            pendingDeepLink.value = DeepLinks.resolve(intent)
+            val restored = savedInstanceState?.getString(STATE_HANDLED_DEEP_LINK)
+            val incoming = DeepLinks.resolve(intent)
+            if (incoming != null && incoming != restored) pendingDeepLink.value = incoming
         }
         PlaybackManager.initialize(this)
         // v1.8.0 (#3): centralised Coil cache so grid thumbnails and viewer
@@ -155,7 +178,10 @@ class MainActivity : AppCompatActivity() {
                     fileViewModel = fileViewModel,
                     settingsViewModel = settingsViewModel,
                     deepLinkRoute = pendingDeepLink,
-                    onDeepLinkHandled = { pendingDeepLink.value = null },
+                    onDeepLinkHandled = {
+                        handledDeepLink = pendingDeepLink.value
+                        pendingDeepLink.value = null
+                    },
                     pickRequest = pendingPick,
                     // v1.12.0 picker result: hand the granted URI back to the
                     // requesting app and close. `null` data = user cancelled.

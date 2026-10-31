@@ -3,6 +3,15 @@
 ## バージョン情報
 - **Version:** 2.0.0
 
+## post-2.0.0 の修正（未リリース / 次回 2.0.1 相当）
+- **共有の安全化**: 外部から `file://` で渡された写真を ACTION_SEND へそのまま流すと `FileUriExposedException`（targetSdk 24+）で落ちるため、`shareableUri()` が FileProvider URI へ変換し、chooser 起動を `runCatching` + 失敗トーストに。
+- **ツールバー**: 画像で 7 アクション並び、411dp でタイトルが「…」・360dp で消えていた。削除/名前変更/情報を `⋮`（`more_options`）へ移し、タイトルと操作の両立を確保。ダイアログ/シートの状態はトップバーの外へ hoist し、動画コントローラの自動非表示で閉じないようにした。
+- **没入の再主張**: システムバーの hide は `LaunchedEffect` で行い、次フレームで再 hide。旧 destination の `onDispose`（show）が後から走ってもバーが残らない。ウィンドウがフォーカスを取り戻したときも再 hide。アプリ内遷移では没入が保たれるが、別タスクからの 2 枚目の受信時のみ OS 側の再表示が残る（既知の残課題）。
+- **障害時の導線**: 画像/動画のデコード失敗時に chrome とシステムバーを表示（没入の黒画面で閉じ方を失わない）。読込中はスピナー。
+- **情報の正確性**: 不明なサイズ・日時は「不明」（`0 B` / `1970` を出さない）。OCR 結果はページ世代で照合し、前画像のテキストを新しいページに重ねない。
+- **ライフサイクル**: プロセス死後の `ACTION_VIEW` 再適用を抑止（同一ルートのみ）。deep link は navigate 成功時だけ消費。権限は `ON_RESUME` で再評価。`PlayerView` は `onRelease` で player を切り離す。ページャの page 参照は `getOrNull`。
+- **RTL**: 動画の手動ページスワイプを `LayoutDirection` に追従（`dragPageDelta()`）。
+
 ## v2.0.0 の設計変更（要約）
 - **外部メディアの入口**: 新ルート `externalViewer/{uriString}?mime={mime}`。`DeepLinks` の `ACTION_VIEW` image/video をここへ送り、MIME がワイルドカード/未指定/octet-stream の場合は拡張子（jpg/png/heic/mp4/mkv…）から推定する。audio は従来どおり `library`、文書/ZIP/フォルダは不変。`DesktopViewerPolicy` に `externalViewer/` を追加し、デスクトップではシェルを畳んで全画面表示する。
 - **外部 URI の解決**: 新規 `external/ExternalMediaInfo` と `resolveExternalMediaInfo()`。`OpenableColumns`（表示名・サイズ）と MediaStore（`_ID`/`DATA`/`DATE_MODIFIED`）をベストエフォートで読み、全クエリを `runCatching` で保護する。解決前は URI 最終セグメントとインテント MIME のフォールバックで即時表示する。

@@ -44,13 +44,16 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.activity.compose.BackHandler
+import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -87,6 +90,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
@@ -227,6 +231,10 @@ fun ViewerScreen(
     var isOcrLoading by remember { mutableStateOf(false) }
     var recognizedText by remember { mutableStateOf<Text?>(null) }
     var imageSize by remember { mutableStateOf(IntSize.Zero) }
+    // v2.0.1: bumped on every page change. An OCR request that finishes after
+    // the user swiped must not paint the previous photo's text onto the new
+    // one (the overlay is viewer-wide, not page-wide).
+    var ocrGeneration by remember { mutableStateOf(0) }
 
     val coroutineScope = rememberCoroutineScope()
 
@@ -289,15 +297,50 @@ fun ViewerScreen(
         // the shell (DesktopNavigation) so the bars stay hidden across the
         // editor round trip instead of being restored by this onDispose.
         val controller = if (hasTarget && !desktop && isFullScreen && activity != null) {
-            WindowCompat.getInsetsController(activity.window, activity.window.decorView).also {
-                it.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                it.hide(WindowInsetsCompat.Type.systemBars())
+            WindowCompat.getInsetsController(activity.window, activity.window.decorView)
+        } else null
+        // v2.0.1: Android restores the system bars when the window regains
+        // focus (another app's ACTION_VIEW brings the task forward), and the
+        // hide applied on entry is not re-applied. Re-hide on focus gain so an
+        // immersive viewer never ends up with bars after being resumed.
+        val decorView = activity?.window?.decorView
+        val focusListener = if (controller != null && decorView != null) {
+            val listener = android.view.ViewTreeObserver.OnWindowFocusChangeListener { hasFocus ->
+                if (hasFocus) {
+                    controller.systemBarsBehavior =
+                        WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    runCatching { controller.hide(WindowInsetsCompat.Type.systemBars()) }
+                }
             }
+            runCatching { decorView.viewTreeObserver.addOnWindowFocusChangeListener(listener) }
+            listener
         } else null
         onDispose {
+            if (focusListener != null) {
+                runCatching { decorView?.viewTreeObserver?.removeOnWindowFocusChangeListener(focusListener) }
+            }
             if (controller != null) {
                 runCatching { controller.show(WindowInsetsCompat.Type.systemBars()) }
             }
+        }
+    }
+    // v2.0.1: hide in a launched effect, not in the DisposableEffect above.
+    // When a second external image replaces the current viewer (or the editors
+    // come back), the outgoing destination's onDispose re-shows the bars *after*
+    // the incoming destination composed — that ordering left the immersive
+    // viewer with status/navigation bars visible. A LaunchedEffect body runs
+    // after that disposal, so the hide always wins.
+    LaunchedEffect(activity, isFullScreen, desktop, hasTarget, routeKey) {
+        if (hasTarget && !desktop && isFullScreen && activity != null) {
+            val controller = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            runCatching { controller.hide(WindowInsetsCompat.Type.systemBars()) }
+            // The outgoing destination restores the bars from its onDispose,
+            // which can land after this effect. Re-assert on the next frame so
+            // replacing one external image with another cannot leave the
+            // immersive viewer with system bars showing.
+            withFrameNanos { }
+            runCatching { controller.hide(WindowInsetsCompat.Type.systemBars()) }
         }
     }
 
@@ -441,21 +484,44 @@ fun ViewerScreen(
         var dismissOffsetY by remember { mutableStateOf(0f) }
         var dismissEngaged by remember { mutableStateOf(false) }
         var viewerHeightPx by remember { mutableStateOf(0f) }
+        // v2.0.1: dialog/sheet flags live outside the translucent top bar.
+        // They used to be owned by the AnimatedVisibility content, so a video
+        // whose controller auto-hid the bar silently dismissed an open Info /
+        // Rename sheet mid-interaction.
+        var confirmDelete by remember { mutableStateOf(false) }
+        var showRenameDialog by remember { mutableStateOf(false) }
+        var showInfoSheet by remember { mutableStateOf(false) }
         val density = LocalDensity.current
         val dismissThresholdPx = remember(density) { with(density) { 140.dp.toPx() } }
+        // v2.0.1: the manual video swipe below must follow the pager's RTL mirroring.
+        val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+
         fun settleDismiss(totalDy: Float) {
             coroutineScope.launch {
                 val anim = Animatable(dismissOffsetY)
-                if (shouldConfirmDismiss(totalDy, dismissThresholdPx) && viewerHeightPx > 0f) {
-                    runCatching { anim.animateTo(viewerHeightPx, tween(220)) { dismissOffsetY = value } }
-                    closeViewer()
-                } else {
-                    runCatching { anim.animateTo(0f, tween(180)) { dismissOffsetY = value } }
+                // v2.0.1: only a completed fling may close the viewer. When the
+                // composition (and this scope) is disposed mid-animation the
+                // old runCatching swallowed the CancellationException and still
+                // called closeViewer(), popping one screen too many.
+                val dismissed = try {
+                    if (shouldConfirmDismiss(totalDy, dismissThresholdPx) && viewerHeightPx > 0f) {
+                        anim.animateTo(viewerHeightPx, tween(220)) { dismissOffsetY = value }
+                        true
+                    } else {
+                        anim.animateTo(0f, tween(180)) { dismissOffsetY = value }
+                        false
+                    }
+                } catch (cancel: CancellationException) {
+                    throw cancel
+                } catch (_: Exception) {
+                    false
                 }
+                if (dismissed) closeViewer()
                 dismissEngaged = false
             }
         }
         LaunchedEffect(pagerState.currentPage) {
+            ocrGeneration++
             isOcrMode = false
             recognizedText = null
             imageSize = IntSize.Zero
@@ -489,6 +555,10 @@ fun ViewerScreen(
                 override fun onPlayerError(error: PlaybackException) {
                     playerError = error.message
                     isBuffering = false
+                    // v2.0.1: same as the image path — surface the chrome so
+                    // the close/fullscreen controls are reachable.
+                    isFullScreen = false
+                    chromeVisible = true
                 }
             }
             viewerPlayer.addListener(listener)
@@ -595,6 +665,7 @@ fun ViewerScreen(
                                         isOcrMode = true
                                         if (recognizedText == null && !isOcrLoading) {
                                             isOcrLoading = true
+                                            val generation = ocrGeneration
                                             coroutineScope.launch {
                                                 val recognizer = TextRecognition.getClient(
                                                     JapaneseTextRecognizerOptions.Builder().build(),
@@ -605,10 +676,12 @@ fun ViewerScreen(
                                                     }
                                                     val size = IntSize(inputImage.width, inputImage.height)
                                                     val result = recognizer.process(inputImage).await()
-                                                    imageSize = size
-                                                    recognizedText = result
+                                                    if (generation == ocrGeneration) {
+                                                        imageSize = size
+                                                        recognizedText = result
+                                                    }
                                                 } catch (_: Exception) {
-                                                    recognizedText = null
+                                                    if (generation == ocrGeneration) recognizedText = null
                                                 } finally {
                                                     runCatching { recognizer.close() }
                                                     isOcrLoading = false
@@ -641,69 +714,84 @@ fun ViewerScreen(
                                     Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.edit))
                                 }
                             }
-                            // v2.0.0: an external-only item has no Library
-                            // identity, so destructive actions stay hidden;
-                            // share/edit/info remain available.
-                            val canModify = external == null || matchedLibraryFile != null
-                            var confirmDelete by remember { mutableStateOf(false) }
-                            if (canModify) {
-                                if (confirmDelete) {
-                                    ConfirmDeleteDialog(
-                                        title = stringResource(R.string.delete),
-                                        message = currentFile.name,
-                                        confirmLabel = stringResource(R.string.delete),
-                                        dismissLabel = stringResource(R.string.cancel),
-                                        onDismiss = { confirmDelete = false },
-                                        onConfirm = {
-                                            confirmDelete = false
-                                            val deletedPath = currentFile.path
-                                            coroutineScope.launch {
-                                                viewModel.deleteFile(deletedPath, currentFile.contentUri)
-                                                closeViewer()
-                                            }
-                                        },
-                                    )
-                                }
-                                IconButton(onClick = { confirmDelete = true }) {
-                                    Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete))
-                                }
-                            }
                             IconButton(onClick = {
-                                val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                    type = currentFile.mimeType
-                                    putExtra(android.content.Intent.EXTRA_STREAM, contentUri)
-                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                // v2.0.1: external callers can hand us a file://
+                                // URI; forwarding it in ACTION_SEND throws
+                                // FileUriExposedException on targetSdk 24+ and
+                                // killed the app. Map through FileProvider and
+                                // never let a failed chooser crash the viewer.
+                                val shareTarget = shareableUri(context, contentUri)
+                                val started = shareTarget != null && runCatching {
+                                    val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                        type = currentFile.mimeType
+                                        putExtra(android.content.Intent.EXTRA_STREAM, shareTarget)
+                                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    context.startActivity(
+                                        android.content.Intent.createChooser(
+                                            shareIntent,
+                                            context.getString(R.string.share_media),
+                                        )
+                                    )
+                                }.isSuccess
+                                if (!started) {
+                                    Toast.makeText(context, context.getString(R.string.cannot_open_app), Toast.LENGTH_SHORT).show()
                                 }
-                                context.startActivity(android.content.Intent.createChooser(shareIntent, context.getString(R.string.share_media)))
                             }) {
                                 Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share))
                             }
-                            if (canModify) {
-                                var showRenameDialog by remember { mutableStateOf(false) }
-                                if (showRenameDialog) {
-                                    RenameDialog(
-                                        currentName = currentFile.name,
-                                        onDismiss = { showRenameDialog = false },
-                                        onConfirm = { newName ->
-                                            showRenameDialog = false
-                                            viewModel.renameFile(currentFile.path, currentFile.contentUri, newName)
-                                        },
+                            // v2.0.0: an external-only item has no Library
+                            // identity, so delete/rename stay hidden while
+                            // share/edit/info remain available.
+                            // v2.0.1: delete/rename/info moved into an overflow
+                            // menu. Seven icons left the title with no room (it
+                            // collapsed to "…" at 411dp and vanished at 360dp);
+                            // five keep the file name readable on narrow screens.
+                            val canModify = external == null || matchedLibraryFile != null
+                            var moreOpen by remember { mutableStateOf(false) }
+                            Box {
+                                IconButton(onClick = { moreOpen = true }) {
+                                    Icon(
+                                        Icons.Default.MoreVert,
+                                        contentDescription = stringResource(R.string.more_options),
                                     )
                                 }
-                                IconButton(onClick = { showRenameDialog = true }) {
-                                    Icon(Icons.Default.DriveFileRenameOutline, contentDescription = stringResource(R.string.rename))
+                                DropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
+                                    if (canModify) {
+                                        DropdownMenuItem(
+                                            text = { Text(stringResource(R.string.rename)) },
+                                            onClick = {
+                                                moreOpen = false
+                                                showRenameDialog = true
+                                            },
+                                            leadingIcon = {
+                                                Icon(Icons.Default.DriveFileRenameOutline, contentDescription = null)
+                                            },
+                                        )
+                                    }
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.file_info)) },
+                                        onClick = {
+                                            moreOpen = false
+                                            showInfoSheet = true
+                                        },
+                                        leadingIcon = {
+                                            Icon(Icons.Outlined.Info, contentDescription = null)
+                                        },
+                                    )
+                                    if (canModify) {
+                                        DropdownMenuItem(
+                                            text = { Text(stringResource(R.string.delete)) },
+                                            onClick = {
+                                                moreOpen = false
+                                                confirmDelete = true
+                                            },
+                                            leadingIcon = {
+                                                Icon(Icons.Default.Delete, contentDescription = null)
+                                            },
+                                        )
+                                    }
                                 }
-                            }
-                            var showInfoSheet by remember { mutableStateOf(false) }
-                            if (showInfoSheet) {
-                                FileInfoSheet(
-                                    file = currentFile,
-                                    player = if (isVideo) viewerPlayer else null,
-                                    onDismiss = { showInfoSheet = false },
-                                )
-                            }
-                            IconButton(onClick = { showInfoSheet = true }) {
-                                Icon(Icons.Outlined.Info, contentDescription = stringResource(R.string.file_info))
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
@@ -753,7 +841,10 @@ fun ViewerScreen(
                     },
                 userScrollEnabled = !isOcrMode && !isZoomedIn && !dismissEngaged
             ) { page ->
-                val pageFile = mediaList[page]
+                // v2.0.1: guard the index. A rescan (delete / external refresh)
+                // can shrink mediaList while this page is still being composed;
+                // an unguarded [page] threw IndexOutOfBoundsException.
+                val pageFile = mediaList.getOrNull(page) ?: return@HorizontalPager
                 val pageUri = pageFile.contentUri ?: Uri.fromFile(File(pageFile.path))
                 val pageIsVideo = pageFile.mimeType.startsWith("video/")
                 val pageIsAudio = pageFile.mimeType.startsWith("audio/")
@@ -781,7 +872,7 @@ fun ViewerScreen(
                                     // (earlier, parent-to-child) Initial pass — before the
                                     // event is forwarded into the native view — lets us
                                     // consume it and drive the page change manually instead.
-                                    .pointerInput(pagerState.currentPage, mediaList.size, isZoomedIn, dismissThresholdPx) {
+                                    .pointerInput(pagerState.currentPage, mediaList.size, isZoomedIn, dismissThresholdPx, rtl) {
                                         var dragTotal = Offset.Zero
                                         var handedToPager = false
                                         // v1.9.2: downward dismiss tracking. Mutually
@@ -808,7 +899,7 @@ fun ViewerScreen(
                                                         kotlin.math.abs(dragTotal.x) > kotlin.math.abs(dragTotal.y) * 1.5f
                                                     ) {
                                                         handedToPager = true
-                                                        val targetPage = if (dragTotal.x < 0) pagerState.currentPage + 1 else pagerState.currentPage - 1
+                                                        val targetPage = pagerState.currentPage + dragPageDelta(dragTotal.x, rtl)
                                                         if (targetPage in 0 until mediaList.size) {
                                                             coroutineScope.launch { pagerState.animateScrollToPage(targetPage) }
                                                         }
@@ -859,6 +950,12 @@ fun ViewerScreen(
                                             }
                                         },
                                         update = { it.player = viewerPlayer },
+                                        // v2.0.1: detach on dispose. PlayerView keeps
+                                        // itself registered on the player, so a discarded
+                                        // video page used to retain its view (and the
+                                        // Activity context) until the viewer was closed;
+                                        // video↔image swiping accumulated them.
+                                        onRelease = { it.player = null },
                                         modifier = Modifier.fillMaxSize()
                                     )
                                 }
@@ -890,6 +987,13 @@ fun ViewerScreen(
                             onDismissDrag = { dismissOffsetY = it },
                             onDismissEngage = { dismissEngaged = it },
                             onDismissSettle = ::settleDismiss,
+                            // v2.0.1: a dead external URI must not leave the
+                            // user on an immersive black page with no visible
+                            // exit; show the chrome and the system bars.
+                            onImageError = {
+                                isFullScreen = false
+                                chromeVisible = true
+                            },
                         )
                     }
                 }
@@ -922,6 +1026,44 @@ fun ViewerScreen(
                 }
             }
         }
+        // v2.0.1: rendered outside the fading top bar so hiding the chrome
+        // (video controller auto-hide, a tap while a sheet is open) cannot
+        // dispose an open dialog or sheet.
+        if (confirmDelete && (external == null || matchedLibraryFile != null)) {
+            ConfirmDeleteDialog(
+                title = stringResource(R.string.delete),
+                message = currentFile.name,
+                confirmLabel = stringResource(R.string.delete),
+                dismissLabel = stringResource(R.string.cancel),
+                onDismiss = { confirmDelete = false },
+                onConfirm = {
+                    confirmDelete = false
+                    val deletedPath = currentFile.path
+                    val deletedUri = currentFile.contentUri
+                    coroutineScope.launch {
+                        viewModel.deleteFile(deletedPath, deletedUri)
+                        closeViewer()
+                    }
+                },
+            )
+        }
+        if (showRenameDialog && (external == null || matchedLibraryFile != null)) {
+            RenameDialog(
+                currentName = currentFile.name,
+                onDismiss = { showRenameDialog = false },
+                onConfirm = { newName ->
+                    showRenameDialog = false
+                    viewModel.renameFile(currentFile.path, currentFile.contentUri, newName)
+                },
+            )
+        }
+        if (showInfoSheet) {
+            FileInfoSheet(
+                file = currentFile,
+                player = if (isVideo) viewerPlayer else null,
+                onDismiss = { showInfoSheet = false },
+            )
+        }
         } // Box (ESC focus)
         } // when (Success)
     } // when
@@ -938,6 +1080,42 @@ private fun pageAwareOverlay(currentPage: Int, mediaList: List<MediaFile>): Bool
  */
 internal fun shouldConfirmDismiss(dragDyPx: Float, thresholdPx: Float): Boolean =
     dragDyPx > thresholdPx
+
+/**
+ * v2.0.1: URI that is safe to hand to another app through ACTION_SEND.
+ *
+ * A `file://` URI (another app's ACTION_VIEW can carry one) trips
+ * StrictMode's `FileUriExposedException` on targetSdk 24+ and crashed the
+ * viewer when the user tapped Share. Map it through our FileProvider; URIs
+ * outside shared storage cannot be mapped, so the caller reports a failure
+ * instead of crashing.
+ */
+internal fun shareableUri(context: Context, uri: Uri): Uri? =
+    if (uri.scheme == "file") {
+        val path = uri.path
+        if (path.isNullOrBlank()) {
+            null
+        } else {
+            runCatching {
+                FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", File(path))
+            }.getOrNull()
+        }
+    } else {
+        uri
+    }
+
+/**
+ * v2.0.1: page delta for a horizontal drag on the video page.
+ *
+ * The Compose pager mirrors itself in RTL; the manual pointer detector that
+ * forwards video swipes must mirror the same way or an Arabic multi-page
+ * video pages in the wrong direction. Pure so a unit test can pin it.
+ */
+internal fun dragPageDelta(dragX: Float, rtl: Boolean): Int = when {
+    dragX < 0f -> if (rtl) -1 else 1
+    dragX > 0f -> if (rtl) 1 else -1
+    else -> 0
+}
 
 /**
  * v1.9.2 dismiss veil: the pager dims toward 45% as it slides down a full
@@ -958,6 +1136,9 @@ fun ImageWithOcrOverlay(
     onDismissDrag: (Float) -> Unit,
     onDismissEngage: (Boolean) -> Unit,
     onDismissSettle: (Float) -> Unit,
+    // v2.0.1: a failed decode reveals the chrome instead of leaving an
+    // immersive black page with no visible way out.
+    onImageError: () -> Unit = {},
 ) {
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
@@ -1169,6 +1350,8 @@ fun ImageWithOcrOverlay(
         // v1.8.0 (#3): cached request + error placeholder so a failed decode
         // never leaves a permanent blank page requiring manual reload.
         var imageError by remember(uri) { mutableStateOf(false) }
+        // v2.0.1: first successful frame (drives the loading hint below).
+        var imageLoaded by remember(uri) { mutableStateOf(false) }
         val imageRequest = remember(uri) {
             coil.request.ImageRequest.Builder(context)
                 .data(uri)
@@ -1187,14 +1370,32 @@ fun ImageWithOcrOverlay(
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(16.dp),
                     )
-                    Button(onClick = { imageError = false }) { Text(stringResource(R.string.retry)) }
+                    Button(onClick = {
+                        imageError = false
+                        imageLoaded = false
+                    }) { Text(stringResource(R.string.retry)) }
                 }
             }
         } else {
+            // v2.0.1: an external photo showed a plain black page while Coil
+            // decoded it (over a second for a large first frame on cold start).
+            if (!imageLoaded) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(
+                        color = ViewerOnSurface,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(36.dp),
+                    )
+                }
+            }
             AsyncImage(
                 model = imageRequest,
                 contentDescription = stringResource(R.string.image_viewer),
-                onError = { imageError = true },
+                onSuccess = { imageLoaded = true },
+                onError = {
+                    imageError = true
+                    onImageError()
+                },
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer(
@@ -1346,8 +1547,17 @@ private fun FileInfoSheet(file: MediaFile, player: ExoPlayer?, onDismiss: () -> 
             Spacer(modifier = Modifier.height(16.dp))
             InfoRow(stringResource(R.string.file_name), file.name)
             InfoRow(stringResource(R.string.file_path), file.path)
-            InfoRow(stringResource(R.string.file_size), formatSizeLocalized(file.size))
-            InfoRow(stringResource(R.string.date_modified), formatDate(file.dateModified))
+            // v2.0.1: providers may not expose SIZE / DATE_MODIFIED. Showing
+            // "0 B" / "1970/1/1" as if it were fact was worse than saying the
+            // value is unknown (external SAF / chat attachments hit this).
+            InfoRow(
+                stringResource(R.string.file_size),
+                if (file.size > 0L) formatSizeLocalized(file.size) else stringResource(R.string.unknown),
+            )
+            InfoRow(
+                stringResource(R.string.date_modified),
+                if (file.dateModified > 0L) formatDate(file.dateModified) else stringResource(R.string.unknown),
+            )
             if (isImage) {
                 resolution?.let { InfoRow(stringResource(R.string.resolution), it) }
             }

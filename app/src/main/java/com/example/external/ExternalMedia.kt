@@ -48,8 +48,10 @@ data class ExternalMediaInfo(
  * Identity is checked in order of reliability:
  * 1. the exact content URI string (re-sharing a MediaStore URI),
  * 2. the resolved filesystem path (`DATA` / `file://`),
- * 3. the MediaStore `_ID` (Gmail/Gallery style `images/media/<id>` and
- *    documents-provider `image:<id>` URIs).
+ * 3. the MediaStore `_ID`, only for MediaStore-authority URIs whose volume is
+ *    known (gallery style `images/media/<id>`). SAF/document providers are
+ *    deliberately excluded: their numeric segments are not MediaStore ids and
+ *    matching them caused false positives.
  *
  * Name/size matching is deliberately NOT used: two different files can share
  * a display name, and falsely enabling paging from a cloud/chat attachment

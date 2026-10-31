@@ -81,6 +81,37 @@ v2.0.0 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitTe
 - Google Photos などクラウド専用 URI の照合（ローカル MediaStore に存在しないため1ページ表示）。
 - ラスタ経路の instrumentation テスト（今後の候補）。
 
+## post-v2.0.0 品質精査と修正（未リリース / 次回 2.0.1 相当）
+
+リリース済み v2.0.0 に対し、メモリ安全性・クラッシュ安全性・動作の安定性・GUI の完全性・設定内容の整合性・互換の対応・表示の正確性の 7 観点で横断監査を行い、確定した不具合を修正した。詳細は `docs/plans/post-2.0.0-hardening-plan.md`。
+
+### 修正した不具合（抜粋）
+
+- **外部 `file://` の共有でクラッシュ（HIGH）**: 他アプリが `file://` で渡した写真を共有すると `FileUriExposedException`。共有 URI を `FileProvider` 経由に変換し、chooser 起動も `runCatching` + 失敗トーストに変更。
+- **ページャのインデックス無検査（HIGH）**: `mediaList[page]` を `getOrNull` に。再スキャンや削除でリストが縮んだ瞬間の `IndexOutOfBoundsException` 余地を除去。
+- **deep link の無言失敗（MEDIUM）**: `navigate` が失敗しても「処理済み」にしていた。成功時のみ消費し、失敗時は保留して再試行。
+- **プロセス復帰で外部画像に戻る（MEDIUM）**: `onCreate` の deep link 解決を `savedInstanceState == null` のときだけに限定。
+- **全ファイル権限の付与後に画面が進まない（MEDIUM）**: `ON_RESUME` で `Environment.isExternalStorageManager()` を再評価（`DesktopNavigation` と同じ tick 方式）。
+- **ツールバーのタイトルが潰れる（MEDIUM）**: 画像で 7 アクション並び、411dp でタイトルが「…」、360dp で消えていた。削除・名前変更・情報を `⋮` オーバーフローへ移動（`more_options` を 5 ロケール追加）。
+- **読み込み失敗時に閉じ方が見えない（MEDIUM）**: 画像/動画のエラーで chrome とシステムバーを表示。
+- **情報シートの誤情報（MEDIUM）**: 不明なサイズ・日時を「0 B」「1970/1/1」と表示していたのを `不明` に。
+- **`PlayerView` の後始末漏れ（MEDIUM）**: `onRelease` で player を切り離し、動画⇄画像の往復で view が残らないようにした。
+- **ミニプレーヤーが全画面を欠く（MEDIUM）**: ビューア/エディタではミニプレーヤーを出さない。
+- **2 枚目の外部画像でシステムバーが戻る（MEDIUM / 一部残存）**: バーの hide を `LaunchedEffect` に移し、**次フレームで再 hide** することで旧 destination の `onDispose`（show）より後に実行。ウィンドウがフォーカスを取り戻したときも再 hide。アプリ内の遷移・エディタ往復・復帰では没入を維持するが、**別アプリから 2 枚目を渡したタスク遷移では OS がバーを再表示する経路が残る**（I-07）。恒久対策はバー所有権をシェルへ移す設計変更。
+- **細部**: 破棄中の下スワイプで余分に閉じる／OCR 結果がページ切替後に前画像のテキストを出す／RTL で動画スワイプが逆／読込中の黒画面／照合コメントの不一致。
+
+### 検証
+
+- 単体テスト 220 件（`ViewerMediaHelpersTest` 5 件を追加）、lint 0 errors。
+- エミュレータ（release APK）で、外部 VIEW（一致/不一致/`file://`）、共有、360dp/411dp のツールバー、情報シート、2 回目の ACTION_VIEW、下スワイプ、デスクトップを確認。
+
+### 残課題（記録のみ）
+
+- `ACTION_SEND`（共有シート）への露出はプロダクト判断のため未対応。
+- ライブラリのコンパクト表示（降順）中は、外部ページャの昇順と並びが逆（既定の BY_DATE では一致）。
+- 外部を開くたびの `libraryMediaOrder`（filter+sort）はコンポジション中に実行。実測では問題ないが、将来 `produceState` 化の余地。
+- 再スキャン中の一時的な 1 ページ縮小、ドラッグ中のキー変化による dismiss 固着は理論経路のみ（再現せず）。
+
 ## v1.14.0 実装内容（ライブラリ全画面・ツールバー・編集リセット/切り抜き比率/四隅合わせ）
 
 ### 1. ライブラリ（デスクトップ）の全画面

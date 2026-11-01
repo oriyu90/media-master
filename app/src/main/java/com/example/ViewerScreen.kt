@@ -330,7 +330,11 @@ fun ViewerScreen(
     // the incoming destination composed — that ordering left the immersive
     // viewer with status/navigation bars visible. A LaunchedEffect body runs
     // after that disposal, so the hide always wins.
-    LaunchedEffect(activity, isFullScreen, desktop, hasTarget, routeKey) {
+    // v2.0.1: keyed on chromeVisible as well. If the OS reveals the bars while
+    // the viewer stays immersive (see the residual in the hardening plan), any
+    // tap that toggles the overlay re-asserts the hide, so the state is
+    // recoverable without leaving the viewer.
+    LaunchedEffect(activity, isFullScreen, desktop, hasTarget, routeKey, chromeVisible) {
         if (hasTarget && !desktop && isFullScreen && activity != null) {
             val controller = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
             controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE

@@ -4,6 +4,22 @@ Media Master is an open-source Android media and file manager built with Kotlin 
 
 Media Master は、Kotlin と Jetpack Compose で開発されたオープンソースのAndroid向けメディア・ファイル管理アプリです。写真・動画、音楽、書類、ストレージ、アプリ／APK、編集、バックアップを1つのアプリで扱えます。
 
+## v2.0.1
+
+- **Crash fix — sharing a photo opened from another app:** an external `file://` URI was passed straight into the share sheet, which throws `FileUriExposedException` on modern Android and killed the app. It is now mapped through our FileProvider (and a failed chooser is reported instead of crashing).
+- **Readable toolbar:** the image viewer used to squeeze seven actions into the bar, collapsing the file name to "…" at 411dp and hiding it at 360dp. Delete, Rename and File info moved into a `⋮` overflow menu, so the title is readable and every action still reachable on narrow screens.
+- **Correct file info:** providers that do not expose size/date now show "unknown" instead of "0 B" and "1970/1/1".
+- **Never stuck on a black page:** a failed image/video decode reveals the toolbar and system bars, and images show a progress indicator until the first frame.
+- **Lifecycle and stability:** the full-file-access grant is re-read on resume (opening a photo right after granting works), the launch intent is not replayed after the process is recreated, a failed deep-link navigation is retried instead of silently dropped, the pager guards a shrinking list, `PlayerView` releases its player, and a late OCR result cannot paint the previous page.
+- **Details:** video swipes follow RTL, the mini player no longer insets a fullscreen viewer, and the immersive state is re-asserted after focus changes (receiving a second photo from another app can still re-show the status bar; tapping restores it).
+- **修正（クラッシュ）:** 他アプリから `file://` で渡された写真を共有すると `FileUriExposedException` で落ちていました。FileProvider 経由に変換し、共有先が見つからない場合もクラッシュせず通知します。
+- **ツールバー:** 画像ビューアで7アクションが並び、411dp でファイル名が「…」、360dp で消えていました。削除・名前変更・情報を `⋮` に移し、狭い画面でもタイトルと全操作を両立します。
+- **情報の正確性:** サイズ・更新日を提供しないプロバイダでは「0 B」「1970/1/1」ではなく「不明」と表示します。
+- **黒画面で閉じ方を失わない:** 画像/動画の読み込み失敗時はツールバーとシステムバーを表示し、画像は先頭フレームまでインジケータを出します。
+- **ライフサイクルと安定性:** 全ファイルアクセス許可を `ON_RESUME` で再評価（許可直後に開ける）、プロセス再生成で起動インテントを再生しない、deep link の失敗を握りつぶさず再試行、ページャのリスト縮小を防御、`PlayerView` の解放、遅延した OCR 結果が前ページに重ならないようにしました。
+- **細部:** 動画スワイプの RTL 追従、全画面ビューアをミニプレーヤーが欠かない、フォーカス復帰時の没入再主張（別アプリからの2枚目ではステータスバーが再表示されることがありますが、タップで復帰します）。
+- Version `2.0.1` (`versionCode 25`), signed with the same upload key as v0.1.0–v2.0.0 (APK Signature Scheme v2 verified). **APK SHA-256: `75c75f0423bf568f67cb679377524db1fe0b8e9d67d2ee598bb4472f3bae8b76`**.
+
 ## v2.0.0
 
 - **Photos and videos from other apps open in the viewer:** `ACTION_VIEW` image/video now launches the in-app media viewer directly on the incoming URI, fullscreen (and full-window on desktop/DeX) instead of dropping the user on the Library grid. Senders that omit the MIME type but carry a `.jpg`/`.png`/`.heic`/`.mp4`/… name are recognized too.

@@ -1,9 +1,9 @@
 # 設計書兼仕様書 (Media Master)
 
 ## バージョン情報
-- **Version:** 2.0.0
+- **Version:** 2.0.1
 
-## post-2.0.0 の修正（未リリース / 次回 2.0.1 相当）
+## v2.0.1 の修正
 - **共有の安全化**: 外部から `file://` で渡された写真を ACTION_SEND へそのまま流すと `FileUriExposedException`（targetSdk 24+）で落ちるため、`shareableUri()` が FileProvider URI へ変換し、chooser 起動を `runCatching` + 失敗トーストに。
 - **ツールバー**: 画像で 7 アクション並び、411dp でタイトルが「…」・360dp で消えていた。削除/名前変更/情報を `⋮`（`more_options`）へ移し、タイトルと操作の両立を確保。ダイアログ/シートの状態はトップバーの外へ hoist し、動画コントローラの自動非表示で閉じないようにした。
 - **没入の再主張**: システムバーの hide は `LaunchedEffect` で行い、次フレームで再 hide。旧 destination の `onDispose`（show）が後から走ってもバーが残らない。ウィンドウがフォーカスを取り戻したときも再 hide。アプリ内遷移では没入が保たれるが、別タスクからの 2 枚目の受信時のみ OS 側の再表示が残る（既知の残課題）。

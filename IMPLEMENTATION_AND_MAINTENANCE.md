@@ -1,20 +1,20 @@
-# Media Master v2.0.0 実装・保守メモ
+# Media Master v2.0.1 実装・保守メモ
 
-最終更新: 2026-10-31
+最終更新: 2026-11-01
 
 ## リリース情報
 
 | 項目 | 内容 |
 | --- | --- |
-| バージョン | `2.0.0` (`versionCode 24`) |
+| バージョン | `2.0.1` (`versionCode 25`) |
 | アプリケーションID | `com.yukiorita.mediamaster` |
 | 最小 SDK / target SDK | 24 / 36 |
 | ライセンス | MIT |
 | 著作者 | Yuki_Orita |
 | release APK | `app/build/outputs/apk/release/app-release.apk`（R8 + resource shrink 有効） |
-| APK SHA-256 | `67e8807f9172adedd71989e16bbd4d8a1be7794b5c4708f53483467f9b5135fb` |
-| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v1.14.0 と同一鍵） |
-| GitHub Release | `v2.0.0` (GitHub Releases) |
+| APK SHA-256 | `75c75f0423bf568f67cb679377524db1fe0b8e9d67d2ee598bb4472f3bae8b76` |
+| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v2.0.0 と同一鍵） |
+| GitHub Release | `v2.0.1` (GitHub Releases) |
 
 release APK は RSA 4096 ビット鍵・APK Signature Scheme v2 署名（`apksigner verify` で確認）。署名鍵は `common-rules-document/keystores/media-master-upload-key.jks`（alias `upload`）。
 
@@ -81,7 +81,7 @@ v2.0.0 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitTe
 - Google Photos などクラウド専用 URI の照合（ローカル MediaStore に存在しないため1ページ表示）。
 - ラスタ経路の instrumentation テスト（今後の候補）。
 
-## post-v2.0.0 品質精査と修正（未リリース / 次回 2.0.1 相当）
+## v2.0.1 品質精査と修正（リリース済み）
 
 リリース済み v2.0.0 に対し、メモリ安全性・クラッシュ安全性・動作の安定性・GUI の完全性・設定内容の整合性・互換の対応・表示の正確性の 7 観点で横断監査を行い、確定した不具合を修正した。詳細は `docs/plans/post-2.0.0-hardening-plan.md`。
 

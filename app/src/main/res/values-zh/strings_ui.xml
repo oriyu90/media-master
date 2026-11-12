@@ -50,4 +50,55 @@
     <string name="crop_help">拖动裁剪框进行裁剪。选择宽高比可将其锁定。</string><string name="reset_crop">重置裁剪</string><string name="perspective_align_corners">对齐四角</string><string name="perspective_help">拖动四个角，点按“确定”裁剪并校正该区域。</string><string name="perspective_invalid">请保持四角为凸形（不要交叉）。</string><string name="ok">确定</string><string name="save_failed">无法保存编辑后的图像。</string><string name="image_open_failed">无法打开此图像。</string>
     <string name="perspective_failed">无法应用透视校正。</string>
     <string name="more_options">更多操作</string>
+
+    <!-- v2.1.0 (WP2): accent colour -->
+    <string name="accent_color">强调色</string>
+    <string name="select_accent_color">选择颜色</string>
+    <string name="custom_color">自定义颜色</string>
+    <string name="hex_color_label">十六进制颜色（#RRGGBB）</string>
+    <string name="reset_to_default">恢复默认</string>
+    <string name="invalid_color_format">颜色格式不正确，请使用 #RRGGBB。</string>
+    <string name="accent_amber">琥珀色</string>
+    <string name="accent_blue">蓝色</string>
+    <string name="accent_green">绿色</string>
+    <string name="accent_purple">紫色</string>
+    <string name="accent_pink">粉色</string>
+    <string name="accent_orange">橙色</string>
+    <string name="accent_teal">青色</string>
+    <string name="accent_red">红色</string>
+
+    <string name="copy_path">复制路径</string>
+    <string name="move_to_path">移动到路径…</string>
+    <string name="copy_to_path">复制到路径…</string>
+    <string name="move_to_path_desc">输入目标文件夹路径，所选项目将移动到该位置。</string>
+    <string name="copy_to_path_desc">输入目标文件夹路径，所选项目将复制到该位置。</string>
+    <string name="destination_path">目标路径</string>
+    <string name="path_copied">已复制路径</string>
+    <string name="path_error_empty">请输入目标路径</string>
+    <string name="path_error_not_absolute">请输入以 / 开头的绝对路径</string>
+    <string name="path_error_not_found">该文件夹不存在</string>
+    <string name="path_error_not_a_directory">该路径不是文件夹</string>
+    <string name="path_error_outside_storage">请选择设备存储中的文件夹</string>
+    <string name="path_error_same_as_source">目标位置与源位置相同</string>
+    <string name="path_error_inside_source">不能将文件夹移动到其自身内部</string>
+    <string name="path_error_not_writable">该文件夹不可写入</string>
+    <string name="transfer_done">%1$s：%2$d 项</string>
+    <string name="transfer_failed">%1$s失败：%2$d 项</string>
+    <string name="transfer_partial">%1$s：完成 %2$d 项，失败 %3$d 项</string>
+    <string name="folder_is_empty">此文件夹为空</string>
+
+    <!-- v2.1.0 (WP3): receive shared files / multi-select picker -->
+    <string name="incoming_save_title">保存共享的文件</string>
+    <string name="incoming_save_count">将保存 %1$d 个文件</string>
+    <string name="incoming_save_destination">保存位置</string>
+    <string name="incoming_save_destination_loading">正在查找文件夹…</string>
+    <string name="incoming_choose_folder">选择文件夹</string>
+    <string name="incoming_save_action">保存</string>
+    <string name="incoming_saving_progress">正在保存 %1$d / %2$d…</string>
+    <string name="incoming_save_done">已保存 %1$d 个文件</string>
+    <string name="incoming_save_failed">保存失败的文件：%1$d 个</string>
+    <string name="incoming_save_hint">不会覆盖同名文件，重复的文件会以 name (1).jpg 这样的编号保存。</string>
+    <string name="pick_files_hint">点按文件进行选择，然后确认</string>
+    <string name="pick_selected_count">已选择 %1$d 项</string>
+    <string name="pick_confirm_selection">确认选择</string>
 </resources>

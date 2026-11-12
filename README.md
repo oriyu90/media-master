@@ -4,6 +4,22 @@ Media Master is an open-source Android media and file manager built with Kotlin 
 
 Media Master は、Kotlin と Jetpack Compose で開発されたオープンソースのAndroid向けメディア・ファイル管理アプリです。写真・動画、音楽、書類、ストレージ、アプリ／APK、編集、バックアップを1つのアプリで扱えます。
 
+## v2.1.0
+
+- **Explorer: copy a path, move/copy to a typed path.** Every file and folder context menu (right-click, long-press) and the selection toolbar now offer **Copy path** (clipboard + confirmation) and **Move to path…** / **Copy to path…**, which accept absolute paths, `~` and `file://` input. Invalid input is rejected before anything touches the disk: a missing folder, a path outside device storage, the same folder as the source, a folder moved into itself, or a read-only folder each show a localized reason and keep the confirm button disabled.
+- **Mouse double-click renames.** On a mouse (DeX, ChromeOS, tablets with a trackpad) a double-click on a file or folder opens the rename dialog; touch keeps the long-press menu (which also gained Rename).
+- **Drag & drop moves files.** Files and folders can be dragged (mouse drag, or touch long-press-and-drag) onto a folder row/tile, a breadcrumb segment or a sidebar pin/volume to move them there. Multi-selection drags the whole selection, drop targets highlight while hovered, and a move into the same folder, into itself or into a descendant is refused. The payload is plain text, so dragging from Media Master to another app (and from another app into Media Master) keeps working.
+- **Accent colour.** Settings → Accent colour offers eight presets (Amber — the shipped brand colour — Blue, Green, Purple, Pink, Orange, Teal, Red) plus a custom `#RRGGBB` value and "reset to default". Only the one-point accent hue changes; the surfaces stay the warm neutral ramp, and every preset is contrast-checked so body text keeps WCAG AA (4.5:1) in both light and dark themes.
+- **Standard file manager.** Media Master now receives `ACTION_SEND` / `ACTION_SEND_MULTIPLE` from the system share sheet and saves the shared files into a folder you pick (streamed copy, no memory spike, automatic `name (1).ext` de-duplication, up to 50 items). The system picker (`GET_CONTENT` / `OPEN_DOCUMENT`) honours `EXTRA_ALLOW_MULTIPLE` and returns a `ClipData` for multi-selection. Requests that carry their own URI grant (open a photo/document, save a share) are served even on devices without "All files access", so every device behaves the same; the in-app file listing keeps the full-access gate it genuinely needs.
+- **GUI clean-up.** The Explorer's Details header and rows now share one column definition (the header used to sort "Modified" by creation date and the row divider was pinned at 72dp), the selection toolbar moved Rename/Move/Copy/Path into a `⋮` menu so six icons no longer crowd a phone bar, the grid context menu gained Share/Delete/Rename, empty folders show an empty state instead of a blank page, and file sizes in the list use the locale-aware formatter.
+- **パスをコピー／パスを指定して移動。** エクスプローラーの右クリック・長押しメニューと選択ツールバーに「パスをコピー」と「パスを指定して移動…／コピー…」を追加しました。絶対パス・`~`・`file://` を受け付け、存在しないフォルダ、端末ストレージ外、移動元と同じ場所、フォルダ自身の中、書き込み不可のフォルダは理由を表示して実行できません。
+- **マウスのダブルクリックで名前変更。** DeX・ChromeOS・トラックパッド付きタブレットではダブルクリックで名前変更ダイアログが開きます（タッチは従来どおり長押しメニュー、こちらにも名前変更を追加）。
+- **ドラッグ&ドロップで移動。** ファイル・フォルダをフォルダ行/タイル、パンくず、サイドバーのピンやストレージへドラッグすると移動します。複数選択中は選択全体をドラッグ、ドロップ先はハイライト表示、同じ場所・自身の中・子孫への移動は拒否します。ペイロードはプレーンテキストなので他アプリとの相互ドラッグも維持します。
+- **アクセントカラー。** 設定 → アクセントカラーで8色のプリセット（アンバー＝従来色、青・緑・紫・ピンク・オレンジ・ティール・赤）、カスタム `#RRGGBB`、既定に戻すを選べます。変わるのはワンポイント色の色相だけで、背景は暖色ニュートラルのまま。全プリセットで本文コントラストが WCAG AA（4.5:1）を満たすことをテストで保証しています。
+- **標準ファイル管理アプリ。** 共有シートからの `ACTION_SEND` / `ACTION_SEND_MULTIPLE` を受けて、選んだフォルダへストリーム保存します（メモリに載せず、`name (1).ext` で重複回避、最大50件）。システムのファイル選択（`GET_CONTENT` / `OPEN_DOCUMENT`）は複数選択に対応し `ClipData` で返します。URI 権限付きの要求（写真・文書を開く、共有を保存）は「全ファイルアクセス」未許可の端末でも処理し、アプリ内のファイル一覧のみ従来どおり権限を要求します。
+- **GUI の整合。** エクスプローラーの列ヘッダと行が同じ列定義を共有（従来は「更新日」ヘッダが作成日でソート、区切り線が 72dp 固定）、選択ツールバーは名前変更・移動・コピー・パスを `⋮` に集約して6アイコンの過密を解消、グリッドのメニューに共有・削除・名前変更を追加、空フォルダは空状態を表示、一覧のサイズ表記をロケール対応にしました。
+- Version `2.1.0` (`versionCode 26`), signed with the same upload key as v0.1.0–v2.0.1 (APK Signature Scheme v2 verified). **APK SHA-256: `89268d458547e1ae3a672cea364e14b1bd1159264f5269cf4f8100b7d8bdd9ae`**.
+
 ## v2.0.1
 
 - **Crash fix — sharing a photo opened from another app:** an external `file://` URI was passed straight into the share sheet, which throws `FileUriExposedException` on modern Android and killed the app. It is now mapped through our FileProvider (and a failed chooser is reported instead of crashing).

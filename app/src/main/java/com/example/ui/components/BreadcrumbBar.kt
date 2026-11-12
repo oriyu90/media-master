@@ -15,6 +15,10 @@ import androidx.compose.material3.SuggestionChipDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -36,6 +40,9 @@ fun BreadcrumbBar(
     rootLabel: String,
     currentPath: String,
     onNavigate: (String) -> Unit,
+    // v2.1.0: dropping files on a crumb moves them into that folder
+    // (Windows Explorer parity). Null keeps the bar read-only.
+    onDropPaths: ((destination: String, paths: List<String>) -> Boolean)? = null,
 ) {
     val relative = currentPath.removePrefix(rootPath).trim('/')
     val segments = if (relative.isBlank()) emptyList() else relative.split('/')
@@ -59,6 +66,7 @@ fun BreadcrumbBar(
             description = stringResource(R.string.navigate_to, rootLabel),
             selected = segments.isEmpty(),
             onClick = { onNavigate(rootPath) },
+            onDropPaths = onDropPaths?.let { drop -> { paths -> drop(rootPath, paths) } },
         )
         var accumulated = rootPath
         segments.forEachIndexed { index, segment ->
@@ -70,22 +78,40 @@ fun BreadcrumbBar(
                 description = stringResource(R.string.navigate_to, segment),
                 selected = index == segments.lastIndex,
                 onClick = { onNavigate(target) },
+                onDropPaths = onDropPaths?.let { drop -> { paths -> drop(target, paths) } },
             )
         }
     }
 }
 
 @Composable
-private fun BreadcrumbChip(label: String, description: String, selected: Boolean, onClick: () -> Unit) {
+private fun BreadcrumbChip(
+    label: String,
+    description: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    onDropPaths: ((List<String>) -> Boolean)? = null,
+) {
+    var dropHover by remember { mutableStateOf(false) }
+    val dropModifier = Modifier.dropTarget(
+        enabled = onDropPaths != null,
+        onHover = { dropHover = it },
+        onDrop = { paths -> onDropPaths?.invoke(paths) ?: false },
+    )
     SuggestionChip(
         onClick = onClick,
         label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        modifier = Modifier.semantics {
-            this.selected = selected
-            this.contentDescription = description
-        },
+        modifier = Modifier
+            .then(dropModifier)
+            .semantics {
+                this.selected = selected
+                this.contentDescription = description
+            },
         colors = SuggestionChipDefaults.suggestionChipColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            containerColor = if (dropHover) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.surfaceContainerHigh,
+            labelColor = if (dropHover) MaterialTheme.colorScheme.onPrimary
+            else MaterialTheme.colorScheme.onSurface,
         ),
     )
 }

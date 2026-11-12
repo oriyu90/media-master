@@ -55,6 +55,15 @@ fun MainNavigation(
     // GET_CONTENT / OPEN_DOCUMENT. The picker replaces the normal shells.
     pickRequest: StateFlow<PickRequest?> = MutableStateFlow(null),
     onPickFinished: (uri: android.net.Uri?, mimeType: String?) -> Unit = { _, _ -> },
+    // WP3: multi-file picker result (EXTRA_ALLOW_MULTIPLE). Kept as a separate
+    // callback so the existing single-result signature above never changes.
+    // An empty list means "cancelled".
+    onPickMultipleFinished: (uris: List<android.net.Uri>) -> Unit = { },
+    // WP3 "save shared files": non-null while serving another app's
+    // ACTION_SEND / ACTION_SEND_MULTIPLE. Takes precedence over the picker
+    // and over deep links (a share never becomes a normal navigation).
+    sendRequest: StateFlow<com.example.deeplink.SendRequest?> = MutableStateFlow(null),
+    onSendFinished: () -> Unit = {},
 ) {
     val navController = rememberNavController()
     val context = LocalContext.current
@@ -107,6 +116,27 @@ fun MainNavigation(
     } else {
         permissionsState.permissions.any { it.status.isGranted }
     }
+    // WP3: an external request carries its own URI grants. Blocking it behind
+    // MANAGE_EXTERNAL_STORAGE meant a device without "All files access" could
+    // neither open a shared photo nor save a shared file — the permission
+    // screen swallowed the request. Such a request is served directly; the
+    // in-app file listing keeps the old gate (it genuinely needs full access).
+    val pick by pickRequest.collectAsStateWithLifecycle()
+    val send by sendRequest.collectAsStateWithLifecycle()
+    // A picker still needs the file listing, so it is only released once the
+    // storage gate is open (otherwise it would show an unreadable root).
+    val activePick = pick?.takeIf { isGranted }
+    // External URI requests (deep link / share / granted picker) are served
+    // even when the storage gate is closed. The permission screen only stays
+    // for a plain app launch, so it can never swallow a hand-off.
+    // Only URI-carrying requests qualify: an internal deep link
+    // (`file_browser?path=…`, `home`, …) still needs the storage gate, and
+    // letting it through would render a broken listing behind a hidden
+    // permission screen.
+    val externalUriLink = pendingDeepLink != null && (
+        pendingDeepLink!!.startsWith("externalViewer/") || pendingDeepLink!!.startsWith("docViewer/")
+        )
+    val hasExternalRequest = externalUriLink || send != null || activePick != null
     // Apply an external deep link once storage access is granted and the NavHost exists.
     // Unknown routes are swallowed so a malformed external intent can never crash the app.
     // v2.0.1: also key on the current entry. On a cold start the deep link can
@@ -114,9 +144,15 @@ fun MainNavigation(
     // attempt then fails and the request stays pending. Re-running when the
     // first destination appears retries it instead of leaving the user on Home.
     val currentEntry by navController.currentBackStackEntryAsState()
-    LaunchedEffect(pendingDeepLink, isGranted, currentEntry?.id) {
+    LaunchedEffect(pendingDeepLink, isGranted, currentEntry?.id, send) {
         val route = pendingDeepLink
-        if (isGranted && route != null) {
+        // A share owns the screen; the deep link stays pending and is applied
+        // after the save flow closes. WP3: an external viewer/document request
+        // carries its own URI grant, so it is applied even without storage
+        // access (the in-app listing keeps the old gate).
+        val externalUriRoute = route != null &&
+            (route.startsWith("externalViewer/") || route.startsWith("docViewer/"))
+        if ((isGranted || externalUriRoute) && route != null && send == null) {
             // v2.0.1: only mark the request handled when navigation landed. A
             // swallowed failure used to discard it silently (the app stayed on
             // Home and the photo never opened); leaving it pending lets the
@@ -136,17 +172,30 @@ fun MainNavigation(
         }
     }
 
-    if (isGranted) {
+    if (isGranted || hasExternalRequest) {
+        // WP3: a share owns the screen before anything else (no shells, no
+        // deep-link consumption). Saving needs no storage permission: the
+        // sender's URI grant is enough for the copy.
+        val activeSend = send
+        if (activeSend != null) {
+            IncomingSaveScreen(
+                viewModel = fileViewModel,
+                request = activeSend,
+                onFinished = onSendFinished,
+                onCancelled = onSendFinished,
+            )
+            return
+        }
         // v1.12.0: while picking for another app, show only the picker —
         // no home/nav shells, no deep-link consumption, no side effects.
-        val pick by pickRequest.collectAsStateWithLifecycle()
-        val activePick = pick
         if (activePick != null) {
             FilePickerScreen(
                 viewModel = fileViewModel,
                 mimeFilter = activePick.mimeType,
                 onPick = { uri, mime -> onPickFinished(uri, mime) },
                 onCancel = { onPickFinished(null, null) },
+                allowMultiple = activePick.allowMultiple,
+                onPickMultiple = { uris -> onPickMultipleFinished(uris) },
             )
             return
         }

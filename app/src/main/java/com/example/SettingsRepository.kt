@@ -32,6 +32,20 @@ class SettingsRepository(private val context: Context) {
         val LIST_SHOW_DATE_MODIFIED = booleanPreferencesKey("list_show_date_modified")
         val LIST_SHOW_DATE_CREATED = booleanPreferencesKey("list_show_date_created")
         val LIST_SHOW_TYPE = booleanPreferencesKey("list_show_type")
+        // v2.1.0 (WP2): one-point accent colour as an opaque ARGB int.
+        val ACCENT_COLOR = intPreferencesKey("accent_color")
+
+        /**
+         * Shipped brand amber (`md_primary_dark`). Kept as a literal so this
+         * file has no dependency on the Compose theme package; it must stay in
+         * sync with [com.example.ui.theme.AccentPalette.DEFAULT_AMBER].
+         */
+        val DEFAULT_ACCENT_COLOR: Int = 0xFFF2BF48.toInt()
+    }
+
+    /** Default accent = the shipped brand amber (see AccentPalette.DEFAULT_AMBER). */
+    val accentColorFlow: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[ACCENT_COLOR] ?: DEFAULT_ACCENT_COLOR
     }
 
     val themeModeFlow: Flow<Int> = context.dataStore.data.map { preferences ->
@@ -141,4 +155,9 @@ class SettingsRepository(private val context: Context) {
     suspend fun setListShowDateModified(value: Boolean) { context.dataStore.edit { it[LIST_SHOW_DATE_MODIFIED] = value } }
     suspend fun setListShowDateCreated(value: Boolean) { context.dataStore.edit { it[LIST_SHOW_DATE_CREATED] = value } }
     suspend fun setListShowType(value: Boolean) { context.dataStore.edit { it[LIST_SHOW_TYPE] = value } }
+
+    /** Stores the accent as opaque ARGB (alpha forced to FF so a stray 0x00 never hides the accent). */
+    suspend fun setAccentColor(value: Int) {
+        context.dataStore.edit { it[ACCENT_COLOR] = value or (0xFF shl 24) }
+    }
 }

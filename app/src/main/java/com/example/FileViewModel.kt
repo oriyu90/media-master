@@ -232,6 +232,80 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
         reloadJob = viewModelScope.launch { loadFilesInternal(path) }
     }
 
+    /**
+     * WP3 "save shared files": copies each shared URI into [destDir].
+     *
+     * Streamed (`openInputStream` → `BufferedOutputStream`, 64 KiB buffer) so
+     * a multi-GB video never lands in memory. Names come from
+     * [com.example.deeplink.IncomingFiles] (sanitized single segment, `name (1).ext`
+     * on collision, resolved inside [destDir] only). Each file is independent:
+     * a provider that cannot be opened, a write failure or a partial copy is
+     * counted in `failed` (partial output deleted) and never aborts the batch
+     * or throws. Saved files are announced to the MediaScanner.
+     *
+     * [onProgress] receives (completed, total) after every file, on the caller's
+     * main dispatcher. [onDone] receives (savedPaths, savedCount, failedCount).
+     */
+    fun saveIncomingFiles(
+        uris: List<Uri>,
+        destDir: String,
+        onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
+        onDone: (savedPaths: List<String>, saved: Int, failed: Int) -> Unit = { _, _, _ -> },
+    ) {
+        if (uris.isEmpty()) {
+            onDone(emptyList(), 0, 0)
+            return
+        }
+        viewModelScope.launch {
+            val total = uris.size
+            val app = getApplication<Application>()
+            val savedPaths = mutableListOf<String>()
+            var failed = 0
+            for ((index, uri) in uris.withIndex()) {
+                val savedPath = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val dir = File(destDir)
+                        if (!dir.isDirectory && !dir.mkdirs()) throw java.io.IOException("cannot create $destDir")
+                        val desired = com.example.deeplink.IncomingFiles.displayName(app, uri)
+                            ?: com.example.deeplink.IncomingFiles.FALLBACK_NAME
+                        val name = com.example.deeplink.IncomingFiles.uniqueName(desired) { candidate ->
+                            File(dir, candidate).exists()
+                        }
+                        val dest = com.example.deeplink.IncomingFiles.resolveDestination(dir, name)
+                        val input = app.contentResolver.openInputStream(uri)
+                            ?: throw java.io.IOException("cannot open $uri")
+                        try {
+                            input.use { raw ->
+                                java.io.BufferedInputStream(raw, 64 * 1024).use { input ->
+                                    java.io.BufferedOutputStream(dest.outputStream(), 64 * 1024).use { output ->
+                                        input.copyTo(output)
+                                    }
+                                }
+                            }
+                        } catch (t: Throwable) {
+                            // Never leave a half-written file behind.
+                            runCatching { dest.delete() }
+                            throw t
+                        }
+                        dest.absolutePath
+                    }.getOrNull()
+                }
+                if (savedPath != null) savedPaths += savedPath else failed++
+                onProgress(index + 1, total)
+            }
+            if (savedPaths.isNotEmpty()) {
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                        android.media.MediaScannerConnection.scanFile(
+                            app, savedPaths.toTypedArray(), null, null,
+                        )
+                    }
+                }
+            }
+            onDone(savedPaths.toList(), savedPaths.size, failed)
+        }
+    }
+
     private suspend fun loadFilesInternal(path: String) {
         currentPath = path
         _fileTreeState.update { ViewState.Loading }
@@ -483,6 +557,139 @@ class FileViewModel(application: Application) : AndroidViewModel(application) {
         copyFile(path, contentUri, destDir) { destPath ->
             if (destPath != null) deleteFile(path, contentUri)
         }
+    }
+
+    /**
+     * v2.1.0 Explorer: batched copy of [items] into [destDir] (multi-select
+     * copy and drag & drop). Each item carries its own MediaStore URI when
+     * known. Items already inside [destDir] are skipped (copying a file onto
+     * itself would truncate it), and the whole batch runs sequentially on IO
+     * so a large selection never fans out into dozens of parallel streams.
+     * [onDone] receives (copied, failed) counts.
+     */
+    fun copyFiles(
+        items: List<Pair<String, Uri?>>,
+        destDir: String,
+        onDone: (Int, Int) -> Unit = { _, _ -> },
+    ) {
+        if (items.isEmpty()) return
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                var ok = 0
+                var failed = 0
+                items.distinctBy { it.first }.forEach { (path, uri) ->
+                    if (sameDirectory(path, destDir)) return@forEach
+                    if (copyOne(path, uri, destDir, overwrite = false)) ok++ else failed++
+                }
+                ok to failed
+            }
+            if (result.first > 0) loadAllMedia()
+            onDone(result.first, result.second)
+        }
+    }
+
+    /**
+     * v2.1.0 Explorer: move [items] into [destDir]. Same-directory moves are
+     * no-ops, and a move into the source itself (or one of its descendants)
+     * is rejected before anything is copied — a folder moved into itself
+     * would otherwise be deleted along with its copy.
+     *
+     * Order and failure handling are deliberately conservative:
+     *  1. copy first (a failed copy leaves the source untouched),
+     *  2. remove the source only after the copy fully succeeded,
+     *  3. a partially copied destination is deleted again, so a failure can
+     *     never leave a half-mirrored folder behind,
+     *  4. files are removed through [deleteFile], which keeps the MediaStore
+     *     delete-request flow (Android 11+ foreign files) and error reporting.
+     * [onDone] receives (moved, failed) counts. Nothing to do reports (0, 0).
+     */
+    fun moveFiles(
+        items: List<Pair<String, Uri?>>,
+        destDir: String,
+        onDone: (Int, Int) -> Unit = { _, _ -> },
+    ) {
+        if (items.isEmpty()) return
+        val target = destDir.trimEnd('/').ifEmpty { "/" }
+        val safe = items.distinctBy { it.first }.filter { (path, _) ->
+            !sameDirectory(path, destDir) && !com.example.ui.PathInput.isSameOrInside(target, path)
+        }
+        if (safe.isEmpty()) {
+            onDone(0, 0)
+            return
+        }
+        viewModelScope.launch {
+            var ok = 0
+            var failed = 0
+            val directories = mutableListOf<String>()
+            withContext(Dispatchers.IO) {
+                safe.forEach { (path, uri) ->
+                    val source = File(path)
+                    val dest = File(target, source.name)
+                    if (source.isDirectory) {
+                        val copied = runCatching {
+                            dest.parentFile?.mkdirs()
+                            source.copyRecursively(dest, overwrite = false)
+                        }
+                        if (copied.isSuccess) {
+                            directories.add(path)
+                            ok++
+                        } else {
+                            // Never leave a half-copied tree behind.
+                            runCatching { dest.deleteRecursively() }
+                            failed++
+                        }
+                    } else if (copyOne(path, uri, target, overwrite = false)) {
+                        // File removal goes through the shared delete path so
+                        // MediaStore requests/errors behave exactly like a
+                        // user-initiated delete.
+                        deleteFile(path, uri)
+                        ok++
+                    } else {
+                        failed++
+                    }
+                }
+            }
+            directories.forEach { dir ->
+                val removed = runCatching { File(dir).deleteRecursively() }.getOrDefault(false)
+                if (!removed) {
+                    failed++
+                    ok--
+                }
+            }
+            val current = currentPath
+            if (current != null) loadFiles(current)
+            loadAllMedia()
+            onDone(ok, failed)
+        }
+    }
+
+    /** True when [path] already lives directly in [destDir] (canonical compare). */
+    private fun sameDirectory(path: String, destDir: String): Boolean {
+        val parent = File(path).parentFile?.absolutePath ?: return false
+        return com.example.ui.PathInput.canonicalize(parent) ==
+            com.example.ui.PathInput.canonicalize(destDir.trimEnd('/').ifEmpty { "/" })
+    }
+
+    /**
+     * Copies one file into [destDir]. Returns false (never throws) when the
+     * source cannot be read, the destination cannot be written, or the target
+     * already exists and [overwrite] is false. Runs on IO.
+     */
+    private fun copyOne(path: String, uri: Uri?, destDir: String, overwrite: Boolean): Boolean {
+        val dest = File(destDir, File(path).name)
+        if (dest.exists() && !overwrite) return false
+        return runCatching {
+            dest.parentFile?.mkdirs()
+            val input = if (uri != null && uri != Uri.EMPTY) {
+                getApplication<Application>().contentResolver.openInputStream(uri)
+            } else {
+                File(path).inputStream()
+            } ?: throw java.io.IOException("cannot read $path")
+            input.use { inStream -> dest.outputStream().use { out -> inStream.copyTo(out) } }
+            android.media.MediaScannerConnection.scanFile(
+                getApplication(), arrayOf(dest.path), null, null,
+            )
+        }.onFailure { runCatching { dest.delete() } }.isSuccess
     }
 
     /**

@@ -63,4 +63,55 @@
     <string name="crop_help">枠をドラッグして切り抜きます。アスペクト比を選ぶと固定されます。</string><string name="reset_crop">切り抜きをリセット</string><string name="perspective_align_corners">四隅を合わせる</string><string name="perspective_help">四隅をドラッグし、OKでその範囲を切り抜いて変形します。</string><string name="perspective_invalid">四隅が交差しないようにしてください。</string><string name="ok">OK</string><string name="save_failed">編集した画像を保存できませんでした。</string><string name="image_open_failed">この画像を開けませんでした。</string>
     <string name="perspective_failed">遠近補正を適用できませんでした。</string>
     <string name="more_options">その他の操作</string>
+
+    <!-- v2.1.0 (WP2): アクセントカラー -->
+    <string name="accent_color">アクセントカラー</string>
+    <string name="select_accent_color">色を選択</string>
+    <string name="custom_color">カスタム色</string>
+    <string name="hex_color_label">16進カラー（#RRGGBB）</string>
+    <string name="reset_to_default">既定に戻す</string>
+    <string name="invalid_color_format">色の形式が正しくありません（#RRGGBB で入力してください）</string>
+    <string name="accent_amber">アンバー</string>
+    <string name="accent_blue">青</string>
+    <string name="accent_green">緑</string>
+    <string name="accent_purple">紫</string>
+    <string name="accent_pink">ピンク</string>
+    <string name="accent_orange">オレンジ</string>
+    <string name="accent_teal">ティール</string>
+    <string name="accent_red">赤</string>
+
+    <string name="copy_path">パスをコピー</string>
+    <string name="move_to_path">パスを指定して移動…</string>
+    <string name="copy_to_path">パスを指定してコピー…</string>
+    <string name="move_to_path_desc">移動先フォルダのパスを入力してください。選択した項目をそこへ移動します。</string>
+    <string name="copy_to_path_desc">コピー先フォルダのパスを入力してください。選択した項目をそこへコピーします。</string>
+    <string name="destination_path">移動先のパス</string>
+    <string name="path_copied">パスをコピーしました</string>
+    <string name="path_error_empty">移動先のパスを入力してください</string>
+    <string name="path_error_not_absolute">/ から始まる絶対パスを入力してください</string>
+    <string name="path_error_not_found">そのフォルダは存在しません</string>
+    <string name="path_error_not_a_directory">そのパスはフォルダではありません</string>
+    <string name="path_error_outside_storage">端末のストレージ内のフォルダを選んでください</string>
+    <string name="path_error_same_as_source">移動元と同じ場所です</string>
+    <string name="path_error_inside_source">フォルダを自身の中へ移動することはできません</string>
+    <string name="path_error_not_writable">そのフォルダには書き込めません</string>
+    <string name="transfer_done">%1$s: %2$d件</string>
+    <string name="transfer_failed">%1$sに失敗: %2$d件</string>
+    <string name="transfer_partial">%1$s: %2$d件完了、%3$d件失敗</string>
+    <string name="folder_is_empty">このフォルダは空です</string>
+
+    <!-- v2.1.0 (WP3): receive shared files / multi-select picker -->
+    <string name="incoming_save_title">共有されたファイルを保存</string>
+    <string name="incoming_save_count">%1$d件のファイルを保存します</string>
+    <string name="incoming_save_destination">保存先</string>
+    <string name="incoming_save_destination_loading">フォルダを検索しています…</string>
+    <string name="incoming_choose_folder">保存先を選択</string>
+    <string name="incoming_save_action">保存</string>
+    <string name="incoming_saving_progress">%1$d / %2$d件を保存中…</string>
+    <string name="incoming_save_done">%1$d件を保存しました</string>
+    <string name="incoming_save_failed">保存に失敗したファイル: %1$d件</string>
+    <string name="incoming_save_hint">同名のファイルは上書きせず、name (1).jpg のように連番を付けて保存します。</string>
+    <string name="pick_files_hint">ファイルをタップして選択し、確定してください</string>
+    <string name="pick_selected_count">%1$d件を選択中</string>
+    <string name="pick_confirm_selection">選択を確定</string>
 </resources>

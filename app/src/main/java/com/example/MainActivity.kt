@@ -27,6 +27,7 @@ import com.example.ui.MainNavigation
 import com.example.ui.theme.MediaMasterTheme
 import com.example.deeplink.DeepLinks
 import com.example.deeplink.PickRequest
+import com.example.deeplink.SendRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 
 import com.example.playback.PlaybackManager
@@ -61,17 +62,34 @@ class MainActivity : AppCompatActivity() {
      */
     private val pendingPick = MutableStateFlow<PickRequest?>(null)
 
+    /**
+     * WP3 "save shared files": non-null while serving another app's
+     * `ACTION_SEND` / `ACTION_SEND_MULTIPLE`. Takes precedence over the picker
+     * and over [pendingDeepLink] — a share never becomes a normal navigation.
+     */
+    private val pendingSend = MutableStateFlow<SendRequest?>(null)
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         val pick = PickRequest.parse(intent)
-        if (pick != null) {
-            pendingPick.value = pick
-            pendingDeepLink.value = null
-        } else {
-            // A brand-new intent is a new request even if it repeats a route.
-            handledDeepLink = null
-            DeepLinks.resolve(intent)?.let { pendingDeepLink.value = it }
+        val send = if (pick == null) SendRequest.parse(intent) else null
+        when {
+            pick != null -> {
+                pendingPick.value = pick
+                pendingSend.value = null
+                pendingDeepLink.value = null
+            }
+            send != null -> {
+                pendingSend.value = send
+                pendingPick.value = null
+                pendingDeepLink.value = null
+            }
+            else -> {
+                // A brand-new intent is a new request even if it repeats a route.
+                handledDeepLink = null
+                DeepLinks.resolve(intent)?.let { pendingDeepLink.value = it }
+            }
         }
     }
 
@@ -93,10 +111,12 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         // v1.12.0: picker requests win over deep links (cold start included).
         pendingPick.value = PickRequest.parse(intent)
+        // WP3: a share comes next; it is not a navigation either.
+        if (pendingPick.value == null) pendingSend.value = SendRequest.parse(intent)
         // v2.0.1: skip replaying the launch intent only when this exact route
         // was already applied before the process died (see handledDeepLink).
         // A genuinely new intent still opens its target.
-        if (pendingPick.value == null) {
+        if (pendingPick.value == null && pendingSend.value == null) {
             val restored = savedInstanceState?.getString(STATE_HANDLED_DEEP_LINK)
             val incoming = DeepLinks.resolve(intent)
             if (incoming != null && incoming != restored) pendingDeepLink.value = incoming
@@ -157,6 +177,7 @@ class MainActivity : AppCompatActivity() {
         setContent {
             val themeMode by settingsViewModel.themeMode.collectAsStateWithLifecycle()
             val language by settingsViewModel.language.collectAsStateWithLifecycle()
+            val accentColor by settingsViewModel.accentColor.collectAsStateWithLifecycle()
 
             LaunchedEffect(language) {
                 val localeList = if (language == "system") {
@@ -173,7 +194,7 @@ class MainActivity : AppCompatActivity() {
                 else -> isSystemInDarkTheme()
             }
             
-            MediaMasterTheme(darkTheme = useDarkTheme) {
+            MediaMasterTheme(darkTheme = useDarkTheme, accentColor = accentColor) {
                 MainNavigation(
                     fileViewModel = fileViewModel,
                     settingsViewModel = settingsViewModel,
@@ -202,6 +223,31 @@ class MainActivity : AppCompatActivity() {
                             setResult(RESULT_CANCELED)
                         }
                         pendingPick.value = null
+                        finish()
+                    },
+                    // WP3 multi-file picker result: one ClipData carrying every
+                    // checked URI (see PickRequest.buildResult for the shape).
+                    onPickMultipleFinished = { uris ->
+                        val result = PickRequest.buildResult(
+                            uris = uris,
+                            requestedMimeType = pendingPick.value?.mimeType,
+                            grantWrite = intent?.flags?.and(Intent.FLAG_GRANT_WRITE_URI_PERMISSION) != 0,
+                        )
+                        if (result != null) {
+                            setResult(RESULT_OK, result)
+                        } else {
+                            setResult(RESULT_CANCELED)
+                        }
+                        pendingPick.value = null
+                        finish()
+                    },
+                    // WP3 "save shared files": the screen already reported the
+                    // outcome with a toast; close with RESULT_OK so the sender
+                    // knows the hand-off completed.
+                    sendRequest = pendingSend,
+                    onSendFinished = {
+                        setResult(RESULT_OK)
+                        pendingSend.value = null
                         finish()
                     },
                 )

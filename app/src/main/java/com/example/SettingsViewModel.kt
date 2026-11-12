@@ -48,6 +48,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val backupDeletePrevious = repository.backupDeletePreviousFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val desktopModeOverride = repository.desktopModeOverrideFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
+    /** v2.1.0 (WP2): selected accent colour (opaque ARGB), default = brand amber. */
+    val accentColor = repository.accentColorFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = SettingsRepository.DEFAULT_ACCENT_COLOR
+    )
+
     fun setThemeMode(mode: Int) {
         viewModelScope.launch { repository.setThemeMode(mode) }
     }
@@ -84,4 +91,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setBackupTargetPath(value: String) { viewModelScope.launch { repository.setBackupTargetPath(value) } }
     fun setBackupDeletePrevious(value: Boolean) { viewModelScope.launch { repository.setBackupDeletePrevious(value) } }
     fun setDesktopModeOverride(value: Int) { viewModelScope.launch { repository.setDesktopModeOverride(value) } }
+
+    /** v2.1.0 (WP2): persists the accent colour; the theme recollects it immediately. */
+    fun setAccentColor(value: Int) { viewModelScope.launch { repository.setAccentColor(value) } }
 }

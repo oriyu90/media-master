@@ -1,26 +1,68 @@
-# Media Master v2.0.1 実装・保守メモ
+# Media Master v2.1.0 実装・保守メモ
 
-最終更新: 2026-11-01
+最終更新: 2026-11-12
 
 ## リリース情報
 
 | 項目 | 内容 |
 | --- | --- |
-| バージョン | `2.0.1` (`versionCode 25`) |
+| バージョン | `2.1.0` (`versionCode 26`) |
 | アプリケーションID | `com.yukiorita.mediamaster` |
 | 最小 SDK / target SDK | 24 / 36 |
 | ライセンス | MIT |
 | 著作者 | Yuki_Orita |
 | release APK | `app/build/outputs/apk/release/app-release.apk`（R8 + resource shrink 有効） |
-| APK SHA-256 | `75c75f0423bf568f67cb679377524db1fe0b8e9d67d2ee598bb4472f3bae8b76` |
-| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v2.0.0 と同一鍵） |
-| GitHub Release | `v2.0.1` (GitHub Releases) |
+| APK SHA-256 | `89268d458547e1ae3a672cea364e14b1bd1159264f5269cf4f8100b7d8bdd9ae` |
+| 署名証明書 SHA-256 | `33:2C:E3:86:FB:F2:92:54:F1:79:78:B0:44:B8:BD:22:D6:A7:41:89:54:BB:50:59:38:72:17:12:E3:4E:EB:A6`（v0.1.0〜v2.0.1 と同一鍵） |
+| GitHub Release | `v2.1.0` (GitHub Releases) |
 
 release APK は RSA 4096 ビット鍵・APK Signature Scheme v2 署名（`apksigner verify` で確認）。署名鍵は `common-rules-document/keystores/media-master-upload-key.jks`（alias `upload`）。
 
 v2.0.0 はJDK21+R8有効ビルドで`:app:assembleRelease`/`:app:testDebugUnitTest`(215件)/`:app:lintDebug`(0エラー)を確認。**実機（エミュレータ）デバッグ**で、外部 `ACTION_VIEW` の画像が全画面で開くこと、ライブラリ内の画像は前後スワイプで移動できること（コールドスタート含む）、ライブラリ外の画像は1ページのみで下スワイプ/戻るでライブラリへ移動すること、外部のみのファイルでは削除・名前変更が出ないこと、デスクトップでシェルが畳まれること、通常ビューアの全画面・ページング・下スワイプが不変であることを確認し、FATAL 0件。証明書は v0.1.0〜v1.14.0 と同一 `332ce386…eba6`（v2のみ）。
 
 旧リリースの APK SHA-256: v1.14.0 `b09e2f31e4a20d4f376588fcd58b7a1d35dfc5011e5b99f835bc927172e57f95`、v1.13.0 `06baec2275ee3239ecca76caec22fd594d34772388b3228dc4de01049c6f49cb`、v1.12.2 `cb67f77dca5d9a638e2dba938b53d12533dffc4c0a239992523b9303422b8571`、v1.12.1 `847d1aad80da47eb519ea1b695878162e7f9bb48c133ee202cafa2b809b82112`、v1.12.0 `3d9ac550b7404af05c41a8178ec71eae2b0dab8d25db5472a5dc3ceb058c6cbd`、v1.11.0 `69da38c9a7ccbffab663c0043120ec930e3f0559d358fd739df1e082e5922a5c`、v1.10.0 `3663e54015d1495cdd32931412f1c7322a53f195aef0bdb9899fce0e9b07b585`、v1.9.2 `0d41403ece4d59eb94e62a5a4cb5e385f239d22614b16dd727c0d5154e4bc20a`、v1.9.1 `1883e8d144877af852be76d94e9a3d5feb42f94e839da35bd2e0440317bc4a3b`、v1.9.0 `74994a9d1313cb0b2acdec9b15b329b1d3b85b110e9901ef542855b4b33ee85b`、v1.8.0 `e7c07575bbbc6675672d2cf64a30a093fd5b3df1c8fd875eec9d8bfd71caf6c4`、 v1.7.1 `4f79abcc32747a6889787c22d051ff831d55aca27330f81923760fcc63fcc1ee`、v1.7.0 `08236934c0cbf522ce0432595933e03976368ec3b0ee000ad4ced962b2fa9fd5`、v1.6.0 `f922b2b2d797f69fe4b1c9a7aca366e9f1664f8b47c8cfbeeb9aaeb02235b615`。
+
+## v2.1.0 実装内容（エクスプローラー強化 / アクセントカラー / 標準ファイル管理アプリ / D&D）
+
+計画: `docs/plans/v2.1.0-explorer-theme-filemanager-plan.md`。単体テスト 286 件通過、`lintDebug` 0 errors（警告 107 / ヒント 11、いずれも既存由来の軽微項目）。
+
+### 1. エクスプローラー（`FilesScreen.kt`, `ui/PathInput.kt`, `ui/components/PathDialogs.kt`, `FileViewModel.kt`）
+- **パスをコピー**: 行/タイルのコンテキストメニュー（右クリック・長押し）と選択ツールバーの `⋮` に追加。`ClipboardManager` でプレーンテキスト、トースト `path_copied`。複数選択時は改行区切り。
+- **パスを指定して移動/コピー**: `PathMoveDialog`。入力は絶対パス・`~`・`file://` を正規化し、`PathInput.validate`（pure）が「空 / 非絶対 / 不存在 / ストレージ外 / 移動元と同一 / 移動元の子孫 / 書き込み不可」を判定。OK 時のみ確定ボタンが有効。実処理は `FileViewModel.moveFiles/copyFiles`（複数対応、同一フォルダは no-op、フォルダは `copyRecursively` → 成功後に削除）。
+- **マウスダブルクリックで改名**: `Modifier.mouseDoubleClick`（`PointerType.Mouse` の Press を 400ms 以内に 2 回で発火、タッチは無視）。改名ダイアログはツールバー・メニュー・ダブルクリックで共通化。
+- **GUI 整合**: 列ヘッダと行が `FileColumns` の weight を共有（従来は「Modified」ヘッダが `DATE_CREATED` でソート、区切り線が 72dp 固定）、選択ツールバーは Share/Delete/Rename + `⋮`（Move/Copy/Move to path/Copy path/Select all）に整理、グリッドのコンテキストメニューを一覧と共通化（Share/Delete/Rename 追加）、空フォルダに `EmptyState`、一覧のサイズは `formatSizeLocalized`。選択モードは 0 件になっても維持（`selectionMode`）。
+
+### 2. アクセントカラー（`ui/theme/AccentPalette.kt`, `Theme.kt`, `SettingsScreen.kt`）
+- 8 プリセット + カスタム `#RRGGBB` + 既定に戻す。`SettingsRepository.ACCENT_COLOR`（`accent_color`）で永続化、既定 `DEFAULT_AMBER = 0xFFF2BF48`。
+- 生成は **色相アンカー方式**: amber トークン 6 種（primary/onPrimary/primaryContainer/onPrimaryContainer/inversePrimary/surfaceTint）の HSL 明度・彩度を固定し、色相のみ seed へ差し替え。amber seed（および無彩色 seed）は `Color.kt` の定数をそのまま返すので**既定 UI は byte 同一**。secondary/tertiary/error/surface 系は不変。
+- コントラスト: `ensureTextContrast` が 4.5:1 未満なら HSL 明度を 2% 刻みで両方向探索。`AccentPaletteTest`（17件）と `ThemeContrastTest` 追記で全プリセット×昼夜・極端色を検証。
+- `MediaMasterTheme(darkTheme, dynamicColor, accentColor, content)` はデフォルト引数追加のみ（互換）。dynamic color 既定 OFF は維持。
+
+### 3. 標準ファイル管理アプリ（`AndroidManifest.xml`, `deeplink/DeepLinks.kt`, `deeplink/IncomingFiles.kt`, `ui/IncomingSaveScreen.kt`, `ui/FilePickerScreen.kt`, `ui/MainNavigation.kt`, `MainActivity.kt`）
+- **共有シートから保存**: `ACTION_SEND` / `ACTION_SEND_MULTIPLE`（`*/*`、DEFAULT のみ＝BROWSABLE なし）。`SendRequest.parse` が `EXTRA_STREAM`（単一/ArrayList/ClipData）を最大 50 件で解釈、`EXTRA_TEXT` のみは対象外。`IncomingSaveScreen` で保存先を選び、64KiB バッファのストリームコピー → `MediaScannerConnection.scanFile`。重複名は `IncomingFiles.uniqueName` で `name (1).ext`。
+- **ピッカーの複数返却**: `PickRequest.buildResult`。1 件は `data`+`type`+READ、2 件以上は `clipData` のみ + `type` + READ（要求元が WRITE 要求時のみ WRITE）。`ClipData.newUri` は ContentResolver 必須で NPE になるため `ClipData.Item(Uri)` を直接構築。
+- **全端末で動作**: `MainNavigation` の権限ゲートを `isGranted || hasExternalRequest` に緩和。外部 URI 付き要求（`externalViewer/`・`docViewer/` の deep link、共有保存）は「全ファイルアクセス」未許可でも処理し、アプリ内一覧のみ従来どおり権限を要求。
+
+### 4. ドラッグ&ドロップ（`ui/components/DragDrop.kt`, `FilesScreen.kt`, `ui/DesktopNavigation.kt`, `ui/components/BreadcrumbBar.kt`）
+- ペイロードは `text/plain` の `ClipData`（1 アイテム = 1 絶対パス、複数選択は全件）。**マウスドラッグのみ `DRAG_FLAG_GLOBAL`**（タッチはアプリ内完結でパス漏洩を防ぐ）。
+- ドラッグ元: 一覧行・グリッドタイル（「..」は除外）。ドロップ先: フォルダ行/タイル、パンくずの各チップ、デスクトップサイドバーのピンとストレージ。ホバー中はハイライト。
+- 移動は `FileViewModel.moveFiles`。同一フォルダ・自身・子孫は拒否（`PathInput.isSameOrInside`）。サイドバードロップは従来の「フォルダをピン留め」から **ファイル移動** に変更。
+
+### 既知の制約
+- タッチのドラッグは Compose の既定開始検出（長押し）に従うため、長押しメニューとほぼ同時に始まる。指を動かさず離した場合はメニューが開く。
+- ドラッグ中のドラッグシャドウは小さな半透明円のみ（サムネイル画像のシャドウは未実装）。
+- パス指定移動は端末内の実パスのみ（SAF の `content://` ツリーは対象外）。
+- 共有保存は最大 50 件・ストリームコピー（進捗は件数単位）。
+
+### 実機（エミュレータ）検証の記録
+署名済み release APK（v2.1.0 / versionCode 26 / SHA-256 `89268d45…d9ae`）を Android 16（API 36）エミュレータへ `adb install -r` し、`MANAGE_EXTERNAL_STORAGE` と `READ_MEDIA_*` を付与して確認した範囲:
+
+- **起動**: ホーム（タイル一覧）が正常に描画され、アクセントカラー（Blue 選択）が再起動後も保持される。FATAL 0 件。
+- **エクスプローラー**: `mediamaster://browse?path=/storage/emulated/0/Download/mmt` で対象フォルダが開き、`..` / フォルダ / ファイルがグリッドに表示される。
+- **コンテキストメニュー**: 長押しで Open with / Share / Select / Rename / **Copy path** / **Move to path…** / Move / Copy / Delete が表示される。
+- **パス指定移動のバリデーション**: 「Move to path…」ダイアログが現在パスを初期値に開き、入力に応じて理由が切り替わることを確認（`/storage/em` → "That folder does not exist"、`/storage/emulated/` → "Choose a folder in device storage"）。いずれも Move ボタンは無効のまま。`..` を含む同一フォルダ指定の拒否は `PathInputTest`（`dot segments cannot bypass the source checks` ほか）で自動検証している。
+
+**未検証（エミュレータの負荷・GPU レンダラ起因の ANR で完了できず、実機での確認が必要）**: パス指定移動の実行結果、マウスのダブルクリック改名、D&D の移動（行/タイル・パンくず・サイドバー）、共有シートからの保存、ピッカーの複数返却。ANR はいずれも `HardwareRenderer.setStopped` でメインスレッドがブロックするもので、アプリコードのスタックは現れていない（エミュレータの swiftshader/ホスト負荷が原因）。
 
 ## v2.0.0 実装内容（外部アプリの写真・動画をライブラリビューアで表示）
 

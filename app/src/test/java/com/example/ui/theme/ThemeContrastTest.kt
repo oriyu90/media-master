@@ -83,4 +83,45 @@ class ThemeContrastTest {
         assertTextContrast("viewer text on viewer surface", "F5F5F5", "0B0B0B")
         assertTextContrast("viewer variant on viewer surface", "C7C7C7", "0B0B0B")
     }
+
+    // -----------------------------------------------------------------------
+    // v2.1.0 (WP2): accent-colour presets must not weaken the AA promise.
+    // These use the real Compose ColorScheme via AccentPalette (pure JVM
+    // value types), so the hex helpers above stay untouched.
+    // -----------------------------------------------------------------------
+
+    /** Compose colours are floats; the ratio comes from the shared WCAG helper. */
+    private fun assertAccentContrast(name: String, fg: androidx.compose.ui.graphics.Color, bg: androidx.compose.ui.graphics.Color) {
+        val ratio = AccentPalette.contrastRatio(fg, bg)
+        assertTrue("$name: $ratio:1 below 4.5:1", ratio >= 4.5f)
+    }
+
+    @Test
+    fun `accent presets keep AA text contrast in both themes`() {
+        for (seed in AccentPalette.PRESETS) {
+            val name = AccentPalette.toHexString(seed)
+            for (dark in listOf(false, true)) {
+                val s = AccentPalette.buildScheme(seed, dark)
+                val mode = if (dark) "dark" else "light"
+                assertAccentContrast("$mode $name onPrimary/primary", s.onPrimary, s.primary)
+                assertAccentContrast(
+                    "$mode $name onPrimaryContainer/primaryContainer",
+                    s.onPrimaryContainer,
+                    s.primaryContainer,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `custom accent keeps AA text contrast`() {
+        // A deliberately awkward custom seed (mid-luminance cyan).
+        val s = AccentPalette.buildScheme(0xFF00CCCC.toInt(), dark = false)
+        assertAccentContrast("custom light onPrimary/primary", s.onPrimary, s.primary)
+        assertAccentContrast(
+            "custom light onPrimaryContainer/primaryContainer",
+            s.onPrimaryContainer,
+            s.primaryContainer,
+        )
+    }
 }

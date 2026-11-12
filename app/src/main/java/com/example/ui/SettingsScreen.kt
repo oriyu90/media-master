@@ -1,9 +1,13 @@
 package com.example.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
@@ -12,8 +16,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.net.Uri
@@ -31,12 +39,14 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.example.SettingsViewModel
+import com.example.ui.theme.AccentPalette
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostController) {
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val language by viewModel.language.collectAsStateWithLifecycle()
+    val accentColor by viewModel.accentColor.collectAsStateWithLifecycle()
     val desktopModeOverride by viewModel.desktopModeOverride.collectAsStateWithLifecycle()
 
     val backupEnabled by viewModel.backupEnabled.collectAsStateWithLifecycle()
@@ -49,6 +59,7 @@ fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostControlle
     val backupDeletePrevious by viewModel.backupDeletePrevious.collectAsStateWithLifecycle()
     var showThemeDialog by remember { mutableStateOf(false) }
     var showLangDialog by remember { mutableStateOf(false) }
+    var showAccentDialog by remember { mutableStateOf(false) }
     var showDesktopDialog by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -80,6 +91,18 @@ fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostControlle
                     headlineContent = { Text(stringResource(R.string.language)) },
                     supportingContent = { Text(getLangString(language)) },
                     modifier = Modifier.clickable { showLangDialog = true }
+                )
+            }
+            item {
+                // v2.1.0 (WP2): one-point accent colour. The trailing swatch
+                // previews the live colour; the dialog below changes it.
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.accent_color)) },
+                    supportingContent = { Text(getAccentName(accentColor)) },
+                    trailingContent = {
+                        AccentSwatch(color = Color(accentColor), size = 24.dp)
+                    },
+                    modifier = Modifier.clickable { showAccentDialog = true }
                 )
             }
             item {
@@ -403,6 +426,15 @@ fun SettingsScreen(viewModel: SettingsViewModel, navController: NavHostControlle
         )
     }
 
+    if (showAccentDialog) {
+        AccentColorDialog(
+            current = accentColor,
+            onSelect = { viewModel.setAccentColor(it) },
+            onReset = { viewModel.setAccentColor(AccentPalette.DEFAULT_AMBER) },
+            onDismiss = { showAccentDialog = false },
+        )
+    }
+
     if (showDesktopDialog) {
         AlertDialog(
             onDismissRequest = { showDesktopDialog = false },
@@ -490,4 +522,159 @@ fun getDesktopModeString(mode: Int) = when (mode) {
     1 -> stringResource(R.string.desktop_mode_force_desktop)
     2 -> stringResource(R.string.desktop_mode_force_touch)
     else -> stringResource(R.string.desktop_mode_auto)
+}
+
+// ---------------------------------------------------------------------------
+// v2.1.0 (WP2): accent colour picker
+// ---------------------------------------------------------------------------
+
+/** Human-readable name of [argb]; unknown (custom) colours show their hex code. */
+@Composable
+fun getAccentName(argb: Int): String = when (argb and 0xFFFFFF) {
+    AccentPalette.DEFAULT_AMBER and 0xFFFFFF -> stringResource(R.string.accent_amber)
+    AccentPalette.BLUE and 0xFFFFFF -> stringResource(R.string.accent_blue)
+    AccentPalette.GREEN and 0xFFFFFF -> stringResource(R.string.accent_green)
+    AccentPalette.PURPLE and 0xFFFFFF -> stringResource(R.string.accent_purple)
+    AccentPalette.PINK and 0xFFFFFF -> stringResource(R.string.accent_pink)
+    AccentPalette.ORANGE and 0xFFFFFF -> stringResource(R.string.accent_orange)
+    AccentPalette.TEAL and 0xFFFFFF -> stringResource(R.string.accent_teal)
+    AccentPalette.RED and 0xFFFFFF -> stringResource(R.string.accent_red)
+    else -> AccentPalette.toHexString(argb)
+}
+
+/** Flat colour dot with a hairline ring so light swatches stay visible on light surfaces. */
+@Composable
+private fun AccentSwatch(color: Color, size: Dp, selected: Boolean = false) {
+    val ring = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outlineVariant
+    Box(
+        modifier = Modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(color)
+            .border(if (selected) 3.dp else 1.dp, ring, CircleShape)
+    )
+}
+
+/**
+ * Accent picker dialog, modelled on the `select_theme` dialog above: the eight
+ * presets are a selectable grid of colour dots (Role.RadioButton), followed by
+ * a custom `#RRGGBB` field and a "reset to default" action. Every choice
+ * applies immediately — the dialog stays open so the user can keep comparing.
+ */
+@Composable
+private fun AccentColorDialog(
+    current: Int,
+    onSelect: (Int) -> Unit,
+    onReset: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var hexInput by remember { mutableStateOf(AccentPalette.toHexString(current)) }
+    var hexTouched by remember { mutableStateOf(false) }
+    val parsed = AccentPalette.parseHexColor(hexInput)
+    val showError = hexTouched && parsed == null
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.select_accent_color)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()).imePadding()) {
+                // Presets: 4 columns x 2 rows, each dot labelled for screen readers.
+                Column(Modifier.selectableGroup()) {
+                    AccentPalette.PRESETS.chunked(4).forEach { rowColors ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                        ) {
+                            rowColors.forEach { preset ->
+                                val selected = (preset and 0xFFFFFF) == (current and 0xFFFFFF)
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier
+                                        .widthIn(min = 48.dp)
+                                        .heightIn(min = 64.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .selectable(
+                                            selected = selected,
+                                            role = Role.RadioButton,
+                                            onClick = {
+                                                hexInput = AccentPalette.toHexString(preset)
+                                                hexTouched = false
+                                                onSelect(preset)
+                                            },
+                                        )
+                                        .padding(vertical = 8.dp),
+                                ) {
+                                    AccentSwatch(color = Color(preset), size = 32.dp, selected = selected)
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        text = getAccentName(preset),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+                Text(
+                    text = stringResource(R.string.custom_color),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = hexInput,
+                    onValueChange = { input ->
+                        // Hard-cap the length so a pasted blob can never grow
+                        // unbounded; parsing itself never throws.
+                        hexInput = input.take(9)
+                        hexTouched = true
+                    },
+                    label = { Text(stringResource(R.string.hex_color_label)) },
+                    singleLine = true,
+                    isError = showError,
+                    supportingText = if (showError) {
+                        { Text(stringResource(R.string.invalid_color_format)) }
+                    } else {
+                        null
+                    },
+                    trailingIcon = {
+                        val preview = parsed
+                        if (preview != null) AccentSwatch(color = Color(preview), size = 24.dp)
+                    },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Ascii,
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Done,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+                TextButton(
+                    onClick = {
+                        onReset()
+                        hexInput = AccentPalette.toHexString(AccentPalette.DEFAULT_AMBER)
+                        hexTouched = false
+                    },
+                    modifier = Modifier.align(Alignment.Start),
+                ) {
+                    Text(stringResource(R.string.reset_to_default))
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = parsed != null,
+                onClick = {
+                    parsed?.let(onSelect)
+                    onDismiss()
+                },
+            ) { Text(stringResource(R.string.ok)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        },
+    )
 }

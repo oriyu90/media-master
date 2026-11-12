@@ -1,12 +1,10 @@
 package com.example.ui
 
-import android.content.ClipDescription
 import android.content.res.Configuration
 import android.net.Uri
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.draganddrop.dragAndDropTarget
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -22,10 +20,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draganddrop.DragAndDropEvent
-import androidx.compose.ui.draganddrop.DragAndDropTarget
-import androidx.compose.ui.draganddrop.mimeTypes
-import androidx.compose.ui.draganddrop.toAndroidDragEvent
+import com.example.ui.components.dropTarget
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -289,16 +284,29 @@ fun DesktopNavigation(
         navController.navigate(route) { launchSingleTop = true }
     }
 
-    val dropTarget = remember(settingsViewModel) {
-        object : DragAndDropTarget {
-            override fun onDrop(event: DragAndDropEvent): Boolean {
-                val clipData = event.toAndroidDragEvent().clipData ?: return false
-                if (clipData.itemCount == 0) return false
-                val path = clipData.getItemAt(0).text?.toString() ?: return false
-                if (!File(path).isDirectory) return false
-                settingsViewModel.addPinnedFolder(path)
-                return true
+    // v2.1.0: dropping files onto the sidebar moves them into the folder
+    // under the pointer (Windows Explorer parity) instead of only pinning a
+    // dragged folder. Folder drops still pin (the previous behaviour) when
+    // the folder is dragged from outside Media Master.
+    val moveInto: (String, List<String>) -> Boolean = { destination, paths ->
+        val target = destination.trimEnd('/').ifEmpty { "/" }
+        val movable = paths.filter {
+            File(it).parentFile?.absolutePath?.let { parent ->
+                com.example.ui.PathInput.canonicalize(parent) != com.example.ui.PathInput.canonicalize(target)
+            } ?: true
+        }
+        if (movable.isEmpty()) {
+            false
+        } else {
+            fileViewModel.moveFiles(movable.map { it to null }, target) { ok, failed ->
+                val message = when {
+                    failed == 0 -> context.getString(R.string.transfer_done, context.getString(R.string.move), ok)
+                    ok == 0 -> context.getString(R.string.transfer_failed, context.getString(R.string.move), failed)
+                    else -> context.getString(R.string.transfer_partial, context.getString(R.string.move), ok, failed)
+                }
+                android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
             }
+            true
         }
     }
 
@@ -310,13 +318,7 @@ fun DesktopNavigation(
             DesktopSidebar(
                 modifier = Modifier
                     .widthIn(min = 220.dp, max = 280.dp)
-                    .fillMaxHeight()
-                    .dragAndDropTarget(
-                        shouldStartDragAndDrop = { event ->
-                            ClipDescription.MIMETYPE_TEXT_PLAIN in event.mimeTypes()
-                        },
-                        target = dropTarget
-                    ),
+                    .fillMaxHeight(),
                 currentRoute = currentRoute,
                 storageRoots = roots,
                 standardPins = standardPins,
@@ -324,7 +326,8 @@ fun DesktopNavigation(
                 serverUrl = serverUrl,
                 onNavigate = ::navigateInCurrentTab,
                 onNewTab = ::openInNewTab,
-                onRemovePin = settingsViewModel::removePinnedFolder
+                onRemovePin = settingsViewModel::removePinnedFolder,
+                onDropInto = moveInto,
             )
             // v1.9.1: structural separators use outline, not outlineVariant —
             // outlineVariant is ~1.9:1 on near-black dark surfaces (invisible
@@ -454,7 +457,8 @@ private fun DesktopSidebar(
     serverUrl: String,
     onNavigate: (String, String) -> Unit,
     onNewTab: (String) -> Unit,
-    onRemovePin: (String) -> Unit
+    onRemovePin: (String) -> Unit,
+    onDropInto: (String, List<String>) -> Boolean,
 ) {
     val context = LocalContext.current
     // Reuses the caller-resolved roots: identical volume set to the normal UI.
@@ -477,10 +481,10 @@ private fun DesktopSidebar(
         item { SidebarSectionTitle(stringResource(R.string.pinned_folders)) }
         items(count = standardPins.size, key = { i -> "std-$i:${standardPins[i]}" }, contentType = { "pin" }) { index ->
             val path = standardPins[index]
-            PinnedFolderItem(path, removable = false, onNavigate, onNewTab, onRemovePin)
+            PinnedFolderItem(path, removable = false, onNavigate, onNewTab, onRemovePin, onDropInto)
         }
         items(count = customPins.size, key = { i -> "custom-$i:${customPins[i]}" }, contentType = { "pin" }) { index ->
-            PinnedFolderItem(customPins[index], removable = true, onNavigate, onNewTab, onRemovePin)
+            PinnedFolderItem(customPins[index], removable = true, onNavigate, onNewTab, onRemovePin, onDropInto)
         }
 
         item { SidebarSectionTitle(stringResource(R.string.devices)) }
@@ -488,7 +492,12 @@ private fun DesktopSidebar(
             val path = externalRoots[index]
             val internal = path.contains("emulated")
             val title = FolderNames.storageRootTitle(path, internal, internalLabel, externalFallback)
-            SidebarDestination(title, if (internal) Icons.Default.PhoneAndroid else Icons.Default.SdStorage, false) {
+            SidebarDestination(
+                title,
+                if (internal) Icons.Default.PhoneAndroid else Icons.Default.SdStorage,
+                false,
+                onDropInto = { paths -> onDropInto(path, paths) },
+            ) {
                 onNavigate("file_browser?path=${Uri.encode(path)}", title)
             }
         }
@@ -515,18 +524,38 @@ private fun SidebarSectionTitle(text: String) {
 }
 
 @Composable
-private fun SidebarDestination(title: String, icon: ImageVector, selected: Boolean, onClick: () -> Unit) {
+private fun SidebarDestination(
+    title: String,
+    icon: ImageVector,
+    selected: Boolean,
+    onDropInto: ((List<String>) -> Boolean)? = null,
+    onClick: () -> Unit,
+) {
     // v1.8.0 (#1): explicit content colors — unselected rows use onSurface on
     // surfaceContainerLow (AA-checked), selected rows use onSecondaryContainer
     // on secondaryContainer. Never rely on inherited LocalContentColor here
     // because DeX shells may recompose with a stale theme.
-    val container = if (selected) MaterialTheme.colorScheme.secondaryContainer else androidx.compose.ui.graphics.Color.Transparent
-    val content = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface
+    var dropHover by remember { mutableStateOf(false) }
+    val container = when {
+        dropHover -> MaterialTheme.colorScheme.primary
+        selected -> MaterialTheme.colorScheme.secondaryContainer
+        else -> androidx.compose.ui.graphics.Color.Transparent
+    }
+    val content = when {
+        dropHover -> MaterialTheme.colorScheme.onPrimary
+        selected -> MaterialTheme.colorScheme.onSecondaryContainer
+        else -> MaterialTheme.colorScheme.onSurface
+    }
     Surface(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
+            .dropTarget(
+                enabled = onDropInto != null,
+                onHover = { dropHover = it },
+                onDrop = { paths -> onDropInto?.invoke(paths) ?: false },
+            )
             .semantics { this.selected = selected },
         shape = MaterialTheme.shapes.small,
         color = container,
@@ -549,9 +578,11 @@ private fun PinnedFolderItem(
     removable: Boolean,
     onNavigate: (String, String) -> Unit,
     onNewTab: (String) -> Unit,
-    onRemovePin: (String) -> Unit
+    onRemovePin: (String) -> Unit,
+    onDropInto: (String, List<String>) -> Boolean,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    var dropHover by remember { mutableStateOf(false) }
     // v1.10.0 (#2): accurate last-segment name (trailing-slash safe).
     val title = FolderNames.folderDisplayName(path)
     // v1.8.0 (#1): explicit onSurface text on the sidebar surfaceContainerLow
@@ -562,6 +593,12 @@ private fun PinnedFolderItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 48.dp)
+                .dropTarget(
+                    enabled = true,
+                    onHover = { dropHover = it },
+                    onDrop = { paths -> onDropInto(path, paths) },
+                )
+                .background(if (dropHover) MaterialTheme.colorScheme.primaryContainer else androidx.compose.ui.graphics.Color.Transparent)
                 .pointerInput(path) {
                     awaitPointerEventScope {
                         while (true) {
@@ -581,7 +618,12 @@ private fun PinnedFolderItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                Icon(
+                    Icons.Default.Folder,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = if (dropHover) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.primary,
+                )
             }
             Spacer(Modifier.width(10.dp))
             Text(
@@ -589,7 +631,7 @@ private fun PinnedFolderItem(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.bodyMedium,
-                color = textColor,
+                color = if (dropHover) MaterialTheme.colorScheme.onPrimaryContainer else textColor,
                 modifier = Modifier.weight(1f),
             )
             // Keyboard/touch-accessible alternative to right-click / long-press.

@@ -50,4 +50,55 @@
     <string name="crop_help">Sleep het kader om bij te snijden. Kies een beeldverhouding om die vast te zetten.</string><string name="reset_crop">Bijsnijden herstellen</string><string name="perspective_align_corners">Hoeken uitlijnen</string><string name="perspective_help">Sleep de vier hoeken en tik op OK om dat gebied bij te snijden en te corrigeren.</string><string name="perspective_invalid">Houd de hoeken convex (niet gekruist).</string><string name="ok">OK</string><string name="save_failed">Kan de bewerkte afbeelding niet opslaan.</string><string name="image_open_failed">Kan deze afbeelding niet openen.</string>
     <string name="perspective_failed">Kan de perspectiefcorrectie niet toepassen.</string>
     <string name="more_options">Meer opties</string>
+
+    <!-- v2.1.0 (WP2): accent colour -->
+    <string name="accent_color">Accentkleur</string>
+    <string name="select_accent_color">Accentkleur kiezen</string>
+    <string name="custom_color">Aangepaste kleur</string>
+    <string name="hex_color_label">Hexkleur (#RRGGBB)</string>
+    <string name="reset_to_default">Terug naar standaard</string>
+    <string name="invalid_color_format">Ongeldige kleurindeling. Gebruik #RRGGBB.</string>
+    <string name="accent_amber">Amber</string>
+    <string name="accent_blue">Blauw</string>
+    <string name="accent_green">Groen</string>
+    <string name="accent_purple">Paars</string>
+    <string name="accent_pink">Roze</string>
+    <string name="accent_orange">Oranje</string>
+    <string name="accent_teal">Blauwgroen</string>
+    <string name="accent_red">Rood</string>
+
+    <string name="copy_path">Pad kopiëren</string>
+    <string name="move_to_path">Verplaatsen naar pad…</string>
+    <string name="copy_to_path">Kopiëren naar pad…</string>
+    <string name="move_to_path_desc">Voer het pad van de doelmap in. De geselecteerde items worden daarheen verplaatst.</string>
+    <string name="copy_to_path_desc">Voer het pad van de doelmap in. De geselecteerde items worden daarheen gekopieerd.</string>
+    <string name="destination_path">Doelpad</string>
+    <string name="path_copied">Pad gekopieerd</string>
+    <string name="path_error_empty">Voer een doelpad in</string>
+    <string name="path_error_not_absolute">Voer een absoluut pad in dat begint met /</string>
+    <string name="path_error_not_found">Die map bestaat niet</string>
+    <string name="path_error_not_a_directory">Dat pad is geen map</string>
+    <string name="path_error_outside_storage">Kies een map in de apparaatopslag</string>
+    <string name="path_error_same_as_source">De bestemming is gelijk aan de bron</string>
+    <string name="path_error_inside_source">Een map kan niet in zichzelf worden verplaatst</string>
+    <string name="path_error_not_writable">Die map is niet schrijfbaar</string>
+    <string name="transfer_done">%1$s: %2$d item(s)</string>
+    <string name="transfer_failed">%1$s mislukt: %2$d item(s)</string>
+    <string name="transfer_partial">%1$s: %2$d gereed, %3$d mislukt</string>
+    <string name="folder_is_empty">Deze map is leeg</string>
+
+    <!-- v2.1.0 (WP3): receive shared files / multi-select picker -->
+    <string name="incoming_save_title">Gedeelde bestanden opslaan</string>
+    <string name="incoming_save_count">%1$d bestand(en) opslaan</string>
+    <string name="incoming_save_destination">Opslaan in</string>
+    <string name="incoming_save_destination_loading">Map zoeken…</string>
+    <string name="incoming_choose_folder">Map kiezen</string>
+    <string name="incoming_save_action">Opslaan</string>
+    <string name="incoming_saving_progress">%1$d van %2$d opslaan…</string>
+    <string name="incoming_save_done">%1$d bestand(en) opgeslagen</string>
+    <string name="incoming_save_failed">Kon %1$d bestand(en) niet opslaan</string>
+    <string name="incoming_save_hint">Bestaande bestanden blijven staan; duplicaten krijgen een nummer, bijvoorbeeld name (1).jpg.</string>
+    <string name="pick_files_hint">Tik op bestanden om ze te selecteren en bevestig daarna</string>
+    <string name="pick_selected_count">%1$d geselecteerd</string>
+    <string name="pick_confirm_selection">Selectie bevestigen</string>
 </resources>

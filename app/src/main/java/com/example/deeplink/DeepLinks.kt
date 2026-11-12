@@ -1,7 +1,9 @@
 package com.example.deeplink
 
+import android.content.ClipData
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 
 /**
  * External-access surface for Media Master.
@@ -51,6 +53,23 @@ import android.net.Uri
  *                                         Handled via [PickRequest.parse], not
  *                                         [resolve], so a picker launch never
  *                                         turns into a normal deep link.
+ *                                         When the requester sets
+ *                                         EXTRA_ALLOW_MULTIPLE the picker
+ *                                         allows checking several files and
+ *                                         returns them as a ClipData.
+ *
+ *  4. "Save to Media Master" from the system share sheet:
+ *
+ *       ACTION_SEND / ACTION_SEND_MULTIPLE (any type)
+ *                                      -> [SendRequest.parse] collects the
+ *                                         shared streams (EXTRA_STREAM single
+ *                                         Uri or ParcelableArrayList<Uri>, else
+ *                                         ClipData, max [IncomingFiles.MAX_FILES])
+ *                                         and the user picks a destination
+ *                                         folder. Handled via [SendRequest.parse],
+ *                                         not [resolve]. A share carrying only
+ *                                         EXTRA_TEXT (a URL, a quote) is not a
+ *                                         file hand-off and yields `null`.
  *
  * [resolve] converts an incoming [Intent] into an internal navigation route
  * string, or `null` when the request is not understood. Callers must treat
@@ -232,9 +251,10 @@ object DeepLinks {
  * without Android.
  *
  * @param mimeType requested type (wildcard when the sender did not care).
- * @param allowMultiple sender's `EXTRA_ALLOW_MULTIPLE` (honored as
- *   single-return: pickers that need exactly one file keep working, and
- *   multi-needing callers still receive a valid single URI).
+ * @param allowMultiple sender's `EXTRA_ALLOW_MULTIPLE`. When true the picker
+ *   lets the user check several files and returns them as a `ClipData`
+ *   (`Intent.data` stays null, as the platform contract requires). When
+ *   false the picker keeps returning exactly one URI in `Intent.data`.
  * @param persistable true for `ACTION_OPEN_DOCUMENT` (long-lived access
  *   expected). Media Master returns a readable URI grant; callers that
  *   require a persistable `DocumentsProvider` tree should use the system
@@ -255,6 +275,148 @@ data class PickRequest(
                 allowMultiple = intent.getBooleanExtra(Intent.EXTRA_ALLOW_MULTIPLE, false),
                 persistable = action == Intent.ACTION_OPEN_DOCUMENT,
             )
+        }
+
+        /**
+         * WP3 picker result shape, built by [com.example.MainActivity] for
+         * `setResult(RESULT_OK, …)`. Pure so unit tests pin it.
+         *
+         * - `uris.size == 1` → classic single result: `data` + `type` (plus a
+         *   ClipData copy, which is harmless and ignored by single-file
+         *   readers). This keeps requesters that ignore ClipData working even
+         *   if they set EXTRA_ALLOW_MULTIPLE but the user picked one file.
+         * - `uris.size > 1` → `ClipData` only, `data` null, `type` = the
+         *   requester's requested type (wildcard when it was blank), because a
+         *   multi-selection has no single MIME type.
+         * - empty → `null` (caller must answer RESULT_CANCELED).
+         */
+        fun buildResult(
+            uris: List<Uri>,
+            requestedMimeType: String?,
+            grantWrite: Boolean,
+        ): Intent? {
+            val valid = uris.filter { it != Uri.EMPTY }
+            if (valid.isEmpty()) return null
+            val requested = requestedMimeType?.takeUnless { it.isBlank() } ?: "*/*"
+            val intent = Intent().apply {
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                if (grantWrite) addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            }
+            // ClipData.Item(Uri) (not ClipData.newUri): newUri needs a
+            // ContentResolver to look up the MIME type and NPEs without one.
+            // Built directly (not via newPlainText/newUri, which both seed a
+            // placeholder item) so itemCount == uris.size exactly.
+            fun clipOf(uris: List<Uri>): ClipData {
+                val clip = ClipData("Media Master selection", arrayOf("text/uri-list"), ClipData.Item(uris.first()))
+                uris.drop(1).forEach { clip.addItem(ClipData.Item(it)) }
+                return clip
+            }
+            if (valid.size == 1) {
+                val only = valid.first()
+                intent.setDataAndType(only, requested)
+                // A ClipData copy is harmless for single-file readers and lets
+                // a requester that reads only the clip still see the file.
+                intent.clipData = clipOf(valid)
+            } else {
+                intent.clipData = clipOf(valid)
+                intent.type = requested
+            }
+            return intent
+        }
+    }
+}
+
+/**
+ * WP3 "save shared files" request: another app's `ACTION_SEND` /
+ * `ACTION_SEND_MULTIPLE`. Pure data + [parse] so unit tests pin it without
+ * Android UI.
+ *
+ * @param uris shared streams, in sender order, de-duplicated, capped at
+ *   [IncomingFiles.MAX_FILES].
+ * @param mimeType sender's type (wildcard when it did not say).
+ * @param multiple true for `ACTION_SEND_MULTIPLE`.
+ */
+data class SendRequest(
+    val uris: List<Uri>,
+    val mimeType: String,
+    val multiple: Boolean,
+) {
+    val count: Int get() = uris.size
+
+    companion object {
+        /**
+         * Parses a share intent. Returns `null` for anything that is not a
+         * usable file hand-off:
+         *
+         * - `null` intent / other actions,
+         * - a share that only carries `EXTRA_TEXT` (URLs and plain text are
+         *   deliberately not saved — the share sheet is full of them),
+         * - an empty `ClipData` / empty stream list.
+         *
+         * Stream sources, first match wins (they are not merged: a sender that
+         * sets both means the same files):
+         *  1. `EXTRA_STREAM` as a single [Uri],
+         *  2. `EXTRA_STREAM` as a `ParcelableArrayList<Uri>` (API 33+ typed
+         *     read, legacy read below),
+         *  3. `Intent.clipData` items.
+         *
+         * Non-`content`/`file` URIs (http, …) are dropped: they are links, not
+         * files. Never throws.
+         */
+        fun parse(intent: Intent?): SendRequest? {
+            if (intent == null) return null
+            val action = intent.action ?: return null
+            val multiple = action == Intent.ACTION_SEND_MULTIPLE
+            if (action != Intent.ACTION_SEND && !multiple) return null
+
+            val collected = mutableListOf<Uri>()
+            runCatching {
+                val stream = intentStreams(intent)
+                if (stream.isNotEmpty()) collected += stream else collected += clipDataUris(intent.clipData)
+            }
+            val uris = collected
+                .filter { isSavableUri(it) }
+                .distinctBy { it.toString() }
+                .take(IncomingFiles.MAX_FILES)
+            if (uris.isEmpty()) return null
+            return SendRequest(
+                uris = uris,
+                mimeType = intent.type?.takeUnless { it.isBlank() } ?: "*/*",
+                multiple = multiple,
+            )
+        }
+
+        /** Only local streams are copyable; links are not files. */
+        private fun isSavableUri(uri: Uri): Boolean {
+            val scheme = uri.scheme?.lowercase() ?: return false
+            return scheme == "content" || scheme == "file"
+        }
+
+        private fun intentStreams(intent: Intent): List<Uri> {
+            val single = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
+            }
+            if (single != null) return listOf(single)
+            val list = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)
+            }
+            return list?.filterNotNull().orEmpty()
+        }
+
+        private fun clipDataUris(clip: ClipData?): List<Uri> {
+            if (clip == null) return emptyList()
+            val result = mutableListOf<Uri>()
+            for (i in 0 until clip.itemCount) {
+                val item = clip.getItemAt(i) ?: continue
+                item.uri?.let { result += it }
+            }
+            return result
         }
     }
 }

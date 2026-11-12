@@ -1,7 +1,40 @@
 # 設計書兼仕様書 (Media Master)
 
 ## バージョン情報
-- **Version:** 2.0.1
+- **Version:** 2.1.0
+
+## v2.1.0 の設計変更（要約）
+計画: `docs/plans/v2.1.0-explorer-theme-filemanager-plan.md`。4 つのユーザー要望（Explorer のパス操作とダブルクリック改名 / アクセントカラー / 標準ファイル管理アプリ化 / D&D 最適化）と GUI 不整合の解消。既存の互換性・クラッシュ安全性・メモリ安全性は不変。
+
+### 1. エクスプローラー（`FilesScreen.kt`, `ui/PathInput.kt`, `ui/components/PathDialogs.kt`, `FileViewModel.kt`）
+- **パスをコピー**: 行/タイルのコンテキストメニュー（右クリック・長押し）と選択ツールバーの `⋮` に「パスをコピー」。`ClipboardManager` にプレーンテキスト（複数選択は改行区切り）、`path_copied` トースト。
+- **パスを指定して移動/コピー**: `PathMoveDialog`。入力は絶対パス・`~`・`file://` を正規化し、pure な `PathInput.validate` が「空 / 非絶対 / 不存在 / ストレージ外 / 移動元と同一 / 移動元の子孫 / 書き込み不可」を判定。**`..` と `.` は `PathInput.canonicalize` が字句解決**するので、`/storage/emulated/0/Download/../Download` のような表記で同一/子孫判定を迂回できない。OK 時のみ確定ボタンが有効。
+- **移動/コピーの実行**: `FileViewModel.moveFiles/copyFiles`（複数対応）。同一フォルダは no-op、フォルダは `copyRecursively` → **コピー成功後にのみ**削除。削除は既存 `deleteFile` と同じ経路（MediaStore 削除要求 → 失敗時のみ `deleteRecursively`）を使い、`_deleteError` と `onFileDeleted` を迂回しない。コピー途中で失敗した場合は宛先の部分コピーを掃除する。
+- **マウスダブルクリックで改名**: マウスの Press を 400ms 以内に 2 回で改名ダイアログ（タッチは無視）。改名ダイアログはツールバー・メニュー・ダブルクリックで共通化。
+- **GUI 整合**: 列ヘッダと行が `FileColumns` の weight を共有（従来は「Modified」ヘッダが `DATE_CREATED` でソート、区切り線が 72dp 固定）。選択ツールバーは Share/Delete/Rename + `⋮`（Move/Copy/Move to path/Copy path/Select all）に整理。グリッドのコンテキストメニューを一覧と共通化（Share/Delete/Rename 追加）。空フォルダは `EmptyState`、一覧のサイズは `formatSizeLocalized`、選択モードは 0 件になっても維持。
+
+### 2. アクセントカラー（`ui/theme/AccentPalette.kt`, `Theme.kt`, `SettingsScreen.kt`）
+- 8 プリセット（Amber=従来色 / Blue / Green / Purple / Pink / Orange / Teal / Red）+ カスタム `#RRGGBB` + 既定に戻す。`SettingsRepository.ACCENT_COLOR`（`accent_color`）で永続化、既定 `DEFAULT_AMBER = 0xFFF2BF48`。
+- 生成は **色相アンカー方式**: amber の 6 トークン（primary/onPrimary/primaryContainer/onPrimaryContainer/inversePrimary/surfaceTint）の HSL 明度・彩度を固定し、色相のみ seed へ差し替える。amber seed（および無彩色 seed）は `Color.kt` の定数をそのまま返すので**既定 UI は byte 同一**。secondary/tertiary/error/surface 系（暖色ニュートラル）は不変。
+- コントラスト: `ensureTextContrast` が 4.5:1 未満なら HSL 明度を 2% 刻みで両方向探索。`AccentPaletteTest`（17 件）と `ThemeContrastTest` 追記で全プリセット×昼夜・極端色を検証。
+- `MediaMasterTheme(darkTheme, dynamicColor, accentColor, content)` はデフォルト引数追加のみ（互換）。dynamic color 既定 OFF は維持。
+
+### 3. 標準ファイル管理アプリ（`AndroidManifest.xml`, `deeplink/DeepLinks.kt`, `deeplink/IncomingFiles.kt`, `ui/IncomingSaveScreen.kt`, `ui/FilePickerScreen.kt`, `ui/MainNavigation.kt`, `MainActivity.kt`）
+- **共有シートから保存**: `ACTION_SEND` / `ACTION_SEND_MULTIPLE`（`*/*`、DEFAULT のみ＝BROWSABLE なし）。`SendRequest.parse` が `EXTRA_STREAM`（単一/ArrayList/ClipData）を最大 50 件で解釈し、`EXTRA_TEXT` のみは対象外。`IncomingSaveScreen` で保存先を選び、64KiB バッファのストリームコピー → `MediaScannerConnection.scanFile`。重複名は `IncomingFiles.uniqueName` で `name (1).ext`。
+- **ピッカーの複数返却**: `PickRequest.buildResult`。1 件は `data`+`type`+READ、2 件以上は `clipData` のみ + `type` + READ（要求元が WRITE 要求時のみ WRITE）。`ClipData.newUri` は ContentResolver 必須で NPE になるため `ClipData.Item(Uri)` を直接構築。選択状態は `MediaFile`（URI 付き）で保持し、確定時に一覧の再解決へ依存しない。
+- **全端末で動作**: `MainNavigation` の権限ゲートを `isGranted || hasExternalRequest` に緩和。外部 URI 付き要求（`externalViewer/`・`docViewer/` の deep link、共有保存）は「全ファイルアクセス」未許可でも処理し、アプリ内一覧のみ従来どおり権限を要求。
+
+### 4. ドラッグ&ドロップ（`ui/components/DragDrop.kt`, `FilesScreen.kt`, `ui/DesktopNavigation.kt`, `ui/components/BreadcrumbBar.kt`）
+- ペイロードは `text/plain` の `ClipData`（1 アイテム = 1 絶対パス、複数選択は全件）。**マウスドラッグのみ `DRAG_FLAG_GLOBAL`**（タッチはアプリ内完結でパス漏洩を防ぐ）。
+- ドラッグ元: 一覧行・グリッドタイル（「..」は除外）。ドロップ先: フォルダ行/タイル、パンくずの各チップ、デスクトップサイドバーのピンとストレージ。ホバー中はハイライト。
+- **誤タップ防止**: `FileDragDrop.dragInProgress` をドラッグ中だけ立て、行の `onClick` はその間無視する（ドロップ先のない場所で離したときに「開く/フォルダに入る」が誤発火しない）。
+- 移動は `FileViewModel.moveFiles`。同一フォルダ・自身・子孫は拒否（`PathInput.isSameOrInside`）。サイドバードロップは従来の「フォルダをピン留め」から **ファイル移動** に変更。
+
+### 既知の制約
+- タッチのドラッグは Compose の既定開始検出（長押し）に従うため、長押しメニューとほぼ同時に始まる。指を動かさず離した場合はメニューが開く。
+- ドラッグ中のシャドウは小さな半透明円のみ（サムネイル画像のシャドウは未実装）。
+- パス指定移動は端末内の実パスのみ（SAF の `content://` ツリーは対象外）。
+- 共有保存は最大 50 件・ストリームコピー（進捗は件数単位）。
 
 ## v2.0.1 の修正
 - **共有の安全化**: 外部から `file://` で渡された写真を ACTION_SEND へそのまま流すと `FileUriExposedException`（targetSdk 24+）で落ちるため、`shareableUri()` が FileProvider URI へ変換し、chooser 起動を `runCatching` + 失敗トーストに。

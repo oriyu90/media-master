@@ -100,11 +100,17 @@ private val DarkColors = darkColorScheme(
  * Dynamic (Material You) colour is **off by default**: the brand palette above is
  * contrast-checked to WCAG AA, and a device-generated scheme cannot be
  * guaranteed to be. Callers may still opt in with [dynamicColor] = true.
+ *
+ * v2.1.0 (WP2): [accentColor] selects the one-point accent. It defaults to the
+ * shipped amber, so existing call sites render exactly as before. Only the six
+ * accent tokens are re-hued; every other role keeps the checked brand values
+ * (see [AccentPalette]).
  */
 @Composable
 fun MediaMasterTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false,
+    accentColor: Int = AccentPalette.DEFAULT_AMBER,
     content: @Composable () -> Unit,
 ) {
     val colorScheme = when {
@@ -112,8 +118,12 @@ fun MediaMasterTheme(
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-        darkTheme -> DarkColors
-        else -> LightColors
+        // Amber is the shipped palette: use the pre-built constants verbatim so
+        // the default path is bit-identical to pre-WP2 builds.
+        (accentColor and 0xFFFFFF) == (AccentPalette.DEFAULT_AMBER and 0xFFFFFF) ->
+            if (darkTheme) DarkColors else LightColors
+        darkTheme -> AccentPalette.buildScheme(accentColor, dark = true)
+        else -> AccentPalette.buildScheme(accentColor, dark = false)
     }
 
     val view = LocalView.current
@@ -144,14 +154,15 @@ fun MediaMasterTheme(
 /** @deprecated Kept so existing call sites keep compiling; use [MediaMasterTheme]. */
 @Deprecated(
     "Renamed to MediaMasterTheme",
-    ReplaceWith("MediaMasterTheme(darkTheme, dynamicColor, content)")
+    ReplaceWith("MediaMasterTheme(darkTheme, dynamicColor, accentColor, content)")
 )
 @Composable
 fun MyApplicationTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false,
+    accentColor: Int = AccentPalette.DEFAULT_AMBER,
     content: @Composable () -> Unit,
-) = MediaMasterTheme(darkTheme, dynamicColor, content)
+) = MediaMasterTheme(darkTheme, dynamicColor, accentColor, content)
 
 /** True when [color] is light enough that dark text/icons should sit on top of it. */
 internal fun isLight(color: Color) = color.luminance() > 0.5f

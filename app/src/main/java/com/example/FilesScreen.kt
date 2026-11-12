@@ -4,10 +4,7 @@ import androidx.compose.ui.res.stringResource
 import com.example.R
 import android.net.Uri
 import android.content.Intent
-import android.content.ClipData
-import android.view.View
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,7 +13,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.draganddrop.dragAndDropSource
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -27,8 +23,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.draganddrop.DragAndDropTransferData
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.activity.compose.BackHandler
@@ -40,7 +36,13 @@ import com.example.ui.components.SortViewMenu
 import com.example.ui.components.ConfirmDeleteDialog
 import com.example.ui.components.Hallmark
 import com.example.ui.components.BreadcrumbBar
+import com.example.ui.components.EmptyState
 import com.example.ui.components.FolderPickerDialog
+import com.example.ui.components.FileDragDrop
+import com.example.ui.components.dropTarget
+import com.example.ui.components.dragSource
+import com.example.ui.components.PathMoveDialog
+import com.example.ui.components.copyPathToClipboard
 import java.text.DateFormat
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -53,7 +55,21 @@ import java.util.Locale
 import java.io.File
 import androidx.compose.foundation.ExperimentalFoundationApi
 
+/**
+ * v2.1.0: one pending Explorer transfer (move/copy), shared by the toolbar
+ * menu, the context menu, the path dialog and drag & drop so every entry
+ * point funnels into the same confirmation + execution path.
+ */
 private data class FolderPickerMode(val isMove: Boolean, val paths: List<String>)
+
+private data class TransferRequest(
+    val isMove: Boolean,
+    val paths: List<String>,
+    /** Explicit destination (drag & drop); null = ask with the folder picker. */
+    val destination: String? = null,
+    /** Open the typed-path dialog instead of the folder picker. */
+    val byPath: Boolean = false,
+)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -92,8 +108,12 @@ fun FilesScreen(
     var storageRoots by remember { mutableStateOf<List<String>>(emptyList()) }
     var searchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
-    var showRenameDialog by remember { mutableStateOf(false) }
+    var renameTarget by remember { mutableStateOf<String?>(null) }
     var folderPickerMode by remember { mutableStateOf<FolderPickerMode?>(null) }
+    var transfer by remember { mutableStateOf<TransferRequest?>(null) }
+    // v2.1.0: multi-select mode survives an empty selection so "Select all"
+    // then deselecting everything does not drop the user out of the toolbar.
+    var selectionMode by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         storageRoots = withContext(kotlinx.coroutines.Dispatchers.IO) { viewModel.storageRoots() }
@@ -109,6 +129,30 @@ fun FilesScreen(
         initialPath?.takeIf { it.startsWith("/") }?.let(viewModel::loadFiles)
     }
 
+    val currentFiles = (viewState as? ViewState.Success)?.files.orEmpty()
+    val currentPath = (viewState as? ViewState.Success)?.currentPath
+    val primaryRoot = storageRoots.firstOrNull()
+    val itemsOf: (List<String>) -> List<Pair<String, Uri?>> = { paths ->
+        paths.map { path -> path to currentFiles.find { it.path == path }?.contentUri }
+    }
+
+    /** Runs a move/copy batch and reports the outcome (localized). */
+    fun runTransfer(request: TransferRequest, destination: String) {
+        val items = itemsOf(request.paths)
+        val label = context.getString(if (request.isMove) R.string.move else R.string.copy)
+        if (request.isMove) {
+            viewModel.moveFiles(items, destination) { ok, failed ->
+                reportTransfer(context, label, ok, failed)
+            }
+        } else {
+            viewModel.copyFiles(items, destination) { ok, failed ->
+                reportTransfer(context, label, ok, failed)
+            }
+        }
+        selectedFiles.clear()
+        selectionMode = false
+    }
+
     if (pendingDeletePaths.isNotEmpty()) {
         ConfirmDeleteDialog(
             title = stringResource(R.string.delete),
@@ -119,8 +163,9 @@ fun FilesScreen(
             onConfirm = {
                 val toDelete = pendingDeletePaths
                 pendingDeletePaths = emptyList()
-                val files = (viewState as? ViewState.Success)?.files.orEmpty()
+                val files = currentFiles
                 selectedFiles.clear()
+                selectionMode = false
                 coroutineScope.launch {
                     withContext(kotlinx.coroutines.Dispatchers.IO) {
                         toDelete.forEach { path ->
@@ -158,12 +203,14 @@ fun FilesScreen(
         }
     }
 
-    if (showRenameDialog && selectedFiles.size == 1) {
-        val target = (viewState as? ViewState.Success)?.files?.find { it.path == selectedFiles.first() }
+    // v2.1.0: rename is reachable from the toolbar, the context menu and a
+    // mouse double-click; all three open this one dialog.
+    renameTarget?.let { path ->
+        val target = currentFiles.find { it.path == path }
         if (target != null) {
             var newName by remember(target.path) { mutableStateOf(target.name) }
             AlertDialog(
-                onDismissRequest = { showRenameDialog = false },
+                onDismissRequest = { renameTarget = null },
                 title = { Text(stringResource(R.string.rename)) },
                 text = {
                     OutlinedTextField(
@@ -171,69 +218,93 @@ fun FilesScreen(
                         onValueChange = { newName = it },
                         label = { Text(stringResource(R.string.new_name)) },
                         singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            imeAction = androidx.compose.ui.text.input.ImeAction.Done,
+                        ),
                     )
                 },
                 confirmButton = {
                     TextButton(
                         onClick = {
-                            showRenameDialog = false
+                            renameTarget = null
                             viewModel.renameFile(target.path, target.contentUri, newName.trim())
                             selectedFiles.clear()
+                            selectionMode = false
                         },
-                        enabled = newName.isNotBlank(),
+                        enabled = newName.isNotBlank() && newName.trim() != target.name,
                     ) { Text(stringResource(R.string.save)) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showRenameDialog = false }) { Text(stringResource(R.string.cancel)) }
+                    TextButton(onClick = { renameTarget = null }) { Text(stringResource(R.string.cancel)) }
                 },
             )
+        } else {
+            renameTarget = null
         }
     }
 
     folderPickerMode?.let { mode ->
-        val startDir = (viewState as? ViewState.Success)?.currentPath ?: storageRoots.firstOrNull() ?: "/"
+        val startDir = currentPath ?: primaryRoot ?: "/"
         FolderPickerDialog(
             startPath = startDir,
             isMove = mode.isMove,
             onDismiss = { folderPickerMode = null },
             onConfirm = { destDir ->
-                val files = (viewState as? ViewState.Success)?.files.orEmpty()
-                mode.paths.forEach { path ->
-                    val file = files.find { it.path == path } ?: return@forEach
-                    if (mode.isMove) {
-                        viewModel.moveFile(file.path, file.contentUri, destDir)
-                    } else {
-                        viewModel.copyFile(file.path, file.contentUri, destDir)
-                    }
-                }
-                selectedFiles.clear()
                 folderPickerMode = null
+                runTransfer(TransferRequest(mode.isMove, mode.paths), destDir)
             },
         )
     }
 
+    // v2.1.0: typed-path move/copy (Explorer "move to path" parity).
+    transfer?.takeIf { it.byPath && it.destination == null }?.let { request ->
+        PathMoveDialog(
+            isMove = request.isMove,
+            sourcePaths = request.paths,
+            primaryRoot = primaryRoot,
+            storageRoots = storageRoots,
+            initialPath = currentPath ?: primaryRoot ?: "/",
+            onDismiss = { transfer = null },
+            onConfirm = { destDir ->
+                transfer = null
+                runTransfer(request, destDir)
+            },
+        )
+    }
+
+    // A drop with an explicit destination runs immediately (no picker).
+    LaunchedEffect(transfer) {
+        val request = transfer ?: return@LaunchedEffect
+        val destination = request.destination ?: return@LaunchedEffect
+        transfer = null
+        runTransfer(request, destination)
+    }
+
     BackHandler(enabled = viewState is ViewState.Success && !(viewModel.isStorageRoot((viewState as ViewState.Success).currentPath))) {
-        if (isSelectionMode) {
+        if (isSelectionMode || selectionMode) {
             selectedFiles.clear()
+            selectionMode = false
         } else {
             viewModel.navigateUp()
         }
     }
 
+    val showSelectionBar = isSelectionMode || selectionMode
+
     Scaffold(
         topBar = {
-            if (isSelectionMode) {
+            if (showSelectionBar) {
                 TopAppBar(
                     title = { Text(pluralStringResource(R.plurals.items_selected, selectedFiles.size, selectedFiles.size)) },
                     navigationIcon = {
-                        IconButton(onClick = { selectedFiles.clear() }) {
+                        IconButton(onClick = { selectedFiles.clear(); selectionMode = false }) {
                             Icon(Icons.Default.Close, contentDescription = stringResource(R.string.clear_selection))
                         }
                     },
                     actions = {
                         IconButton(onClick = {
                             val uris = selectedFiles.mapNotNull { path ->
-                                (viewState as? ViewState.Success)?.files?.find { it.path == path }?.contentUri
+                                currentFiles.find { it.path == path }?.contentUri
                             }
                             if (uris.isNotEmpty()) {
                                 val shareIntent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
@@ -241,36 +312,78 @@ fun FilesScreen(
                                     putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
                                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                 }
-                                context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.share_files)))
+                                runCatching {
+                                    context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.share_files)))
+                                }
                             }
                             selectedFiles.clear()
+                            selectionMode = false
                         }) {
                             Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share))
                         }
-
-                        IconButton(onClick = {
-                            pendingDeletePaths = selectedFiles.toList()
-                        }) {
-                            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete))
-                        }
+                        // v2.1.0: the toolbar keeps only the four most used
+                        // actions; rename/move/copy/path live in the overflow
+                        // menu so a phone never runs out of space.
                         if (selectedFiles.size == 1) {
-                            IconButton(onClick = { showRenameDialog = true }) {
+                            IconButton(onClick = { renameTarget = selectedFiles.first() }) {
                                 Icon(Icons.Default.DriveFileRenameOutline, contentDescription = stringResource(R.string.rename))
                             }
                         }
-                        IconButton(onClick = { folderPickerMode = FolderPickerMode(isMove = false, paths = selectedFiles.toList()) }) {
-                            Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.copy))
+                        IconButton(onClick = { pendingDeletePaths = selectedFiles.toList() }) {
+                            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete))
                         }
-                        IconButton(onClick = { folderPickerMode = FolderPickerMode(isMove = true, paths = selectedFiles.toList()) }) {
-                            Icon(Icons.Default.DriveFileMove, contentDescription = stringResource(R.string.move))
-                        }
-                        SortViewMenu(viewModel = viewModel, onSelectAll = {
-                            if (viewState is ViewState.Success) {
-                                val files = (viewState as ViewState.Success).files.filter { !it.isDirectory }
-                                selectedFiles.clear()
-                                selectedFiles.addAll(files.map { it.path })
+                        var moreExpanded by remember { mutableStateOf(false) }
+                        Box {
+                            IconButton(onClick = { moreExpanded = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.more_options))
                             }
-                        })
+                            DropdownMenu(expanded = moreExpanded, onDismissRequest = { moreExpanded = false }) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.move)) },
+                                    leadingIcon = { Icon(Icons.Default.DriveFileMove, null) },
+                                    onClick = {
+                                        moreExpanded = false
+                                        transfer = TransferRequest(isMove = true, paths = selectedFiles.toList())
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.copy)) },
+                                    leadingIcon = { Icon(Icons.Default.ContentCopy, null) },
+                                    onClick = {
+                                        moreExpanded = false
+                                        transfer = TransferRequest(isMove = false, paths = selectedFiles.toList())
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.move_to_path)) },
+                                    leadingIcon = { Icon(Icons.Default.DriveFileMove, null) },
+                                    onClick = {
+                                        moreExpanded = false
+                                        transfer = TransferRequest(isMove = true, paths = selectedFiles.toList(), byPath = true)
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.copy_path)) },
+                                    leadingIcon = { Icon(Icons.Default.Link, null) },
+                                    onClick = {
+                                        moreExpanded = false
+                                        copyPathToClipboard(context, selectedFiles.joinToString("\n"))
+                                        selectedFiles.clear()
+                                        selectionMode = false
+                                    },
+                                )
+                                HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.select_all)) },
+                                    leadingIcon = { Icon(Icons.Default.SelectAll, null) },
+                                    onClick = {
+                                        moreExpanded = false
+                                        selectedFiles.clear()
+                                        selectedFiles.addAll(currentFiles.filter { it.name != ".." }.map { it.path })
+                                    },
+                                )
+                            }
+                        }
                     }
                 )
             } else {
@@ -280,7 +393,7 @@ fun FilesScreen(
                 val internalLabel = stringResource(R.string.internal_storage)
                 val externalFallback = stringResource(R.string.external_storage)
                 TopAppBar(
-                    title = { 
+                    title = {
                         val title = if (viewState is ViewState.Success) {
                             val path = (viewState as ViewState.Success).currentPath
                             if (viewModel.isStorageRoot(path)) {
@@ -290,7 +403,7 @@ fun FilesScreen(
                                 com.example.ui.FolderNames.folderDisplayName(path)
                             }
                         } else stringResource(R.string.manage_files)
-                        Text(text = title, maxLines = 1, overflow = TextOverflow.Ellipsis) 
+                        Text(text = title, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     },
                     navigationIcon = {
                         IconButton(onClick = {
@@ -315,6 +428,7 @@ fun FilesScreen(
                                 val files = (viewState as ViewState.Success).files.filter { !it.isDirectory }
                                 selectedFiles.clear()
                                 selectedFiles.addAll(files.map { it.path })
+                                selectionMode = true
                             }
                         })
                     }
@@ -323,7 +437,7 @@ fun FilesScreen(
         }
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            if (!isSelectionMode && viewState is ViewState.Success) {
+            if (!showSelectionBar && viewState is ViewState.Success) {
                 val currentSuccess = viewState as ViewState.Success
                 val root = storageRoots.firstOrNull { currentSuccess.currentPath.startsWith(it) } ?: storageRoots.firstOrNull()
                 if (root != null) {
@@ -339,6 +453,11 @@ fun FilesScreen(
                         rootLabel = rootLabel,
                         currentPath = currentSuccess.currentPath,
                         onNavigate = { viewModel.loadFiles(it) },
+                        // v2.1.0: drop files on a crumb to move them there.
+                        onDropPaths = { destination, paths ->
+                            transfer = TransferRequest(isMove = true, paths = paths, destination = destination)
+                            true
+                        },
                     )
                 }
                 if (searchActive) {
@@ -388,7 +507,43 @@ fun FilesScreen(
                             )
                         }
                     }
-                    if (viewMode == ViewMode.LIST) {
+                    val onItemClick: (MediaFile) -> Unit = { file ->
+                        if (FileDragDrop.dragInProgress) {
+                            // A drag just ended over this row: never treat the
+                            // release as "open".
+                        } else if (showSelectionBar) {
+                            if (file.name != "..") {
+                                if (selectedFiles.contains(file.path)) selectedFiles.remove(file.path)
+                                else selectedFiles.add(file.path)
+                            }
+                        } else if (file.isDirectory) {
+                            viewModel.loadFiles(file.path)
+                        } else {
+                            openFile(file)
+                        }
+                    }
+                    // v2.1.0: drag payload = the whole selection when the
+                    // dragged row is part of it, otherwise just that row.
+                    val dragPathsOf: (MediaFile) -> List<String> = { file ->
+                        if (selectedFiles.contains(file.path)) selectedFiles.toList() else listOf(file.path)
+                    }
+                    val dropOnFolder: (MediaFile, List<String>) -> Boolean = { folder, paths ->
+                        val destination = folder.path
+                        val moving = paths.filter { File(it).parentFile?.absolutePath != destination }
+                        if (moving.isEmpty()) {
+                            false
+                        } else {
+                            transfer = TransferRequest(isMove = true, paths = moving, destination = destination)
+                            true
+                        }
+                    }
+                    if (displayedFiles.isEmpty()) {
+                        EmptyState(
+                            icon = Icons.Default.FolderOpen,
+                            title = stringResource(if (searchQuery.isBlank()) R.string.folder_is_empty else R.string.no_files_found),
+                            description = if (searchQuery.isBlank()) null else stringResource(R.string.search_files),
+                        )
+                    } else if (viewMode == ViewMode.LIST) {
                         // v1.10.0 (#4): Win11 Details header on desktop lists.
                         if (desktop) {
                             FileListHeader(
@@ -413,26 +568,30 @@ fun FilesScreen(
                             ) { _, file ->
                                 val isSelected = selectedFiles.contains(file.path)
                                 FileItemRow(
-                                    file, isSelected, isSelectionMode,
+                                    file = file,
+                                    isSelected = isSelected,
+                                    isSelectionMode = showSelectionBar,
+                                    onToggleSelect = {
+                                        if (isSelected) selectedFiles.remove(file.path) else selectedFiles.add(file.path)
+                                    },
+                                    onPinFolder = onPinFolder,
+                                    onOpenFolderInNewTab = onOpenFolderInNewTab,
                                     showSize = showSize,
                                     showModified = showModified,
                                     showCreated = showCreated,
                                     showType = showType,
-                                    onToggleSelect = {
-                                    if (isSelected) selectedFiles.remove(file.path) else selectedFiles.add(file.path)
-                                }, onPinFolder = onPinFolder, onOpenFolderInNewTab = onOpenFolderInNewTab) {
-                                    if (isSelectionMode) {
-                                        if (!file.isDirectory) {
-                                            if (isSelected) selectedFiles.remove(file.path) else selectedFiles.add(file.path)
-                                        }
-                                    } else {
-                                        if (file.isDirectory) {
-                                            viewModel.loadFiles(file.path)
-                                        } else {
-                                            openFile(file)
-                                        }
-                                    }
-                                }
+                                    dragPaths = { dragPathsOf(file) },
+                                    onDropPaths = { paths -> dropOnFolder(file, paths) },
+                                    onRename = { renameTarget = file.path },
+                                    onCopyPath = { copyPathToClipboard(context, file.path) },
+                                    onMoveToPath = {
+                                        transfer = TransferRequest(isMove = true, paths = listOf(file.path), byPath = true)
+                                    },
+                                    onMove = { transfer = TransferRequest(isMove = true, paths = listOf(file.path)) },
+                                    onCopy = { transfer = TransferRequest(isMove = false, paths = listOf(file.path)) },
+                                    onDelete = { pendingDeletePaths = listOf(file.path) },
+                                    onClick = { onItemClick(file) },
+                                )
                             }
                         }
                     } else {
@@ -449,21 +608,27 @@ fun FilesScreen(
                                 contentType = { if (it.isDirectory) "dir" else "file" },
                             ) { file ->
                                 val isSelected = selectedFiles.contains(file.path)
-                                FileItemGrid(file, isSelected, isSelectionMode, onToggleSelect = {
-                                    if (isSelected) selectedFiles.remove(file.path) else selectedFiles.add(file.path)
-                                }, onPinFolder = onPinFolder, onOpenFolderInNewTab = onOpenFolderInNewTab) {
-                                    if (isSelectionMode) {
-                                        if (!file.isDirectory) {
-                                            if (isSelected) selectedFiles.remove(file.path) else selectedFiles.add(file.path)
-                                        }
-                                    } else {
-                                        if (file.isDirectory) {
-                                            viewModel.loadFiles(file.path)
-                                        } else {
-                                            openFile(file)
-                                        }
-                                    }
-                                }
+                                FileItemGrid(
+                                    file = file,
+                                    isSelected = isSelected,
+                                    isSelectionMode = showSelectionBar,
+                                    onToggleSelect = {
+                                        if (isSelected) selectedFiles.remove(file.path) else selectedFiles.add(file.path)
+                                    },
+                                    onPinFolder = onPinFolder,
+                                    onOpenFolderInNewTab = onOpenFolderInNewTab,
+                                    dragPaths = { dragPathsOf(file) },
+                                    onDropPaths = { paths -> dropOnFolder(file, paths) },
+                                    onRename = { renameTarget = file.path },
+                                    onCopyPath = { copyPathToClipboard(context, file.path) },
+                                    onMoveToPath = {
+                                        transfer = TransferRequest(isMove = true, paths = listOf(file.path), byPath = true)
+                                    },
+                                    onMove = { transfer = TransferRequest(isMove = true, paths = listOf(file.path)) },
+                                    onCopy = { transfer = TransferRequest(isMove = false, paths = listOf(file.path)) },
+                                    onDelete = { pendingDeletePaths = listOf(file.path) },
+                                    onClick = { onItemClick(file) },
+                                )
                             }
                         }
                     }
@@ -471,6 +636,37 @@ fun FilesScreen(
             }
         }
     }
+}
+
+/** v2.1.0: localized toast for a finished move/copy batch. */
+private fun reportTransfer(context: android.content.Context, label: String, ok: Int, failed: Int) {
+    if (ok == 0 && failed == 0) {
+        android.widget.Toast.makeText(
+            context,
+            context.getString(R.string.path_error_same_as_source),
+            android.widget.Toast.LENGTH_SHORT,
+        ).show()
+        return
+    }
+    val message = when {
+        failed == 0 -> context.getString(R.string.transfer_done, label, ok)
+        ok == 0 -> context.getString(R.string.transfer_failed, label, failed)
+        else -> context.getString(R.string.transfer_partial, label, ok, failed)
+    }
+    android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
+}
+
+/**
+ * v2.1.0: shared column weights so the desktop header and the list rows can
+ * never drift apart (the header used to sort "Modified" by DATE_CREATED and
+ * the divider was pinned at 72.dp regardless of the thumbnail size).
+ */
+private object FileColumns {
+    const val NAME = 2f
+    const val SIZE = 1f
+    const val MODIFIED = 1.4f
+    const val CREATED = 1.4f
+    const val TYPE = 1f
 }
 
 /**
@@ -499,14 +695,14 @@ private fun FileListHeader(
             HeaderCell(
                 label = stringResource(R.string.list_header_name),
                 selected = currentSort == SortOption.NAME,
-                modifier = Modifier.weight(2f),
+                modifier = Modifier.weight(FileColumns.NAME),
                 onClick = { viewModel.setSortOption(SortOption.NAME) },
             )
             if (showSize) {
                 HeaderCell(
                     label = stringResource(R.string.list_header_size),
                     selected = currentSort == SortOption.SIZE,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(FileColumns.SIZE),
                     onClick = { viewModel.setSortOption(SortOption.SIZE) },
                 )
             }
@@ -514,7 +710,7 @@ private fun FileListHeader(
                 HeaderCell(
                     label = stringResource(R.string.list_header_modified),
                     selected = currentSort == SortOption.DATE_CREATED,
-                    modifier = Modifier.weight(1.4f),
+                    modifier = Modifier.weight(FileColumns.MODIFIED),
                     onClick = { viewModel.setSortOption(SortOption.DATE_CREATED) },
                 )
             }
@@ -522,7 +718,7 @@ private fun FileListHeader(
                 HeaderCell(
                     label = stringResource(R.string.list_header_created),
                     selected = false,
-                    modifier = Modifier.weight(1.4f),
+                    modifier = Modifier.weight(FileColumns.CREATED),
                     onClick = { viewModel.setSortOption(SortOption.DATE_CREATED) },
                 )
             }
@@ -530,7 +726,7 @@ private fun FileListHeader(
                 HeaderCell(
                     label = stringResource(R.string.list_header_type),
                     selected = currentSort == SortOption.TYPE,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(FileColumns.TYPE),
                     onClick = { viewModel.setSortOption(SortOption.TYPE) },
                 )
             }
@@ -556,6 +752,41 @@ private fun HeaderCell(
     }
 }
 
+/**
+ * v2.1.0: mouse double-click detection. Compose's [combinedClickable] has no
+ * double-click, so the row watches raw presses: a second primary-button press
+ * on the same row within [DOUBLE_CLICK_MS] triggers [onDoubleClick]. Touch is
+ * ignored (long-press opens the menu there, as before).
+ */
+private const val DOUBLE_CLICK_MS = 400L
+
+@Composable
+private fun Modifier.mouseDoubleClick(
+    key: Any?,
+    enabled: Boolean,
+    onDoubleClick: () -> Unit,
+): Modifier {
+    if (!enabled) return this
+    var lastClickAt by remember(key) { mutableLongStateOf(0L) }
+    return this.pointerInput(key) {
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent()
+                if (event.type != PointerEventType.Press) continue
+                val change = event.changes.firstOrNull() ?: continue
+                if (change.type != PointerType.Mouse || event.buttons.isSecondaryPressed) continue
+                val now = android.os.SystemClock.uptimeMillis()
+                if (now - lastClickAt <= DOUBLE_CLICK_MS) {
+                    lastClickAt = 0L
+                    onDoubleClick()
+                } else {
+                    lastClickAt = now
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FileItemRow(
@@ -572,20 +803,29 @@ fun FileItemRow(
     showModified: Boolean = true,
     showCreated: Boolean = false,
     showType: Boolean = true,
+    // v2.1.0 Explorer additions (all default to no-ops so previews/tests and
+    // any other call site keep compiling unchanged).
+    dragPaths: () -> List<String> = { listOf(file.path) },
+    onDropPaths: (List<String>) -> Boolean = { false },
+    onRename: () -> Unit = {},
+    onCopyPath: () -> Unit = {},
+    onMoveToPath: () -> Unit = {},
+    onMove: () -> Unit = {},
+    onCopy: () -> Unit = {},
+    onDelete: () -> Unit = {},
+    /** v2.1.0: true while another dragged row hovers this folder. */
+    isDropHighlighted: Boolean = false,
     onClick: () -> Unit
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    var dropHover by remember { mutableStateOf(false) }
     val context = LocalContext.current
-    val dragModifier = if (file.isDirectory && file.name != "..") {
-        Modifier.dragAndDropSource(transferData = {
-            DragAndDropTransferData(
-                clipData = ClipData.newPlainText("Media Master folder", file.path),
-                flags = View.DRAG_FLAG_GLOBAL
-            )
-        })
-    } else Modifier
+    val isReal = file.name != ".."
+    val highlighted = isDropHighlighted || dropHover
+    // v2.1.0: files drag too (multi-select aware); ".." never drags.
+    val dragModifier = Modifier.dragSource(enabled = isReal, key = file.path, paths = dragPaths)
     // v1.11.0: desktop right-click opens the same context menu as long-press.
-    val rightClickModifier = if (file.name != "..") {
+    val rightClickModifier = if (isReal) {
         Modifier.pointerInput(file.path) {
             awaitPointerEventScope {
                 while (true) {
@@ -598,144 +838,134 @@ fun FileItemRow(
             }
         }
     } else Modifier
-    Box(modifier = dragModifier) {
-    Column {
-    androidx.compose.material3.ListItem(
-        headlineContent = { 
-            Text(
-                text = file.name, 
-                maxLines = 1, 
-                overflow = TextOverflow.Ellipsis,
-                fontWeight = if (file.isDirectory) androidx.compose.ui.text.font.FontWeight.Medium else androidx.compose.ui.text.font.FontWeight.Normal
-            ) 
-        },
-        // v1.10.0 (#4): Explorer Details — Size / Modified / Created / Type
-        // with per-column show/hide. Created falls back to Modified when
-        // unknown (dateAdded==0) and is hidden when identical to Modified.
-        supportingContent = if (!file.isDirectory && file.name != "..") {
-            {
-                val createdMs = file.dateAdded.takeIf { it > 0 } ?: file.dateModified
-                val parts = com.example.ui.FileDetails.detailParts(
-                    sizeText = formatSize(file.size),
-                    modifiedText = formatDate(file.dateModified),
-                    createdText = formatDate(createdMs),
-                    typeText = com.example.ui.FileDetails.typeLabel(file.name, file.mimeType),
-                    showSize = showSize,
-                    showModified = showModified,
-                    showCreated = showCreated,
-                    showType = showType,
-                    isDirectory = false,
-                )
-                if (parts.isNotEmpty()) Text(
-                    com.example.ui.FileDetails.joinParts(parts),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        } else null,
-        leadingContent = {
-            if (file.isDirectory) {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(MaterialTheme.colorScheme.primaryContainer, shape = androidx.compose.foundation.shape.CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Folder,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+    // v2.1.0: folders accept drops (move into); files do not.
+    val dropModifier = Modifier.dropTarget(
+        enabled = file.isDirectory && isReal,
+        onHover = { dropHover = it },
+        onDrop = onDropPaths,
+    )
+    Box(modifier = dragModifier.then(dropModifier)) {
+        Column {
+            androidx.compose.material3.ListItem(
+                headlineContent = {
+                    Text(
+                        text = file.name,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        fontWeight = if (file.isDirectory) androidx.compose.ui.text.font.FontWeight.Medium else androidx.compose.ui.text.font.FontWeight.Normal
                     )
-                }
-            } else {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                    contentAlignment = Alignment.Center
-                ) {
-                    com.example.ui.components.MediaThumbnail(
-                        file = file,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
-            }
-        },
-        trailingContent = if (isSelected) {
-            { Icon(Icons.Default.CheckCircle, contentDescription = stringResource(R.string.selected), tint = MaterialTheme.colorScheme.primary) }
-        } else null,
-        colors = androidx.compose.material3.ListItemDefaults.colors(
-            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surface
-        ),
-        modifier = modifier
-            .fillMaxWidth()
-            .heightIn(min = Hallmark.RowMinHeight)
-            .then(rightClickModifier)
-            .semantics { selected = isSelected }
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = {
-                    // ".." is the synthetic "go up" entry, not a real file: it must never enter
-                    // multi-select (rename/move/copy/delete on it would target the parent dir).
-                    // v1.11.0: files also open the context menu (Open with)
-                    // on long-press; Select inside the menu preserves batch ops.
-                    if (file.name != "..") {
-                        menuExpanded = true
+                },
+                // v1.10.0 (#4): Explorer Details — Size / Modified / Created / Type
+                // with per-column show/hide. Created falls back to Modified when
+                // unknown (dateAdded==0) and is hidden when identical to Modified.
+                supportingContent = if (!file.isDirectory && isReal) {
+                    {
+                        val createdMs = file.dateAdded.takeIf { it > 0 } ?: file.dateModified
+                        val parts = com.example.ui.FileDetails.detailParts(
+                            sizeText = formatSizeLocalized(file.size),
+                            modifiedText = formatDate(file.dateModified),
+                            createdText = formatDate(createdMs),
+                            typeText = com.example.ui.FileDetails.typeLabel(file.name, file.mimeType),
+                            showSize = showSize,
+                            showModified = showModified,
+                            showCreated = showCreated,
+                            showType = showType,
+                            isDirectory = false,
+                        )
+                        if (parts.isNotEmpty()) Text(
+                            com.example.ui.FileDetails.joinParts(parts),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                } else null,
+                leadingContent = {
+                    if (file.isDirectory) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .background(
+                                    if (highlighted) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.primaryContainer,
+                                    shape = androidx.compose.foundation.shape.CircleShape,
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Folder,
+                                contentDescription = null,
+                                tint = if (highlighted) MaterialTheme.colorScheme.onPrimary
+                                else MaterialTheme.colorScheme.onPrimaryContainer,
+                            )
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            com.example.ui.components.MediaThumbnail(
+                                file = file,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
                     }
                 },
-                role = if (isSelectionMode) Role.Checkbox else null,
-            )
-    )
-        HorizontalDivider(
-            modifier = Modifier.padding(start = 72.dp),
-            thickness = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant
-        )
-    }
-        DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-            if (file.isDirectory) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.open_in_new_tab)) },
-                    onClick = { menuExpanded = false; onOpenFolderInNewTab(file.path) },
-                    leadingIcon = { Icon(Icons.Default.Tab, contentDescription = null) }
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.pin_to_sidebar)) },
-                    onClick = { menuExpanded = false; onPinFolder(file.path) },
-                    leadingIcon = { Icon(Icons.Default.PushPin, contentDescription = null) }
-                )
-            } else {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.open_with)) },
-                    onClick = { menuExpanded = false; openWithExternalApp(context, file) },
-                    leadingIcon = { Icon(Icons.Default.OpenInNew, contentDescription = null) }
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.share)) },
-                    onClick = {
-                        menuExpanded = false
-                        val uri = file.contentUri ?: runCatching {
-                            androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", File(file.path))
-                        }.getOrNull()
-                        if (uri != null) {
-                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                type = file.mimeType
-                                putExtra(Intent.EXTRA_STREAM, uri)
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                trailingContent = if (isSelected) {
+                    { Icon(Icons.Default.CheckCircle, contentDescription = stringResource(R.string.selected), tint = MaterialTheme.colorScheme.primary) }
+                } else null,
+                colors = androidx.compose.material3.ListItemDefaults.colors(
+                    containerColor = when {
+                        highlighted -> MaterialTheme.colorScheme.primaryContainer
+                        isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                        else -> MaterialTheme.colorScheme.surface
+                    }
+                ),
+                modifier = modifier
+                    .fillMaxWidth()
+                    .heightIn(min = Hallmark.RowMinHeight)
+                    .then(rightClickModifier)
+                    .mouseDoubleClick(key = file.path, enabled = isReal && !isSelectionMode, onDoubleClick = onRename)
+                    .semantics { selected = isSelected }
+                    .combinedClickable(
+                        onClick = onClick,
+                        onLongClick = {
+                            // ".." is the synthetic "go up" entry, not a real file: it must never enter
+                            // multi-select (rename/move/copy/delete on it would target the parent dir).
+                            // v1.11.0: files also open the context menu (Open with)
+                            // on long-press; Select inside the menu preserves batch ops.
+                            if (isReal) {
+                                menuExpanded = true
                             }
-                            runCatching { context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.share_files))) }
-                        }
-                    },
-                    leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) }
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.select)) },
-                    onClick = { menuExpanded = false; onToggleSelect() },
-                    leadingIcon = { Icon(Icons.Default.CheckCircle, contentDescription = null) }
-                )
-            }
+                        },
+                        role = if (isSelectionMode) Role.Checkbox else null,
+                    )
+            )
+            // v2.1.0: divider starts where the content starts (after the
+            // 48dp thumbnail + ListItem's 16dp padding) instead of a magic 72dp.
+            HorizontalDivider(
+                modifier = Modifier.padding(start = 64.dp),
+                thickness = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
         }
+        ExplorerContextMenu(
+            expanded = menuExpanded,
+            file = file,
+            onDismiss = { menuExpanded = false },
+            onOpenFolderInNewTab = onOpenFolderInNewTab,
+            onPinFolder = onPinFolder,
+            onToggleSelect = onToggleSelect,
+            onRename = onRename,
+            onCopyPath = onCopyPath,
+            onMoveToPath = onMoveToPath,
+            onMove = onMove,
+            onCopy = onCopy,
+            onDelete = onDelete,
+            context = context,
+        )
     }
 }
 
@@ -749,19 +979,28 @@ fun FileItemGrid(
     onPinFolder: (String) -> Unit = {},
     onOpenFolderInNewTab: (String) -> Unit = {},
     modifier: Modifier = Modifier,
+    // v2.1.0 Explorer additions (defaults keep existing call sites valid).
+    dragPaths: () -> List<String> = { listOf(file.path) },
+    onDropPaths: (List<String>) -> Boolean = { false },
+    onRename: () -> Unit = {},
+    onCopyPath: () -> Unit = {},
+    onMoveToPath: () -> Unit = {},
+    onMove: () -> Unit = {},
+    onCopy: () -> Unit = {},
+    onDelete: () -> Unit = {},
     onClick: () -> Unit
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    var dropHover by remember { mutableStateOf(false) }
     val gridContext = LocalContext.current
-    val dragModifier = if (file.isDirectory && file.name != "..") {
-        Modifier.dragAndDropSource(transferData = {
-            DragAndDropTransferData(
-                clipData = ClipData.newPlainText("Media Master folder", file.path),
-                flags = View.DRAG_FLAG_GLOBAL
-            )
-        })
-    } else Modifier
-    val gridRightClick = if (file.name != "..") {
+    val isReal = file.name != ".."
+    val dragModifier = Modifier.dragSource(enabled = isReal, key = file.path, paths = dragPaths)
+    val dropModifier = Modifier.dropTarget(
+        enabled = file.isDirectory && isReal,
+        onHover = { dropHover = it },
+        onDrop = onDropPaths,
+    )
+    val gridRightClick = if (isReal) {
         Modifier.pointerInput(file.path) {
             awaitPointerEventScope {
                 while (true) {
@@ -774,98 +1013,200 @@ fun FileItemGrid(
             }
         }
     } else Modifier
-    Box(modifier = modifier.then(dragModifier).then(gridRightClick).semantics { selected = isSelected }) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 116.dp)
-            .padding(4.dp)
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = {
-                    if (file.name != "..") {
-                        menuExpanded = true
+    Box(
+        modifier = modifier
+            .then(dragModifier)
+            .then(dropModifier)
+            .then(gridRightClick)
+            .mouseDoubleClick(key = file.path, enabled = isReal && !isSelectionMode, onDoubleClick = onRename)
+            .semantics { selected = isSelected }
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 116.dp)
+                .padding(4.dp)
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = {
+                        if (isReal) {
+                            menuExpanded = true
+                        }
                     }
+                ),
+            colors = CardDefaults.cardColors(
+                containerColor = when {
+                    dropHover -> MaterialTheme.colorScheme.primary
+                    isSelected -> MaterialTheme.colorScheme.primaryContainer
+                    else -> MaterialTheme.colorScheme.surfaceContainer
                 }
             ),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer
-        ),
-        shape = MaterialTheme.shapes.medium,
-        elevation = CardDefaults.cardElevation(if (isSelected) 4.dp else 0.dp)
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            if (file.isDirectory) {
-                Column(
-                    modifier = Modifier.fillMaxSize().padding(12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Folder,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(48.dp)
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = file.name,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
-                    )
-                }
-            } else {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    com.example.ui.components.MediaThumbnail(
-                        file = file,
-                        modifier = Modifier.fillMaxWidth().aspectRatio(1f),
-                    )
-                    Text(
-                        text = file.name,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth().padding(4.dp)
-                    )
-                }
-            }
-            if (isSelected) {
-                Icon(
-                    Icons.Default.CheckCircle,
-                    contentDescription = stringResource(R.string.selected),
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(8.dp).align(Alignment.TopEnd)
-                )
-            }
-            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+            shape = MaterialTheme.shapes.medium,
+            elevation = CardDefaults.cardElevation(if (isSelected) 4.dp else 0.dp)
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
                 if (file.isDirectory) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.open_in_new_tab)) },
-                        onClick = { menuExpanded = false; onOpenFolderInNewTab(file.path) }
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.pin_to_sidebar)) },
-                        onClick = { menuExpanded = false; onPinFolder(file.path) }
-                    )
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Folder,
+                            contentDescription = null,
+                            tint = if (dropHover) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = file.name,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
+                        )
+                    }
                 } else {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.open_with)) },
-                        onClick = { menuExpanded = false; openWithExternalApp(gridContext, file) },
-                        leadingIcon = { Icon(Icons.Default.OpenInNew, contentDescription = null) }
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.select)) },
-                        onClick = { menuExpanded = false; onToggleSelect() },
-                        leadingIcon = { Icon(Icons.Default.CheckCircle, contentDescription = null) }
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        com.example.ui.components.MediaThumbnail(
+                            file = file,
+                            modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                        )
+                        Text(
+                            text = file.name,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth().padding(4.dp)
+                        )
+                    }
+                }
+                if (isSelected) {
+                    Icon(
+                        Icons.Default.CheckCircle,
+                        contentDescription = stringResource(R.string.selected),
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(8.dp).align(Alignment.TopEnd)
                     )
                 }
             }
         }
+        ExplorerContextMenu(
+            expanded = menuExpanded,
+            file = file,
+            onDismiss = { menuExpanded = false },
+            onOpenFolderInNewTab = onOpenFolderInNewTab,
+            onPinFolder = onPinFolder,
+            onToggleSelect = onToggleSelect,
+            onRename = onRename,
+            onCopyPath = onCopyPath,
+            onMoveToPath = onMoveToPath,
+            onMove = onMove,
+            onCopy = onCopy,
+            onDelete = onDelete,
+            context = gridContext,
+        )
     }
+}
+
+/**
+ * v2.1.0: one context menu for both layouts (the grid menu used to be a
+ * stripped-down copy that lacked Share/Delete). Folders get navigation +
+ * pin + the file operations that make sense (rename/move/copy/path/delete);
+ * files add "Open with" and Share.
+ */
+@Composable
+private fun ExplorerContextMenu(
+    expanded: Boolean,
+    file: MediaFile,
+    onDismiss: () -> Unit,
+    onOpenFolderInNewTab: (String) -> Unit,
+    onPinFolder: (String) -> Unit,
+    onToggleSelect: () -> Unit,
+    onRename: () -> Unit,
+    onCopyPath: () -> Unit,
+    onMoveToPath: () -> Unit,
+    onMove: () -> Unit,
+    onCopy: () -> Unit,
+    onDelete: () -> Unit,
+    context: android.content.Context,
+) {
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        if (file.isDirectory) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.open_in_new_tab)) },
+                onClick = { onDismiss(); onOpenFolderInNewTab(file.path) },
+                leadingIcon = { Icon(Icons.Default.Tab, contentDescription = null) }
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.pin_to_sidebar)) },
+                onClick = { onDismiss(); onPinFolder(file.path) },
+                leadingIcon = { Icon(Icons.Default.PushPin, contentDescription = null) }
+            )
+        } else {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.open_with)) },
+                onClick = { onDismiss(); openWithExternalApp(context, file) },
+                leadingIcon = { Icon(Icons.Default.OpenInNew, contentDescription = null) }
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.share)) },
+                onClick = {
+                    onDismiss()
+                    val uri = file.contentUri ?: runCatching {
+                        androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", File(file.path))
+                    }.getOrNull()
+                    if (uri != null) {
+                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = file.mimeType
+                            putExtra(Intent.EXTRA_STREAM, uri)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        runCatching { context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.share_files))) }
+                    }
+                },
+                leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) }
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.select)) },
+                onClick = { onDismiss(); onToggleSelect() },
+                leadingIcon = { Icon(Icons.Default.CheckCircle, contentDescription = null) }
+            )
+        }
+        HorizontalDivider()
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.rename)) },
+            onClick = { onDismiss(); onRename() },
+            leadingIcon = { Icon(Icons.Default.DriveFileRenameOutline, contentDescription = null) }
+        )
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.copy_path)) },
+            onClick = { onDismiss(); onCopyPath() },
+            leadingIcon = { Icon(Icons.Default.Link, contentDescription = null) }
+        )
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.move_to_path)) },
+            onClick = { onDismiss(); onMoveToPath() },
+            leadingIcon = { Icon(Icons.Default.DriveFileMove, contentDescription = null) }
+        )
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.move)) },
+            onClick = { onDismiss(); onMove() },
+            leadingIcon = { Icon(Icons.Default.DriveFileMove, contentDescription = null) }
+        )
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.copy)) },
+            onClick = { onDismiss(); onCopy() },
+            leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) }
+        )
+        HorizontalDivider()
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) },
+            onClick = { onDismiss(); onDelete() },
+            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) }
+        )
     }
 }
 
@@ -913,7 +1254,8 @@ fun openMediaFile(
     // kinds open in a new desktop tab instead of direct navigation
     // (media/APK/external flows are untouched).
     onOpenDocInTab: ((uriString: String, path: String?, title: String) -> Unit)? = null,
-) {    if (file.mimeType.startsWith("image/") || file.mimeType.startsWith("video/") || file.mimeType.startsWith("audio/")) {
+) {
+    if (file.mimeType.startsWith("image/") || file.mimeType.startsWith("video/") || file.mimeType.startsWith("audio/")) {
         navController.navigate("viewer/${Uri.encode(file.path)}")
     } else if (file.mimeType == "application/vnd.android.package-archive" || file.path.endsWith(".apk", ignoreCase = true)) {
         val uri = runCatching {
